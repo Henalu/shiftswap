@@ -5,11 +5,11 @@
 Funciona como un marketplace (estilo Wallapop/Tinder) donde los empleados publican turnos que quieren intercambiar y otros pueden aceptarlos.
 
 ## Stack Tecnológico
-- **Frontend:** Next.js 14+ (App Router) con TypeScript
+- **Frontend:** Next.js 16 (App Router) con TypeScript — `params` y `searchParams` son `Promise<...>`, hay que hacer `await`
 - **UI:** Tailwind CSS + shadcn/ui
 - **Backend/BaaS:** Supabase (PostgreSQL, Auth, Realtime, Storage)
-- **Chat:** Supabase Realtime
-- **PDF:** @react-pdf/renderer o jsPDF
+- **Chat:** Supabase Realtime (Fase 3)
+- **PDF:** @react-pdf/renderer o jsPDF (Fase 4)
 - **Despliegue:** Vercel (frontend) + Supabase Cloud (backend)
 - **Testing:** Vitest + React Testing Library
 - **Linting:** ESLint + Prettier
@@ -17,24 +17,53 @@ Funciona como un marketplace (estilo Wallapop/Tinder) donde los empleados public
 ## Estructura del Proyecto
 ```
 src/
-├── app/              # Next.js App Router (páginas y layouts)
-│   ├── (auth)/       # Rutas de autenticación (login, register)
-│   ├── (dashboard)/  # Rutas protegidas (turnos, chat, perfil)
-│   ├── api/          # Route handlers de Next.js
-│   └── layout.tsx    # Layout raíz
-├── components/       # Componentes React reutilizables
-│   ├── ui/           # Componentes base (shadcn/ui)
-│   ├── shifts/       # Componentes relacionados con turnos
-│   ├── chat/         # Componentes del chat
-│   └── layout/       # Header, Sidebar, Footer
-├── lib/              # Utilidades y configuración
-│   ├── supabase/     # Cliente Supabase (server y client)
-│   ├── utils.ts      # Funciones helper
-│   └── constants.ts  # Constantes de la app
-├── hooks/            # Custom React hooks
-├── types/            # Tipos TypeScript
-├── stores/           # Estado global (Zustand si es necesario)
-└── styles/           # Estilos globales
+├── app/
+│   ├── (auth)/
+│   │   ├── layout.tsx
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── (dashboard)/
+│   │   ├── layout.tsx              # Header + SidebarNav, protegido
+│   │   ├── chat/page.tsx           # Placeholder
+│   │   ├── exchanges/page.tsx      # Placeholder
+│   │   ├── profile/page.tsx        # Placeholder
+│   │   └── shifts/
+│   │       ├── page.tsx            # Lista turnos open + filtros
+│   │       ├── [id]/page.tsx       # Detalle + interesados
+│   │       ├── my/
+│   │       │   ├── page.tsx        # Mis turnos + aceptar/rechazar
+│   │       │   └── actions.ts      # acceptRequest / rejectRequest
+│   │       └── new/
+│   │           ├── page.tsx
+│   │           ├── shift-form.tsx
+│   │           └── actions.ts      # createShift
+│   └── layout.tsx
+├── components/
+│   ├── layout/
+│   │   ├── header.tsx              # Logo + mobile nav + avatar dropdown
+│   │   └── sidebar-nav.tsx         # Client Component con active state
+│   ├── shifts/
+│   │   ├── shift-card.tsx
+│   │   ├── shift-filters.tsx       # Filtros por URL searchParams
+│   │   ├── interest-button.tsx
+│   │   └── actions.ts              # showInterest
+│   └── ui/                         # shadcn/ui: button, card, badge, input,
+│                                   # label, avatar, dialog, dropdown-menu,
+│                                   # separator, sonner, tabs, textarea
+├── lib/
+│   ├── supabase/
+│   │   ├── server.ts               # createClient() para Server Components
+│   │   ├── client.ts               # createClient() para Client Components
+│   │   └── middleware.ts
+│   ├── utils.ts
+│   └── constants.ts
+└── types/index.ts
+supabase/
+├── migrations/
+│   ├── 00001_initial_schema.sql
+│   └── 00002_user_profiles_insert.sql
+└── seeds/
+    └── 01_demo_data.sql            # 1 empresa + 3 departamentos (UUIDs fijos)
 ```
 
 ## Convenciones de Código
@@ -56,8 +85,8 @@ src/
 - Colocar lógica de fetching en Server Components o Server Actions
 
 ### Supabase
-- Cliente server-side: `createServerComponentClient` en Server Components
-- Cliente client-side: `createClientComponentClient` en Client Components
+- Server Components / Server Actions: `import { createClient } from "@/lib/supabase/server"` → `const supabase = await createClient()`
+- Client Components: `import { createClient } from "@/lib/supabase/client"` → `const supabase = createClient()`
 - Row Level Security (RLS) activado en todas las tablas
 - Políticas RLS para cada operación CRUD
 
@@ -76,7 +105,7 @@ src/
 ## Modelo de Datos Principal
 
 ### Tablas
-- `users` — Perfil de empleado (extends Supabase auth.users)
+- `user_profiles` — Perfil de empleado (extiende Supabase auth.users)
 - `companies` — Empresas registradas
 - `departments` — Departamentos dentro de una empresa
 - `shifts` — Turnos publicados para intercambio
@@ -87,10 +116,14 @@ src/
 
 ### Estados de un Turno (`shifts.status`)
 - `open` — Publicado, buscando intercambio
-- `pending` — Alguien mostró interés, en negociación
+- `pending` — Solicitud aceptada, en negociación
 - `confirmed` — Intercambio aceptado por ambas partes
 - `completed` — Intercambio realizado
 - `cancelled` — Cancelado
+
+### Lógica de transición de estados
+- `open` → aceptar una solicitud → `pending` (+ `shift_requests.status = 'accepted'`)
+- `pending` → rechazar la única solicitud aceptada → `open`
 
 ### Estados de una Solicitud (`shift_requests.status`)
 - `pending` — Esperando respuesta
@@ -106,20 +139,23 @@ src/
 
 ## Fases de Desarrollo
 
-### Fase 1 — Prototipo (actual)
-- [ ] Setup proyecto Next.js + Supabase
-- [ ] Autenticación (login/registro)
-- [ ] CRUD de turnos
-- [ ] Lista de turnos disponibles
-- [ ] Botón "Me interesa"
+### Fase 1 — Prototipo ✅ COMPLETADA
+- [x] Setup proyecto Next.js + Supabase
+- [x] Autenticación (login/registro)
+- [x] CRUD de turnos (publicar, listar, detalle)
+- [x] Lista de turnos disponibles (/shifts)
+- [x] Botón "Me interesa" (shift_requests)
+- [x] Página "Mis turnos" (/shifts/my) con gestión de solicitudes (aceptar/rechazar)
+- [x] Navegación responsiva (sidebar desktop con active state + mobile nav en header)
 
-### Fase 2 — Matching
-- [ ] Filtro por departamento
+### Fase 2 — Matching (en curso)
+- [x] Filtros en listing: por departamento, tipo de turno, rango de fechas (URL searchParams)
+- [x] Contador de resultados con filtros aplicados
 - [ ] Notificaciones en app
-- [ ] Estados del turno
+- [ ] Cancelar turno propio
 
 ### Fase 3 — Chat
-- [ ] Chat en tiempo real entre empleados
+- [ ] Chat en tiempo real entre empleados (Supabase Realtime)
 
 ### Fase 4 — Confirmación
 - [ ] Flujo de confirmación de intercambio
@@ -137,6 +173,10 @@ npm run test         # Tests
 npx supabase start   # Supabase local
 npx supabase db push # Aplicar migraciones
 ```
+
+## Seed de datos de prueba
+El fichero `supabase/seeds/01_demo_data.sql` crea 1 empresa y 3 departamentos con UUIDs fijos.
+Pégalo en el SQL Editor de Supabase para poder registrar usuarios.
 
 ## Variables de Entorno Requeridas
 ```

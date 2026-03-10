@@ -6,54 +6,88 @@
 ---
 
 ## Estado Actual
-**Fase:** Pre-desarrollo (setup inicial)
-**Última actualización:** 2026-03-09
+**Fase:** Fase 2 — Matching (en curso)
+**Última actualización:** 2026-03-10
 
 ## Decisiones Tomadas
 
 ### 2026-03-09 — Inicio del proyecto
-- **Stack elegido:** Next.js + Supabase + Tailwind + shadcn/ui
+- **Stack elegido:** Next.js 16 + Supabase + Tailwind + shadcn/ui
 - **Razón:** Velocidad de desarrollo para MVP, Supabase cubre auth + DB + realtime + storage
 - **Modelo:** B2B SaaS (la empresa paga, no el empleado)
 - **MVP scope:** Login, publicar turno, ver turnos, marcar interés, chat simple, confirmar intercambio, generar PDF
 - **Idioma del código:** Inglés (variables, commits, comentarios técnicos)
 - **Idioma de la UI:** Español (primera versión, i18n futuro)
 
+### 2026-03-10 — Decisiones de arquitectura
+- **SidebarNav** extraído como Client Component separado para soportar active state con `usePathname()`
+- **Filtros** implementados via URL searchParams (bookmarkables, compatibles con Server Components)
+- **acceptRequest** llama `revalidatePath("/shifts")` — el turno desaparece del listing al aceptarse
+- **Seed de datos** usa UUIDs fijos para poder ser idempotente (re-ejecutable sin duplicados)
+
 ## Progreso por Fase
 
-### Fase 1 — Prototipo
+### Fase 1 — Prototipo ✅ COMPLETADA
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
 | Crear estructura del proyecto | ✅ Hecho | 2026-03-09 |
-| Setup Next.js + TypeScript | ⬜ Pendiente | — |
-| Setup Supabase | ⬜ Pendiente | — |
-| Configurar Tailwind + shadcn/ui | ⬜ Pendiente | — |
-| Crear esquema de base de datos | ⬜ Pendiente | — |
-| Implementar autenticación | ⬜ Pendiente | — |
-| CRUD de turnos | ⬜ Pendiente | — |
-| Lista de turnos disponibles | ⬜ Pendiente | — |
-| Botón "Me interesa" | ⬜ Pendiente | — |
+| Setup Next.js 16 + TypeScript | ✅ Hecho | 2026-03-09 |
+| Setup Supabase (client/server/middleware) | ✅ Hecho | 2026-03-09 |
+| Configurar Tailwind + shadcn/ui | ✅ Hecho | 2026-03-09 |
+| Crear esquema de base de datos (migrations) | ✅ Hecho | 2026-03-09 |
+| Autenticación — login page | ✅ Hecho | 2026-03-09 |
+| Autenticación — register page | ✅ Hecho | 2026-03-09 |
+| Formulario publicar turno (/shifts/new) | ✅ Hecho | 2026-03-09 |
+| Lista de turnos disponibles (/shifts) | ✅ Hecho | 2026-03-09 |
+| Detalle de turno (/shifts/[id]) | ✅ Hecho | 2026-03-09 |
+| Botón "Me interesa" (shift_requests insert) | ✅ Hecho | 2026-03-09 |
+| Página "Mis turnos" (/shifts/my) | ✅ Hecho | 2026-03-10 |
+| Aceptar / rechazar solicitud (owner del turno) | ✅ Hecho | 2026-03-10 |
+| Sidebar desktop con active state (SidebarNav) | ✅ Hecho | 2026-03-10 |
+| Barra de navegación mobile en Header | ✅ Hecho | 2026-03-10 |
+| Seed de datos (empresa + 3 departamentos) | ✅ Hecho | 2026-03-10 |
+| Configurar .env.local con keys de Supabase | ✅ Hecho | 2026-03-10 |
 
-### Fase 2 — Matching
+### Fase 2 — Matching (en curso)
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
-| Filtro por departamento | ⬜ Pendiente | — |
+| Filtros en /shifts (departamento, tipo, fechas) | ✅ Hecho | 2026-03-10 |
+| Contador de resultados con filtros aplicados | ✅ Hecho | 2026-03-10 |
+| Revalidación consistente al aceptar solicitud | ✅ Hecho | 2026-03-10 |
+| Cancelar turno propio desde /shifts/my | ⬜ Pendiente | — |
 | Notificaciones in-app | ⬜ Pendiente | — |
-| Sistema de estados | ⬜ Pendiente | — |
 
 ### Fase 3 — Chat
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
-| Chat realtime | ⬜ Pendiente | — |
+| Chat en tiempo real (Supabase Realtime) | ⬜ Pendiente | — |
+| Lista de conversaciones (/chat) | ⬜ Pendiente | — |
+| Página de conversación individual (/chat/[id]) | ⬜ Pendiente | — |
 
 ### Fase 4 — Confirmación
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
-| Flujo de confirmación | ⬜ Pendiente | — |
-| Generación de PDF | ⬜ Pendiente | — |
+| Flujo de confirmación de intercambio | ⬜ Pendiente | — |
+| Generación de documento PDF | ⬜ Pendiente | — |
 
 ## Problemas Conocidos
-- Ninguno aún (proyecto en fase inicial)
+- Páginas `/profile`, `/chat`, `/exchanges` son placeholders vacíos
+- No hay notificaciones in-app aún
+
+## Archivos Clave
+| Archivo | Descripción |
+|---------|-------------|
+| `src/app/(dashboard)/layout.tsx` | Layout protegido con Header + SidebarNav |
+| `src/components/layout/sidebar-nav.tsx` | Client Component con active state |
+| `src/components/layout/header.tsx` | Header con mobile nav + avatar dropdown |
+| `src/app/(dashboard)/shifts/page.tsx` | Lista turnos open + filtros URL searchParams |
+| `src/app/(dashboard)/shifts/[id]/page.tsx` | Detalle turno + interesados |
+| `src/app/(dashboard)/shifts/my/page.tsx` | Mis turnos + aceptar/rechazar solicitudes |
+| `src/app/(dashboard)/shifts/my/actions.ts` | acceptRequest / rejectRequest server actions |
+| `src/app/(dashboard)/shifts/new/actions.ts` | createShift server action |
+| `src/components/shifts/interest-button.tsx` | Botón "Me interesa" client component |
+| `supabase/migrations/00001_initial_schema.sql` | Schema completo con RLS |
+| `supabase/seeds/01_demo_data.sql` | 1 empresa + 3 departamentos (UUIDs fijos) |
 
 ## Ideas para Futuro (post-MVP)
 - App móvil (React Native o PWA)
@@ -66,11 +100,12 @@
 - Analíticas para managers
 
 ## Notas Técnicas
-- Supabase provee Row Level Security (RLS) — usarlo siempre
-- Supabase Realtime para chat y notificaciones
-- Next.js App Router (no Pages Router)
-- Server Components por defecto, Client Components solo cuando sea necesario
+- **Next.js 16** con App Router — `params` y `searchParams` son `Promise<...>`, hay que hacer `await`
+- Supabase RLS activado en todas las tablas — siempre respetar las políticas
+- Supabase Realtime para chat y notificaciones (Fase 3)
+- Server Components por defecto, `"use client"` solo cuando sea necesario
 - Autenticación con Supabase Auth (email/password para MVP, OAuth futuro)
+- Filtros via URL searchParams para que sean bookmarkables y funcionen con Server Components
 
 ## Contacto del Proyecto
 - **Developer:** Henalu

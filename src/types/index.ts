@@ -1,7 +1,7 @@
 // ShiftSwap — Type Definitions
 
 // ============================================
-// Database types (mirror Supabase schema)
+// Status enums
 // ============================================
 
 export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
@@ -11,7 +11,7 @@ export type UserRole = 'employee' | 'supervisor' | 'admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
 
 // ============================================
-// User
+// UserProfile
 // ============================================
 
 export interface UserProfile {
@@ -28,7 +28,7 @@ export interface UserProfile {
 }
 
 // ============================================
-// Company & Department
+// Company
 // ============================================
 
 export interface Company {
@@ -38,6 +38,10 @@ export interface Company {
   logo_url?: string;
   created_at: string;
 }
+
+// ============================================
+// Department
+// ============================================
 
 export interface Department {
   id: string;
@@ -53,9 +57,9 @@ export interface Department {
 export interface Shift {
   id: string;
   user_id: string;
-  date: string; // ISO date
-  start_time: string; // HH:MM
-  end_time: string; // HH:MM
+  date: string;
+  start_time: string;
+  end_time: string;
   shift_type: ShiftType;
   department_id: string;
   description?: string;
@@ -67,11 +71,10 @@ export interface Shift {
 export interface ShiftWithUser extends Shift {
   user: UserProfile;
   department: Department;
-  requests_count: number;
 }
 
 // ============================================
-// Shift Request
+// ShiftRequest
 // ============================================
 
 export interface ShiftRequest {
@@ -94,8 +97,8 @@ export interface ShiftRequestWithUser extends ShiftRequest {
 export interface Exchange {
   id: string;
   shift_id: string;
-  user_a_id: string; // Original shift owner
-  user_b_id: string; // Person covering
+  user_a_id: string;
+  user_b_id: string;
   status: ExchangeStatus;
   document_url?: string;
   confirmed_at?: string;
@@ -103,7 +106,7 @@ export interface Exchange {
 }
 
 // ============================================
-// Chat / Messages
+// Conversation
 // ============================================
 
 export interface Conversation {
@@ -115,6 +118,10 @@ export interface Conversation {
   updated_at: string;
 }
 
+// ============================================
+// Message
+// ============================================
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -124,20 +131,14 @@ export interface Message {
   created_at: string;
 }
 
-export interface ConversationWithLastMessage extends Conversation {
-  last_message?: Message;
-  other_user: UserProfile;
-  unread_count: number;
-}
-
 // ============================================
-// Notifications
+// Notification
 // ============================================
 
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'shift_request' | 'request_accepted' | 'new_message' | 'exchange_confirmed';
+  type: 'shift_request' | 'request_accepted' | 'request_rejected' | 'new_message' | 'exchange_confirmed';
   title: string;
   body: string;
   read: boolean;
