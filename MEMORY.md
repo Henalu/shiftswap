@@ -6,7 +6,7 @@
 ---
 
 ## Estado Actual
-**Fase:** Fase 2 — Matching (en curso)
+**Fase:** Fase 4 — Confirmación y PDF (siguiente)
 **Última actualización:** 2026-03-10
 
 ## Decisiones Tomadas
@@ -54,15 +54,19 @@
 | Filtros en /shifts (departamento, tipo, fechas) | ✅ Hecho | 2026-03-10 |
 | Contador de resultados con filtros aplicados | ✅ Hecho | 2026-03-10 |
 | Revalidación consistente al aceptar solicitud | ✅ Hecho | 2026-03-10 |
-| Cancelar turno propio desde /shifts/my | ⬜ Pendiente | — |
-| Notificaciones in-app | ⬜ Pendiente | — |
+| Cancelar turno propio desde /shifts/my (CancelShiftButton) | ✅ Hecho | 2026-03-10 |
+| Notificaciones in-app (NotificationBell + Realtime) | ✅ Hecho | 2026-03-10 |
+| SidebarNav como Client Component independiente | ✅ Hecho | 2026-03-10 |
 
-### Fase 3 — Chat
+### Fase 3 — Chat ✅ COMPLETADA
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
-| Chat en tiempo real (Supabase Realtime) | ⬜ Pendiente | — |
-| Lista de conversaciones (/chat) | ⬜ Pendiente | — |
-| Página de conversación individual (/chat/[id]) | ⬜ Pendiente | — |
+| Lista de conversaciones (/chat) | ✅ Hecho | 2026-03-10 |
+| Página de conversación individual (/chat/[id]) | ✅ Hecho | 2026-03-10 |
+| ChatView — Realtime, burbujas, auto-scroll, input | ✅ Hecho | 2026-03-10 |
+| startConversation server action (idempotente) | ✅ Hecho | 2026-03-10 |
+| Botón "Enviar mensaje" en detalle de turno | ✅ Hecho | 2026-03-10 |
+| RLS policies para chat (migrations 00003) | ✅ Hecho | 2026-03-10 |
 
 ### Fase 4 — Confirmación
 | Tarea | Estado | Fecha |
@@ -71,8 +75,16 @@
 | Generación de documento PDF | ⬜ Pendiente | — |
 
 ## Problemas Conocidos
-- Páginas `/profile`, `/chat`, `/exchanges` son placeholders vacíos
-- No hay notificaciones in-app aún
+- Páginas `/profile` y `/exchanges` son placeholders vacíos
+- RLS de `companies` y `departments` requieren política pública para el flujo de registro (ya aplicada en Supabase manualmente — pendiente añadir a migrations)
+- El registro puede dejar usuario a medias si falla el INSERT en `user_profiles` — mejorar manejo de errores en register page
+- `@base-ui/react` eliminado y reemplazado por Radix UI puro — todos los componentes shadcn reescritos
+
+## Decisiones Técnicas Importantes
+- **@base-ui/react eliminado** — causaba conflictos con shadcn/ui. Todos los componentes UI ahora usan Radix UI directamente
+- **ChatView** es Client Component con Supabase Realtime subscription
+- **startConversation** es idempotente — busca conversación existente antes de crear una nueva
+- **migrations/00003** incluye RLS de chat y fix del CHECK constraint de notifications
 
 ## Archivos Clave
 | Archivo | Descripción |

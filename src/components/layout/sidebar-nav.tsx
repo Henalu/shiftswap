@@ -2,25 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  CalendarDays,
+  CalendarCheck,
+  MessageSquare,
+  Repeat,
+  User,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}
+const navItems = [
+  { href: "/shifts", label: "Turnos", icon: CalendarDays },
+  { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/exchanges", label: "Intercambios", icon: Repeat },
+  { href: "/profile", label: "Perfil", icon: User },
+];
 
-interface SidebarNavProps {
-  items: NavItem[];
-}
-
-export function SidebarNav({ items }: SidebarNavProps) {
+export function SidebarNav() {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-col gap-1 p-4">
-      {items.map((item) => {
+      {navItems.map((item) => {
         const isActive =
           item.href === "/shifts"
             ? pathname === "/shifts"

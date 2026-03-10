@@ -2,22 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/layout/header";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
-import {
-  CalendarDays,
-  CalendarCheck,
-  MessageSquare,
-  Repeat,
-  User,
-} from "lucide-react";
 import type { Notification } from "@/types";
-
-const navItems = [
-  { href: "/shifts", label: "Turnos", icon: CalendarDays },
-  { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/exchanges", label: "Intercambios", icon: Repeat },
-  { href: "/profile", label: "Perfil", icon: User },
-];
 
 export default async function DashboardLayout({
   children,
@@ -55,7 +40,7 @@ export default async function DashboardLayout({
       />
       <div className="flex flex-1">
         <aside className="hidden w-56 border-r bg-muted/30 md:block">
-          <SidebarNav items={navItems} />
+          <SidebarNav />
         </aside>
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </div>
