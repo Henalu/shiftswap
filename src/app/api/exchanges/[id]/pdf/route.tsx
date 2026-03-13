@@ -277,8 +277,9 @@ export async function GET(
   }
 
   const buffer = await renderToBuffer(<ExchangePdf exchange={typed} />);
+  const pdfBytes = new Uint8Array(buffer);
 
-  return new Response(buffer, {
+  return new Response(pdfBytes, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="intercambio-${id.slice(0, 8)}.pdf"`,
