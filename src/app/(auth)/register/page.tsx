@@ -84,10 +84,13 @@ export default function RegisterPage() {
       });
 
       if (profileError) {
+        // Sign out to avoid leaving a session with no associated profile
+        await supabase.auth.signOut();
         setLoading(false);
         setError(
-          "Cuenta creada pero no se pudo completar el perfil. " +
-            profileError.message
+          "No se pudo crear tu perfil de usuario. Por favor inténtalo de nuevo o contacta al administrador. (" +
+            profileError.message +
+          ")"
         );
         return;
       }

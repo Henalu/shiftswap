@@ -84,7 +84,14 @@ export default async function ShiftDetailPage({ params }: PageProps) {
   const isOwner = authUser?.id === shift.user_id;
   const showInterestButton = !isOwner && shift.status === "open";
 
-  // Show "Enviar mensaje" if the current user has any request on this shift
+  // Active request of the current user (pending or accepted)
+  const myActiveRequest = authUser
+    ? typedRequests.find(
+        (r) => r.user.id === authUser.id && (r.status === "pending" || r.status === "accepted")
+      )
+    : null;
+
+  // Show "Enviar mensaje" if the current user has any request on this shift (any status)
   const myRequest = authUser
     ? typedRequests.find((r) => r.user.id === authUser.id)
     : null;
@@ -140,7 +147,13 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              {showInterestButton && <InterestButton shiftId={shift.id} />}
+              {showInterestButton && (
+                <InterestButton
+                  shiftId={shift.id}
+                  initialInterested={!!myActiveRequest}
+                  requestId={myActiveRequest?.id ?? null}
+                />
+              )}
               {showMessageButton && (
                 <form action={startConversation}>
                   <input type="hidden" name="shift_id" value={shift.id} />

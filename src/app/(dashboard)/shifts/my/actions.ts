@@ -65,13 +65,30 @@ export async function acceptRequest(formData: FormData): Promise<void> {
     .update({ status: "pending" })
     .eq("id", shiftId);
 
-  // Notify the interested user
+  // Create exchange record (pending_confirmation) if it doesn't already exist
   if (request) {
+    const { data: existingExchange } = await supabase
+      .from("exchanges")
+      .select("id")
+      .eq("shift_id", shiftId)
+      .eq("user_b_id", request.interested_user_id)
+      .neq("status", "cancelled")
+      .maybeSingle();
+
+    if (!existingExchange) {
+      await supabase.from("exchanges").insert({
+        shift_id: shiftId,
+        user_a_id: user.id,
+        user_b_id: request.interested_user_id,
+        status: "pending_confirmation",
+      });
+    }
+
     await createNotification({
       userId: request.interested_user_id,
       type: "request_accepted",
       title: "Tu solicitud fue aceptada",
-      body: "El propietario del turno ha aceptado tu solicitud de intercambio.",
+      body: "El propietario del turno ha aceptado tu solicitud. Confirma el intercambio en /exchanges.",
       data: { shift_id: shiftId },
     });
   }
@@ -79,6 +96,7 @@ export async function acceptRequest(formData: FormData): Promise<void> {
   revalidatePath("/shifts");
   revalidatePath("/shifts/my");
   revalidatePath(`/shifts/${shiftId}`);
+  revalidatePath("/exchanges");
 }
 
 export async function rejectRequest(formData: FormData): Promise<void> {

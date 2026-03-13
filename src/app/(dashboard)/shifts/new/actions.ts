@@ -30,7 +30,15 @@ export async function createShift(
     return { error: "Tipo de turno no válido." };
   }
 
+  // Verify the authenticated user matches the submitted userId (RLS double-check)
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || user.id !== userId) {
+    return { error: "No autorizado." };
+  }
+
   const { error } = await supabase.from("shifts").insert({
     user_id: userId,
     department_id: departmentId,
@@ -47,5 +55,6 @@ export async function createShift(
   }
 
   revalidatePath("/shifts");
-  redirect("/shifts");
+  revalidatePath("/shifts/my");
+  redirect("/shifts/my");
 }

@@ -1,5 +1,19 @@
 # CLAUDE.md — ShiftSwap
 
+### División de trabajo: este chat vs Claude Code
+
+**Este chat (Claude) es SIEMPRE para:**
+- Arquitectura y decisiones de diseño
+- Revisar código que me traes
+- Generar artículos y contenido
+- Conversación, planificación y estrategia
+- Preparar el prompt exacto para Claude Code
+
+**Claude Code es SIEMPRE quien ejecuta:**
+- Cualquier cambio en archivos del proyecto
+- Builds y verificación
+- Debugging con acceso al filesystem
+
 ## Proyecto
 **ShiftSwap** es una plataforma web interna de intercambio de turnos entre empleados.
 Funciona como un marketplace (estilo Wallapop/Tinder) donde los empleados publican turnos que quieren intercambiar y otros pueden aceptarlos.
@@ -11,7 +25,7 @@ Funciona como un marketplace (estilo Wallapop/Tinder) donde los empleados public
 - **Chat:** Supabase Realtime (Fase 3)
 - **PDF:** @react-pdf/renderer o jsPDF (Fase 4)
 - **Despliegue:** Vercel (frontend) + Supabase Cloud (backend)
-- **Testing:** Vitest + React Testing Library
+- **Testing:** Pendiente de configurar (planificado con Vitest + React Testing Library)
 - **Linting:** ESLint + Prettier
 
 ## Estructura del Proyecto
@@ -24,47 +38,76 @@ src/
 │   │   └── register/page.tsx
 │   ├── (dashboard)/
 │   │   ├── layout.tsx              # Header + SidebarNav, protegido
-│   │   ├── chat/page.tsx           # Placeholder
-│   │   ├── exchanges/page.tsx      # Placeholder
-│   │   ├── profile/page.tsx        # Placeholder
+│   │   ├── chat/
+│   │   │   ├── page.tsx            # Lista de conversaciones + contexto turno + estado exchange
+│   │   │   ├── [id]/page.tsx       # Conversación individual
+│   │   │   ├── [id]/chat-view.tsx  # Client Component con Realtime + optimistic update
+│   │   │   └── actions.ts          # startConversation (FormData: shift_id + other_user_id)
+│   │   ├── exchanges/
+│   │   │   ├── page.tsx            # Lista intercambios + acciones directas + botón Chat
+│   │   │   ├── [id]/page.tsx       # Detalle + confirmar/cancelar + PDF + botón Chat
+│   │   │   └── actions.ts          # confirmExchange / cancelExchange
+│   │   ├── profile/
+│   │   │   ├── page.tsx            # Perfil (Server Component)
+│   │   │   ├── profile-form.tsx    # Formulario perfil + avatar upload
+│   │   │   └── actions.ts          # updateProfile (INSERT o UPDATE)
 │   │   └── shifts/
 │   │       ├── page.tsx            # Lista turnos open + filtros
 │   │       ├── [id]/page.tsx       # Detalle + interesados
 │   │       ├── my/
-│   │       │   ├── page.tsx        # Mis turnos + aceptar/rechazar
-│   │       │   └── actions.ts      # acceptRequest / rejectRequest
+│   │       │   ├── page.tsx        # Mis turnos + aceptar/rechazar/cancelar
+│   │       │   └── actions.ts      # acceptRequest / rejectRequest / cancelShift
 │   │       └── new/
 │   │           ├── page.tsx
 │   │           ├── shift-form.tsx
-│   │           └── actions.ts      # createShift
-│   └── layout.tsx
+│   │           └── actions.ts      # createShift → redirige a /shifts/my
+│   ├── api/
+│   │   └── exchanges/[id]/pdf/
+│   │       └── route.tsx           # Route Handler: genera PDF con @react-pdf/renderer
+│   └── layout.tsx                  # Root layout — incluye <Toaster> de sonner
 ├── components/
 │   ├── layout/
 │   │   ├── header.tsx              # Logo + mobile nav + avatar dropdown
+│   │   ├── notification-bell.tsx   # Notificaciones in-app + Realtime
 │   │   └── sidebar-nav.tsx         # Client Component con active state
 │   ├── shifts/
 │   │   ├── shift-card.tsx
 │   │   ├── shift-filters.tsx       # Filtros por URL searchParams
 │   │   ├── interest-button.tsx
+│   │   ├── cancel-shift-button.tsx # Confirmación UI para cancelar turno propio
 │   │   └── actions.ts              # showInterest
 │   └── ui/                         # shadcn/ui: button, card, badge, input,
 │                                   # label, avatar, dialog, dropdown-menu,
-│                                   # separator, sonner, tabs, textarea
+│                                   # separator, sonner, tabs, textarea, alert-dialog
 ├── lib/
 │   ├── supabase/
 │   │   ├── server.ts               # createClient() para Server Components
 │   │   ├── client.ts               # createClient() para Client Components
 │   │   └── middleware.ts
 │   ├── utils.ts
-│   └── constants.ts
+│   ├── constants.ts
+│   └── notifications.ts            # createNotification() helper
 └── types/index.ts
 supabase/
 ├── migrations/
 │   ├── 00001_initial_schema.sql
-│   └── 00002_user_profiles_insert.sql
+│   ├── 00002_user_profiles_insert.sql
+│   ├── 00003_chat_rls_and_notification_types.sql
+│   ├── 00004_fix_rls_companies_departments.sql
+│   ├── 00005_exchanges_rls.sql
+│   ├── 00006_storage_avatars.sql
+│   ├── 00007_user_profiles_self_select.sql
+│   ├── 00008_fix_user_profiles_recursive_rls.sql  # Fix 42P17 con SECURITY DEFINER
+│   └── 00009_shift_requests_update_policies.sql   # UPDATE policies para accept/reject/withdraw
 └── seeds/
     └── 01_demo_data.sql            # 1 empresa + 3 departamentos (UUIDs fijos)
 ```
+
+### Chat — patrones clave
+- `startConversation` recibe `FormData` con `shift_id` + `other_user_id`. El usuario actual se obtiene internamente con `supabase.auth.getUser()`.
+- **Optimistic update**: al enviar, añadir mensaje con `id: "temp_${Date.now()}"` al estado local inmediatamente. El handler Realtime reemplaza el optimista cuando llega confirmación de DB (matching por `sender_id + content + id.startsWith("temp_")`). Dedup con `prev.some(m => m.id === incoming.id)`.
+- **Botón "Ir al chat"** en `/exchanges/[id]` y `/exchanges` listing: visible para ambos usuarios en estado `pending_confirmation` o `confirmed`.
+- `/chat/page.tsx` hace segunda query a `exchanges` tras cargar conversaciones para obtener `exchange.status` (no usar `shift.status`). Usa `Map<shift_id, ExchangeStatus>` para lookup O(1).
 
 ## Convenciones de Código
 
@@ -89,6 +132,9 @@ supabase/
 - Client Components: `import { createClient } from "@/lib/supabase/client"` → `const supabase = createClient()`
 - Row Level Security (RLS) activado en todas las tablas
 - Políticas RLS para cada operación CRUD
+- **Nunca usar `SELECT FROM misma_tabla` dentro de una política RLS** — causa `42P17: infinite recursion`. Usar funciones `SECURITY DEFINER` que bypassean RLS internamente.
+- Turnos nocturnos (fin < inicio) son válidos — no validar que `end_time > start_time`
+- Server Actions que mutan estado deben devolver `{ success: true }` (no `null`) para que Client Components reaccionen visualmente sin esperar re-render
 
 ### Estilos
 - Tailwind CSS como sistema principal
@@ -122,8 +168,11 @@ supabase/
 - `cancelled` — Cancelado
 
 ### Lógica de transición de estados
-- `open` → aceptar una solicitud → `pending` (+ `shift_requests.status = 'accepted'`)
-- `pending` → rechazar la única solicitud aceptada → `open`
+- `open` → acceptRequest → `pending` + crea exchange `pending_confirmation`
+- `pending_confirmation` → confirmExchange (solo user_b) → exchange `confirmed` + shift `confirmed`
+- `pending_confirmation` → cancelExchange → shift vuelve a `open` + request vuelve a `pending`
+- `confirmed` → cancelExchange → shift `cancelled` + exchange `cancelled`
+- Rechazar solicitud sin exchange → shift vuelve a `open`
 
 ### Estados de una Solicitud (`shift_requests.status`)
 - `pending` — Esperando respuesta
@@ -148,18 +197,19 @@ supabase/
 - [x] Página "Mis turnos" (/shifts/my) con gestión de solicitudes (aceptar/rechazar)
 - [x] Navegación responsiva (sidebar desktop con active state + mobile nav en header)
 
-### Fase 2 — Matching (en curso)
+### Fase 2 — Matching ✅ COMPLETADA
 - [x] Filtros en listing: por departamento, tipo de turno, rango de fechas (URL searchParams)
 - [x] Contador de resultados con filtros aplicados
-- [ ] Notificaciones en app
-- [ ] Cancelar turno propio
+- [x] Notificaciones en app (NotificationBell)
+- [x] Cancelar turno propio
 
-### Fase 3 — Chat
-- [ ] Chat en tiempo real entre empleados (Supabase Realtime)
+### Fase 3 — Chat ✅ COMPLETADA
+- [x] Chat en tiempo real entre empleados (Supabase Realtime)
 
-### Fase 4 — Confirmación
-- [ ] Flujo de confirmación de intercambio
-- [ ] Generación de documento PDF
+### Fase 4 — Confirmación ✅ COMPLETADA
+- [x] Flujo de confirmación de intercambio (/exchanges + /exchanges/[id], con acciones directas en cards pendientes)
+- [x] Generación de documento PDF (@react-pdf/renderer, Route Handler)
+- [x] Página de perfil con avatar upload (Supabase Storage)
 
 ### Fase 5 — Testing con usuarios
 - [ ] Prueba con grupo piloto
@@ -169,7 +219,6 @@ supabase/
 npm run dev          # Servidor de desarrollo
 npm run build        # Build de producción
 npm run lint         # Linting
-npm run test         # Tests
 npx supabase start   # Supabase local
 npx supabase db push # Aplicar migraciones
 ```

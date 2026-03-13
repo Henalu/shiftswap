@@ -16,9 +16,11 @@ import { CalendarDays } from "lucide-react";
 interface ShiftCardProps {
   shift: ShiftWithUser;
   currentUserId: string | null;
+  initialInterested?: boolean;
+  requestId?: string | null;
 }
 
-export function ShiftCard({ shift, currentUserId }: ShiftCardProps) {
+export function ShiftCard({ shift, currentUserId, initialInterested = false, requestId = null }: ShiftCardProps) {
   const isOwner = currentUserId === shift.user_id;
   const showInterestButton = !isOwner && shift.status === "open";
 
@@ -72,7 +74,7 @@ export function ShiftCard({ shift, currentUserId }: ShiftCardProps) {
       </CardContent>
       {showInterestButton && (
         <CardFooter>
-          <InterestButton shiftId={shift.id} />
+          <InterestButton shiftId={shift.id} initialInterested={initialInterested} requestId={requestId} />
         </CardFooter>
       )}
     </Card>

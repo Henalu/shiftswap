@@ -22,7 +22,7 @@ export default async function NewShiftPage() {
     .single();
 
   if (!profile?.department_id) {
-    redirect("/profile");
+    redirect("/profile?setup=1");
   }
 
   return (

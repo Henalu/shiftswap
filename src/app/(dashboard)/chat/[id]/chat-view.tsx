@@ -33,21 +33,42 @@ export function ChatView({
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Realtime subscription
+  // Realtime subscription — delivers new messages in real time.
+  // NOTE: No server-side filter — messages table lacks REPLICA IDENTITY FULL,
+  // so postgres_changes column filters are unreliable. We filter client-side.
+  // RLS already ensures only messages from the user's own conversations arrive.
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel(`conversation:${conversationId}`)
+      .channel(`messages:${conversationId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          const incoming = payload.new as Message;
+          // Client-side filter: ignore messages from other conversations
+          if (incoming.conversation_id !== conversationId) return;
+
+          setMessages((prev) => {
+            // Replace matching optimistic message (same sender + content + temp id)
+            const withoutOptimistic = prev.filter(
+              (m) =>
+                !(
+                  m.id.startsWith("temp_") &&
+                  m.sender_id === incoming.sender_id &&
+                  m.content === incoming.content
+                )
+            );
+            // Avoid duplicate if already present (e.g. Realtime fires twice)
+            if (withoutOptimistic.some((m) => m.id === incoming.id)) {
+              return withoutOptimistic;
+            }
+            return [...withoutOptimistic, incoming];
+          });
         }
       )
       .subscribe();
@@ -69,6 +90,17 @@ export function ChatView({
 
     setSending(true);
     setContent("");
+
+    // Optimistic update — message appears immediately
+    const optimisticMsg: Message = {
+      id: `temp_${Date.now()}`,
+      conversation_id: conversationId,
+      sender_id: currentUserId,
+      content: trimmed,
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
 
     const supabase = createClient();
     await supabase.from("messages").insert({

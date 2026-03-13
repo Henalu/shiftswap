@@ -63,6 +63,15 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
 
   const { data: shifts } = await query;
 
+  // Fetch active requests of the current user to show interest state
+  const { data: myRequests } = await supabase
+    .from("shift_requests")
+    .select("id, shift_id")
+    .eq("interested_user_id", authUser.id)
+    .in("status", ["pending", "accepted"]);
+
+  const myRequestMap = new Map((myRequests ?? []).map((r) => [r.shift_id, r.id]));
+
   const typedShifts = (shifts ?? []).map((s) => ({
     ...s,
     user: s.user,
@@ -102,6 +111,8 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
               key={shift.id}
               shift={shift}
               currentUserId={authUser.id}
+              initialInterested={myRequestMap.has(shift.id)}
+              requestId={myRequestMap.get(shift.id) ?? null}
             />
           ))}
         </div>

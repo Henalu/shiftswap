@@ -88,6 +88,7 @@ export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
                 name="end_time"
                 type="time"
                 required
+
               />
             </div>
           </div>

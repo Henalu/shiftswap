@@ -14,8 +14,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { User, LogOut, CalendarDays, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NotificationBell } from "./notification-bell";
+import dynamic from "next/dynamic";
 import type { UserProfile, Notification } from "@/types";
+
+// Loaded client-side only — avoids Radix useId SSR/hydration mismatch
+const NotificationBell = dynamic(
+  () => import("./notification-bell").then((m) => ({ default: m.NotificationBell })),
+  { ssr: false }
+);
 
 interface HeaderProps {
   user: UserProfile | null;

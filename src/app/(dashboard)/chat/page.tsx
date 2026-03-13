@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare } from "lucide-react";
+import { SHIFT_TYPE_LABELS, EXCHANGE_STATUS_LABELS } from "@/lib/constants";
+import { formatShortDate } from "@/lib/utils";
+import type { ShiftType, ExchangeStatus } from "@/types";
 
 export default async function ChatPage() {
   const supabase = await createClient();
@@ -20,7 +23,9 @@ export default async function ChatPage() {
       id, shift_id, created_at, updated_at,
       participant_a:user_profiles!participant_a_id(id, full_name),
       participant_b:user_profiles!participant_b_id(id, full_name),
-      messages(id, content, created_at, read, sender_id)
+      messages(id, content, created_at, read, sender_id),
+      shift:shifts!shift_id(id, date, shift_type, status,
+        department:departments!department_id(id, name))
     `
     )
     .or(
@@ -36,16 +41,43 @@ export default async function ChatPage() {
     read: boolean;
     sender_id: string;
   };
+  type RawShift = {
+    id: string;
+    date: string;
+    shift_type: string;
+    status: string;
+    department: { id: string; name: string };
+  };
   type RawConversation = {
     id: string;
-    shift_id: string;
+    shift_id: string | null;
     updated_at: string;
     participant_a: Participant;
     participant_b: Participant;
     messages: RawMessage[];
+    shift: RawShift | null;
   };
 
   const typedConvs = (conversations ?? []) as unknown as RawConversation[];
+
+  // Fetch exchanges for all shift_ids present in these conversations
+  const shiftIds = typedConvs
+    .map((c) => c.shift_id)
+    .filter((id): id is string => id !== null);
+
+  const exchangesByShiftId = new Map<string, ExchangeStatus>();
+
+  if (shiftIds.length > 0) {
+    const { data: exchanges } = await supabase
+      .from("exchanges")
+      .select("shift_id, status")
+      .in("shift_id", shiftIds)
+      .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`);
+
+    for (const ex of exchanges ?? []) {
+      exchangesByShiftId.set(ex.shift_id, ex.status as ExchangeStatus);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -86,6 +118,10 @@ export default async function ChatPage() {
               .toUpperCase()
               .slice(0, 2);
 
+            const exchangeStatus = conv.shift_id
+              ? exchangesByShiftId.get(conv.shift_id)
+              : undefined;
+
             return (
               <li key={conv.id}>
                 <Link
@@ -107,6 +143,16 @@ export default async function ChatPage() {
                         </span>
                       )}
                     </div>
+                    {conv.shift && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {formatShortDate(conv.shift.date)} ·{" "}
+                        {SHIFT_TYPE_LABELS[conv.shift.shift_type as ShiftType]} ·{" "}
+                        {conv.shift.department.name}
+                        {exchangeStatus && (
+                          <> · {EXCHANGE_STATUS_LABELS[exchangeStatus]}</>
+                        )}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-sm text-muted-foreground">
                         {lastMsg ? lastMsg.content : "Sin mensajes aún"}

@@ -6,8 +6,8 @@
 ---
 
 ## Estado Actual
-**Fase:** Fase 4 — Confirmación y PDF (siguiente)
-**Última actualización:** 2026-03-10
+**Fase:** Fase 5 — Testing con usuarios (siguiente)
+**Última actualización:** 2026-03-13
 
 ## Decisiones Tomadas
 
@@ -24,6 +24,11 @@
 - **Filtros** implementados via URL searchParams (bookmarkables, compatibles con Server Components)
 - **acceptRequest** llama `revalidatePath("/shifts")` — el turno desaparece del listing al aceptarse
 - **Seed de datos** usa UUIDs fijos para poder ser idempotente (re-ejecutable sin duplicados)
+
+### 2026-03-13 — Ajustes de flujo y documentación
+- **/exchanges listing** expone `Confirmar` y `Cancelar` directamente en la card cuando el usuario autenticado es `user_b` y el estado es `pending_confirmation`
+- **confirmExchange / cancelExchange** se reutilizan sin cambios desde el listing; la revalidación de `/exchanges` sigue centralizada en las server actions
+- **MEMORY.md** y **CLAUDE.md** se alinean con el estado real del repo: `/profile` y `/exchanges` ya no son placeholders, y `00009_shift_requests_update_policies.sql` ya forma parte de las migraciones versionadas
 
 ## Progreso por Fase
 
@@ -48,7 +53,7 @@
 | Seed de datos (empresa + 3 departamentos) | ✅ Hecho | 2026-03-10 |
 | Configurar .env.local con keys de Supabase | ✅ Hecho | 2026-03-10 |
 
-### Fase 2 — Matching (en curso)
+### Fase 2 — Matching ✅ COMPLETADA
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
 | Filtros en /shifts (departamento, tipo, fechas) | ✅ Hecho | 2026-03-10 |
@@ -68,16 +73,18 @@
 | Botón "Enviar mensaje" en detalle de turno | ✅ Hecho | 2026-03-10 |
 | RLS policies para chat (migrations 00003) | ✅ Hecho | 2026-03-10 |
 
-### Fase 4 — Confirmación
+### Fase 4 — Confirmación ✅ COMPLETADA
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
-| Flujo de confirmación de intercambio | ⬜ Pendiente | — |
-| Generación de documento PDF | ⬜ Pendiente | — |
+| Página `/exchanges` con listado de intercambios | ✅ Hecho | 2026-03-12 |
+| Confirmar / cancelar desde `/exchanges/[id]` | ✅ Hecho | 2026-03-12 |
+| Confirmar / cancelar directo en card de `/exchanges` cuando confirma `user_b` | ✅ Hecho | 2026-03-13 |
+| Generación de documento PDF | ✅ Hecho | 2026-03-12 |
+| Página de perfil con avatar upload | ✅ Hecho | 2026-03-12 |
 
 ## Problemas Conocidos
-- Páginas `/profile` y `/exchanges` son placeholders vacíos
-- RLS de `companies` y `departments` requieren política pública para el flujo de registro (ya aplicada en Supabase manualmente — pendiente añadir a migrations)
 - El registro puede dejar usuario a medias si falla el INSERT en `user_profiles` — mejorar manejo de errores en register page
+- No hay suite de tests automatizados configurada todavía (`package.json` no expone `npm run test`)
 - `@base-ui/react` eliminado y reemplazado por Radix UI puro — todos los componentes shadcn reescritos
 
 ## Decisiones Técnicas Importantes
@@ -85,20 +92,28 @@
 - **ChatView** es Client Component con Supabase Realtime subscription
 - **startConversation** es idempotente — busca conversación existente antes de crear una nueva
 - **migrations/00003** incluye RLS de chat y fix del CHECK constraint de notifications
+- **migrations/00009** añade las UPDATE policies que faltaban en `shift_requests` para aceptar/rechazar solicitudes y retirar interés sin que RLS filtre silenciosamente el update
 
 ## Archivos Clave
 | Archivo | Descripción |
 |---------|-------------|
 | `src/app/(dashboard)/layout.tsx` | Layout protegido con Header + SidebarNav |
 | `src/components/layout/sidebar-nav.tsx` | Client Component con active state |
-| `src/components/layout/header.tsx` | Header con mobile nav + avatar dropdown |
+| `src/components/layout/header.tsx` | Header con mobile nav + avatar dropdown + NotificationBell |
+| `src/components/layout/notification-bell.tsx` | Dropdown de notificaciones en tiempo real |
 | `src/app/(dashboard)/shifts/page.tsx` | Lista turnos open + filtros URL searchParams |
 | `src/app/(dashboard)/shifts/[id]/page.tsx` | Detalle turno + interesados |
 | `src/app/(dashboard)/shifts/my/page.tsx` | Mis turnos + aceptar/rechazar solicitudes |
 | `src/app/(dashboard)/shifts/my/actions.ts` | acceptRequest / rejectRequest server actions |
+| `src/app/(dashboard)/exchanges/page.tsx` | Lista de intercambios + acciones directas para confirmar/cancelar |
+| `src/app/(dashboard)/exchanges/actions.ts` | confirmExchange / cancelExchange + revalidación de rutas relacionadas |
+| `src/app/(dashboard)/profile/page.tsx` | Perfil del usuario autenticado |
+| `src/app/(dashboard)/profile/actions.ts` | updateProfile server action |
 | `src/app/(dashboard)/shifts/new/actions.ts` | createShift server action |
 | `src/components/shifts/interest-button.tsx` | Botón "Me interesa" client component |
+| `src/components/shifts/cancel-shift-button.tsx` | Confirmación UI para cancelar turno propio |
 | `supabase/migrations/00001_initial_schema.sql` | Schema completo con RLS |
+| `supabase/migrations/00009_shift_requests_update_policies.sql` | UPDATE policies faltantes para `shift_requests` |
 | `supabase/seeds/01_demo_data.sql` | 1 empresa + 3 departamentos (UUIDs fijos) |
 
 ## Ideas para Futuro (post-MVP)
