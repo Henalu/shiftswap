@@ -22,6 +22,29 @@ function formatTime(dateStr: string) {
   });
 }
 
+function mergeIncomingMessage(
+  currentMessages: Message[],
+  incomingMessage: Message
+): Message[] {
+  const withoutOptimistic = currentMessages.filter(
+    (message) =>
+      !(
+        message.id.startsWith("temp_") &&
+        message.sender_id === incomingMessage.sender_id &&
+        message.content === incomingMessage.content
+      )
+  );
+
+  if (withoutOptimistic.some((message) => message.id === incomingMessage.id)) {
+    return withoutOptimistic;
+  }
+
+  return [...withoutOptimistic, incomingMessage].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+}
+
 export function ChatView({
   conversationId,
   currentUserId,
@@ -32,6 +55,9 @@ export function ChatView({
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const latestCreatedAtRef = useRef<string | null>(
+    initialMessages[initialMessages.length - 1]?.created_at ?? null
+  );
 
   // Realtime subscription — delivers new messages in real time.
   // NOTE: No server-side filter — messages table lacks REPLICA IDENTITY FULL,
@@ -53,28 +79,58 @@ export function ChatView({
           // Client-side filter: ignore messages from other conversations
           if (incoming.conversation_id !== conversationId) return;
 
-          setMessages((prev) => {
-            // Replace matching optimistic message (same sender + content + temp id)
-            const withoutOptimistic = prev.filter(
-              (m) =>
-                !(
-                  m.id.startsWith("temp_") &&
-                  m.sender_id === incoming.sender_id &&
-                  m.content === incoming.content
-                )
-            );
-            // Avoid duplicate if already present (e.g. Realtime fires twice)
-            if (withoutOptimistic.some((m) => m.id === incoming.id)) {
-              return withoutOptimistic;
-            }
-            return [...withoutOptimistic, incoming];
-          });
+          setMessages((prev) => mergeIncomingMessage(prev, incoming));
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    latestCreatedAtRef.current =
+      messages[messages.length - 1]?.created_at ?? null;
+  }, [messages]);
+
+  // Fallback sync: if Realtime is not enabled for `messages` in the active
+  // Supabase environment, poll the latest rows so the other participant still
+  // sees new messages without refreshing the page.
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function syncLatestMessages() {
+      let query = supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+
+      const latestCreatedAt = latestCreatedAtRef.current;
+      if (latestCreatedAt) {
+        query = query.gte("created_at", latestCreatedAt);
+      }
+
+      const { data, error } = await query;
+
+      if (cancelled || error || !data || data.length === 0) return;
+
+      setMessages((prev) =>
+        data.reduce(
+          (nextMessages, rawMessage) =>
+            mergeIncomingMessage(nextMessages, rawMessage as Message),
+          prev
+        )
+      );
+    }
+
+    const intervalId = window.setInterval(syncLatestMessages, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [conversationId]);
 

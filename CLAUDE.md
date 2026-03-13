@@ -41,7 +41,7 @@ src/
 │   │   ├── chat/
 │   │   │   ├── page.tsx            # Lista de conversaciones + contexto turno + estado exchange
 │   │   │   ├── [id]/page.tsx       # Conversación individual
-│   │   │   ├── [id]/chat-view.tsx  # Client Component con Realtime + optimistic update
+│   │   │   ├── [id]/chat-view.tsx  # Client Component con Realtime + optimistic update + polling fallback
 │   │   │   └── actions.ts          # startConversation (FormData: shift_id + other_user_id)
 │   │   ├── exchanges/
 │   │   │   ├── page.tsx            # Lista intercambios + acciones directas + botón Chat
@@ -98,14 +98,18 @@ supabase/
 │   ├── 00006_storage_avatars.sql
 │   ├── 00007_user_profiles_self_select.sql
 │   ├── 00008_fix_user_profiles_recursive_rls.sql  # Fix 42P17 con SECURITY DEFINER
-│   └── 00009_shift_requests_update_policies.sql   # UPDATE policies para accept/reject/withdraw
+│   ├── 00009_shift_requests_update_policies.sql   # UPDATE policies para accept/reject/withdraw
+│   └── 00010_enable_realtime_for_messages.sql    # Añade messages a supabase_realtime publication
 └── seeds/
     └── 01_demo_data.sql            # 1 empresa + 3 departamentos (UUIDs fijos)
 ```
 
 ### Chat — patrones clave
 - `startConversation` recibe `FormData` con `shift_id` + `other_user_id`. El usuario actual se obtiene internamente con `supabase.auth.getUser()`.
-- **Optimistic update**: al enviar, añadir mensaje con `id: "temp_${Date.now()}"` al estado local inmediatamente. El handler Realtime reemplaza el optimista cuando llega confirmación de DB (matching por `sender_id + content + id.startsWith("temp_")`). Dedup con `prev.some(m => m.id === incoming.id)`.
+- **Optimistic update**: al enviar, añadir mensaje con `id: "temp_${Date.now()}"` al estado local inmediatamente. La función `mergeIncomingMessage` (extraída) reemplaza el optimista cuando llega confirmación de DB (matching por `sender_id + content + id.startsWith("temp_")`). Dedup con `prev.some(m => m.id === incoming.id)`. Mensajes se ordenan por `created_at`.
+- **Realtime**: tabla `messages` añadida a `supabase_realtime` publication via migración 00010. Sin filtro server-side (tabla no tiene REPLICA IDENTITY FULL); filtro client-side `if (incoming.conversation_id !== conversationId) return`.
+- **Polling fallback**: `useEffect` con `setInterval(3000)` que consulta mensajes nuevos (`gte created_at`) por si Realtime no está habilitado o falla. Usa `latestCreatedAtRef` para eficiencia. Dedup via `mergeIncomingMessage`.
+- **`DropdownMenuTrigger` sin `asChild`**: shadcn/ui en esta versión no expone `asChild` en los tipos de `DropdownMenuTrigger`. Aplicar estilos directamente al trigger (ya renderiza `<button>`).
 - **Botón "Ir al chat"** en `/exchanges/[id]` y `/exchanges` listing: visible para ambos usuarios en estado `pending_confirmation` o `confirmed`.
 - `/chat/page.tsx` hace segunda query a `exchanges` tras cargar conversaciones para obtener `exchange.status` (no usar `shift.status`). Usa `Map<shift_id, ExchangeStatus>` para lookup O(1).
 
