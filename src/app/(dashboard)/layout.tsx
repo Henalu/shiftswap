@@ -18,18 +18,23 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const [{ data: profile }, { data: notifications }] = await Promise.all([
+  const [{ data: profile }, { data: notifications }, unreadResult] = await Promise.all([
     supabase.from("user_profiles").select("*").eq("id", authUser.id).single(),
     supabase
       .from("notifications")
       .select("*")
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(10),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", authUser.id)
+      .eq("read", false),
   ]);
 
   const typedNotifications = (notifications ?? []) as Notification[];
-  const unreadCount = typedNotifications.filter((n) => !n.read).length;
+  const unreadCount = unreadResult.count ?? 0;
 
   return (
     <div className="flex min-h-screen flex-col">

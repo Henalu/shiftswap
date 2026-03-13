@@ -85,13 +85,21 @@ export async function acceptRequest(formData: FormData): Promise<void> {
       .neq("status", "cancelled")
       .maybeSingle();
 
+    let exchangeId = existingExchange?.id ?? null;
+
     if (!existingExchange) {
-      await supabase.from("exchanges").insert({
-        shift_id: shiftId,
-        user_a_id: user.id,
-        user_b_id: request.interested_user_id,
-        status: "pending_confirmation",
-      });
+      const { data: createdExchange } = await supabase
+        .from("exchanges")
+        .insert({
+          shift_id: shiftId,
+          user_a_id: user.id,
+          user_b_id: request.interested_user_id,
+          status: "pending_confirmation",
+        })
+        .select("id")
+        .single();
+
+      exchangeId = createdExchange?.id ?? null;
     }
 
     await createNotification({
@@ -99,7 +107,11 @@ export async function acceptRequest(formData: FormData): Promise<void> {
       type: "request_accepted",
       title: "Tu solicitud fue aceptada",
       body: "El propietario del turno ha aceptado tu solicitud. Confirma el intercambio en /exchanges.",
-      data: { shift_id: shiftId },
+      data: {
+        shift_id: shiftId,
+        exchange_id: exchangeId ?? undefined,
+        action_url: exchangeId ? `/exchanges/${exchangeId}` : "/exchanges",
+      },
     });
   }
 
@@ -164,7 +176,10 @@ export async function rejectRequest(formData: FormData): Promise<void> {
       type: "request_rejected",
       title: "Tu solicitud no fue aceptada",
       body: "El propietario del turno no ha podido aceptar tu solicitud en este momento.",
-      data: { shift_id: shiftId },
+      data: {
+        shift_id: shiftId,
+        action_url: `/shifts/${shiftId}`,
+      },
     });
   }
 

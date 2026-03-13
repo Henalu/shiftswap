@@ -139,13 +139,28 @@ export interface Message {
 // Notification
 // ============================================
 
+export interface NotificationData {
+  action_url?: string;
+  shift_id?: string;
+  exchange_id?: string;
+  conversation_id?: string;
+  [key: string]: unknown;
+}
+
+export type NotificationType =
+  | 'shift_request'
+  | 'request_accepted'
+  | 'request_rejected'
+  | 'new_message'
+  | 'exchange_confirmed';
+
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'shift_request' | 'request_accepted' | 'request_rejected' | 'new_message' | 'exchange_confirmed';
+  type: NotificationType;
   title: string;
   body: string;
   read: boolean;
-  data?: Record<string, unknown>;
+  data?: NotificationData;
   created_at: string;
 }

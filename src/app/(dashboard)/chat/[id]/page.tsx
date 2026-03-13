@@ -66,6 +66,14 @@ export default async function ConversationPage({ params }: PageProps) {
     .neq("sender_id", authUser.id)
     .eq("read", false);
 
+  await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("user_id", authUser.id)
+    .eq("type", "new_message")
+    .eq("read", false)
+    .contains("data", { conversation_id: id });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">

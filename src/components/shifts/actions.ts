@@ -100,7 +100,10 @@ export async function toggleInterest(
       type: "shift_request",
       title: "Nuevo interesado en tu turno",
       body: `${interestedProfile.full_name} está interesado en tu turno del ${formatShortDate(shift.date)}.`,
-      data: { shift_id: shiftId },
+      data: {
+        shift_id: shiftId,
+        action_url: `/shifts/${shiftId}`,
+      },
     });
   }
 

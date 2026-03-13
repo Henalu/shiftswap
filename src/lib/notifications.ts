@@ -1,7 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import type { Notification } from "@/types";
-
-type NotificationType = Notification["type"];
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { NotificationData, NotificationType } from "@/types";
 
 export async function createNotification({
   userId,
@@ -14,10 +12,10 @@ export async function createNotification({
   type: NotificationType;
   title: string;
   body: string;
-  data?: Record<string, unknown>;
+  data?: NotificationData;
 }): Promise<void> {
-  const supabase = await createClient();
-  await supabase.from("notifications").insert({
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("notifications").insert({
     user_id: userId,
     type,
     title,
@@ -25,4 +23,11 @@ export async function createNotification({
     data,
     read: false,
   });
+
+  if (error) {
+    console.error("Failed to create notification", error.message, {
+      userId,
+      type,
+    });
+  }
 }

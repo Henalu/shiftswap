@@ -45,6 +45,27 @@ function mergeIncomingMessage(
   );
 }
 
+async function markConversationAsRead(
+  conversationId: string,
+  currentUserId: string
+) {
+  const supabase = createClient();
+
+  await supabase
+    .from("messages")
+    .update({ read: true })
+    .eq("conversation_id", conversationId)
+    .neq("sender_id", currentUserId)
+    .eq("read", false);
+
+  await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("type", "new_message")
+    .eq("read", false)
+    .contains("data", { conversation_id: conversationId });
+}
+
 export function ChatView({
   conversationId,
   currentUserId,
@@ -80,6 +101,10 @@ export function ChatView({
           if (incoming.conversation_id !== conversationId) return;
 
           setMessages((prev) => mergeIncomingMessage(prev, incoming));
+
+          if (incoming.sender_id !== currentUserId) {
+            void markConversationAsRead(conversationId, currentUserId);
+          }
         }
       )
       .subscribe();
@@ -87,12 +112,16 @@ export function ChatView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, currentUserId]);
 
   useEffect(() => {
     latestCreatedAtRef.current =
       messages[messages.length - 1]?.created_at ?? null;
   }, [messages]);
+
+  useEffect(() => {
+    void markConversationAsRead(conversationId, currentUserId);
+  }, [conversationId, currentUserId]);
 
   // Fallback sync: if Realtime is not enabled for `messages` in the active
   // Supabase environment, poll the latest rows so the other participant still

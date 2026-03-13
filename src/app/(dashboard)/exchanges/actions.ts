@@ -63,7 +63,11 @@ export async function confirmExchange(formData: FormData): Promise<void> {
     type: "exchange_confirmed",
     title: "Intercambio confirmado",
     body: "El otro empleado ha confirmado el intercambio de turno.",
-    data: { exchange_id: exchangeId, shift_id: exchange.shift_id },
+    data: {
+      exchange_id: exchangeId,
+      shift_id: exchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
   });
 
   revalidateExchangeViews(exchangeId, exchange.shift_id);
@@ -234,7 +238,11 @@ export async function signExchange(
       type: "exchange_confirmed",
       title: "Intercambio firmado",
       body: "Ambas partes han firmado el intercambio de turno.",
-      data: { exchange_id: exchangeId, shift_id: exchange.shift_id },
+      data: {
+        exchange_id: exchangeId,
+        shift_id: exchange.shift_id,
+        action_url: `/exchanges/${exchangeId}`,
+      },
     });
   }
 
@@ -299,7 +307,11 @@ export async function requestSignedExchangeCancellation(
     type: "exchange_confirmed",
     title: "Solicitud de cancelación enviada",
     body: "La otra parte ha solicitado cancelar un intercambio ya firmado.",
-    data: { exchange_id: exchangeId, shift_id: typedExchange.shift_id },
+    data: {
+      exchange_id: exchangeId,
+      shift_id: typedExchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -364,7 +376,11 @@ export async function confirmSignedExchangeCancellation(
     type: "exchange_confirmed",
     title: "Cancelación confirmada",
     body: "La otra parte ha aceptado cancelar el intercambio firmado.",
-    data: { exchange_id: exchangeId, shift_id: typedExchange.shift_id },
+    data: {
+      exchange_id: exchangeId,
+      shift_id: typedExchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -424,7 +440,11 @@ export async function rejectSignedExchangeCancellation(
     type: "exchange_confirmed",
     title: "Solicitud de cancelación rechazada",
     body: "La otra parte ha rechazado cancelar el intercambio firmado.",
-    data: { exchange_id: exchangeId, shift_id: typedExchange.shift_id },
+    data: {
+      exchange_id: exchangeId,
+      shift_id: typedExchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -487,7 +507,11 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     type: "exchange_confirmed",
     title: "Intercambio cancelado",
     body: "El intercambio de turno ha sido cancelado por la otra parte.",
-    data: { exchange_id: exchangeId, shift_id: exchange.shift_id },
+    data: {
+      exchange_id: exchangeId,
+      shift_id: exchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
   });
 
   revalidateExchangeViews(exchangeId, exchange.shift_id);
