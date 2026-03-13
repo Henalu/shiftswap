@@ -30,6 +30,12 @@
 - **confirmExchange / cancelExchange** se reutilizan sin cambios desde el listing; la revalidación de `/exchanges` sigue centralizada en las server actions
 - **MEMORY.md** y **CLAUDE.md** se alinean con el estado real del repo: `/profile` y `/exchanges` ya no son placeholders, y `00009_shift_requests_update_policies.sql` ya forma parte de las migraciones versionadas
 
+### 2026-03-13 — Realtime y estabilidad de build
+- **Chat realtime**: el problema de sincronización entre participantes se cubre en dos capas: migración `00010_enable_realtime_for_messages.sql` para añadir `messages` a `supabase_realtime`, y polling fallback en `chat-view.tsx` cada 3 segundos si Realtime no entrega eventos
+- **ChatView** extrae `mergeIncomingMessage` para deduplicar mensajes, reemplazar optimistas y mantener orden por `created_at`
+- **DropdownMenuTrigger** se reescribe como wrapper con `React.forwardRef` para preservar props de Radix y evitar errores de TypeScript en Vercel
+- **PDF route** convierte `Buffer` a `Uint8Array` antes de `new Response(...)` para evitar fallo de build en `src/app/api/exchanges/[id]/pdf/route.tsx`
+
 ## Progreso por Fase
 
 ### Fase 1 — Prototipo ✅ COMPLETADA
@@ -72,6 +78,8 @@
 | startConversation server action (idempotente) | ✅ Hecho | 2026-03-10 |
 | Botón "Enviar mensaje" en detalle de turno | ✅ Hecho | 2026-03-10 |
 | RLS policies para chat (migrations 00003) | ✅ Hecho | 2026-03-10 |
+| Realtime de `messages` publicado via migration 00010 | ✅ Hecho | 2026-03-13 |
+| Polling fallback en `ChatView` para entornos sin Realtime operativo | ✅ Hecho | 2026-03-13 |
 
 ### Fase 4 — Confirmación ✅ COMPLETADA
 | Tarea | Estado | Fecha |
@@ -89,10 +97,13 @@
 
 ## Decisiones Técnicas Importantes
 - **@base-ui/react eliminado** — causaba conflictos con shadcn/ui. Todos los componentes UI ahora usan Radix UI directamente
-- **ChatView** es Client Component con Supabase Realtime subscription
+- **ChatView** es Client Component con Supabase Realtime subscription y polling fallback para resiliencia en despliegues donde `messages` aún no está publicado
 - **startConversation** es idempotente — busca conversación existente antes de crear una nueva
 - **migrations/00003** incluye RLS de chat y fix del CHECK constraint de notifications
 - **migrations/00009** añade las UPDATE policies que faltaban en `shift_requests` para aceptar/rechazar solicitudes y retirar interés sin que RLS filtre silenciosamente el update
+- **migrations/00010** añade `messages` a `supabase_realtime` para que `postgres_changes` entregue inserts de chat a ambos participantes
+- **DropdownMenuTrigger** usa wrapper tipado con `forwardRef` para que los componentes Radix compilen correctamente en Vercel
+- **Route Handler de PDF** convierte `Buffer` a `Uint8Array` antes de `Response` para cumplir el tipado de Next.js/Web API
 
 ## Archivos Clave
 | Archivo | Descripción |
@@ -101,12 +112,15 @@
 | `src/components/layout/sidebar-nav.tsx` | Client Component con active state |
 | `src/components/layout/header.tsx` | Header con mobile nav + avatar dropdown + NotificationBell |
 | `src/components/layout/notification-bell.tsx` | Dropdown de notificaciones en tiempo real |
+| `src/components/ui/dropdown-menu.tsx` | Wrapper shadcn/Radix con `DropdownMenuTrigger` tipado |
 | `src/app/(dashboard)/shifts/page.tsx` | Lista turnos open + filtros URL searchParams |
 | `src/app/(dashboard)/shifts/[id]/page.tsx` | Detalle turno + interesados |
 | `src/app/(dashboard)/shifts/my/page.tsx` | Mis turnos + aceptar/rechazar solicitudes |
 | `src/app/(dashboard)/shifts/my/actions.ts` | acceptRequest / rejectRequest server actions |
+| `src/app/(dashboard)/chat/[id]/chat-view.tsx` | Vista de conversación con Realtime, optimistic update y polling fallback |
 | `src/app/(dashboard)/exchanges/page.tsx` | Lista de intercambios + acciones directas para confirmar/cancelar |
 | `src/app/(dashboard)/exchanges/actions.ts` | confirmExchange / cancelExchange + revalidación de rutas relacionadas |
+| `src/app/api/exchanges/[id]/pdf/route.tsx` | Route Handler del PDF con respuesta tipada para build de producción |
 | `src/app/(dashboard)/profile/page.tsx` | Perfil del usuario autenticado |
 | `src/app/(dashboard)/profile/actions.ts` | updateProfile server action |
 | `src/app/(dashboard)/shifts/new/actions.ts` | createShift server action |
@@ -114,6 +128,7 @@
 | `src/components/shifts/cancel-shift-button.tsx` | Confirmación UI para cancelar turno propio |
 | `supabase/migrations/00001_initial_schema.sql` | Schema completo con RLS |
 | `supabase/migrations/00009_shift_requests_update_policies.sql` | UPDATE policies faltantes para `shift_requests` |
+| `supabase/migrations/00010_enable_realtime_for_messages.sql` | Publica `messages` en `supabase_realtime` |
 | `supabase/seeds/01_demo_data.sql` | 1 empresa + 3 departamentos (UUIDs fijos) |
 
 ## Ideas para Futuro (post-MVP)
@@ -130,6 +145,7 @@
 - **Next.js 16** con App Router — `params` y `searchParams` son `Promise<...>`, hay que hacer `await`
 - Supabase RLS activado en todas las tablas — siempre respetar las políticas
 - Supabase Realtime para chat y notificaciones (Fase 3)
+- `messages` usa filtro client-side en Realtime y polling fallback; la sincronización completa depende de aplicar también la migración `00010` en la base de datos activa
 - Server Components por defecto, `"use client"` solo cuando sea necesario
 - Autenticación con Supabase Auth (email/password para MVP, OAuth futuro)
 - Filtros via URL searchParams para que sean bookmarkables y funcionen con Server Components

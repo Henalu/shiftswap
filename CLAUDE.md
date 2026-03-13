@@ -109,9 +109,12 @@ supabase/
 - **Optimistic update**: al enviar, añadir mensaje con `id: "temp_${Date.now()}"` al estado local inmediatamente. La función `mergeIncomingMessage` (extraída) reemplaza el optimista cuando llega confirmación de DB (matching por `sender_id + content + id.startsWith("temp_")`). Dedup con `prev.some(m => m.id === incoming.id)`. Mensajes se ordenan por `created_at`.
 - **Realtime**: tabla `messages` añadida a `supabase_realtime` publication via migración 00010. Sin filtro server-side (tabla no tiene REPLICA IDENTITY FULL); filtro client-side `if (incoming.conversation_id !== conversationId) return`.
 - **Polling fallback**: `useEffect` con `setInterval(3000)` que consulta mensajes nuevos (`gte created_at`) por si Realtime no está habilitado o falla. Usa `latestCreatedAtRef` para eficiencia. Dedup via `mergeIncomingMessage`.
-- **`DropdownMenuTrigger` sin `asChild`**: shadcn/ui en esta versión no expone `asChild` en los tipos de `DropdownMenuTrigger`. Aplicar estilos directamente al trigger (ya renderiza `<button>`).
+- **`DropdownMenuTrigger` wrapper tipado**: `components/ui/dropdown-menu.tsx` usa `React.forwardRef` + `ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Trigger>` para preservar props de Radix (incluido `asChild`) y evitar errores de TypeScript en build de producción.
 - **Botón "Ir al chat"** en `/exchanges/[id]` y `/exchanges` listing: visible para ambos usuarios en estado `pending_confirmation` o `confirmed`.
 - `/chat/page.tsx` hace segunda query a `exchanges` tras cargar conversaciones para obtener `exchange.status` (no usar `shift.status`). Usa `Map<shift_id, ExchangeStatus>` para lookup O(1).
+
+### Build / PDF — patrones clave
+- En Route Handlers que devuelven PDF, convertir el resultado de `renderToBuffer(...)` a `Uint8Array` antes de crear `new Response(...)` para satisfacer el tipado Web API de Next.js en producción.
 
 ## Convenciones de Código
 
