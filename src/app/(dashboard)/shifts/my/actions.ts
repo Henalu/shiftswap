@@ -42,11 +42,21 @@ export async function acceptRequest(formData: FormData): Promise<void> {
   // Verify the shift belongs to the current user
   const { data: shift } = await supabase
     .from("shifts")
-    .select("user_id, date")
+    .select("user_id, status")
     .eq("id", shiftId)
     .single();
 
-  if (!shift || shift.user_id !== user.id) return;
+  if (!shift || shift.user_id !== user.id || shift.status !== "open") return;
+
+  const { data: activeExchange } = await supabase
+    .from("exchanges")
+    .select("id")
+    .eq("shift_id", shiftId)
+    .in("status", ["pending_confirmation", "confirmed", "signed", "completed"])
+    .limit(1)
+    .maybeSingle();
+
+  if (activeExchange) return;
 
   // Fetch the request to get the interested user id
   const { data: request } = await supabase

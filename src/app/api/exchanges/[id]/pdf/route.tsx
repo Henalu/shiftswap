@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
 
 interface ExchangeData {
   id: string;
+  status: string;
   confirmed_at: string | null;
   created_at: string;
   shift: {
@@ -196,7 +197,9 @@ function ExchangePdf({ exchange }: { exchange: ExchangeData }) {
           <Text style={styles.sectionTitle}>Confirmación</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Estado:</Text>
-            <Text style={styles.value}>Confirmado</Text>
+            <Text style={styles.value}>
+              {exchange.status === "signed" ? "Firmado" : "Confirmado"}
+            </Text>
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Fecha de confirmación:</Text>
@@ -270,9 +273,13 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const typed = exchange as unknown as ExchangeData & { status: string };
+  const typed = exchange as unknown as ExchangeData;
 
-  if (typed.status !== "confirmed" && typed.status !== "completed") {
+  if (
+    typed.status !== "confirmed" &&
+    typed.status !== "signed" &&
+    typed.status !== "completed"
+  ) {
     return new Response("Exchange not confirmed yet", { status: 400 });
   }
 

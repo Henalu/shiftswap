@@ -24,6 +24,7 @@ export const REQUEST_STATUS_LABELS = {
 export const EXCHANGE_STATUS_LABELS = {
   pending_confirmation: 'Pendiente de confirmación',
   confirmed: 'Confirmado',
+  signed: 'Firmado',
   completed: 'Completado',
   cancelled: 'Cancelado',
 } as const;

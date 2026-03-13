@@ -6,7 +6,7 @@
 
 export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
-export type ExchangeStatus = 'pending_confirmation' | 'confirmed' | 'completed' | 'cancelled';
+export type ExchangeStatus = 'pending_confirmation' | 'confirmed' | 'signed' | 'completed' | 'cancelled';
 export type UserRole = 'employee' | 'supervisor' | 'admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
 
@@ -102,6 +102,10 @@ export interface Exchange {
   status: ExchangeStatus;
   document_url?: string;
   confirmed_at?: string;
+  signed_by_user_a_at?: string;
+  signed_by_user_b_at?: string;
+  cancellation_requested_by?: string;
+  cancellation_requested_at?: string;
   created_at: string;
 }
 

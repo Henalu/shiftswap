@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { InterestButton } from "@/components/shifts/interest-button";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,10 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
+  if (!authUser) {
+    redirect("/login");
+  }
+
   const { data: shiftData } = await supabase
     .from("shifts")
     .select(
@@ -55,6 +59,19 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     user: shiftData.user,
     department: shiftData.department,
   } as ShiftWithUser;
+
+  const { data: activeExchange } = await supabase
+    .from("exchanges")
+    .select("id")
+    .eq("shift_id", id)
+    .in("status", ["pending_confirmation", "confirmed", "signed", "completed"])
+    .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (activeExchange) {
+    redirect(`/exchanges/${activeExchange.id}`);
+  }
 
   const { data: requests } = await supabase
     .from("shift_requests")
@@ -81,20 +98,18 @@ export default async function ShiftDetailPage({ params }: PageProps) {
   };
 
   const timeRange = `${formatTimeDisplay(shift.start_time)} - ${formatTimeDisplay(shift.end_time)}`;
-  const isOwner = authUser?.id === shift.user_id;
+  const isOwner = authUser.id === shift.user_id;
   const showInterestButton = !isOwner && shift.status === "open";
 
   // Active request of the current user (pending or accepted)
-  const myActiveRequest = authUser
-    ? typedRequests.find(
-        (r) => r.user.id === authUser.id && (r.status === "pending" || r.status === "accepted")
-      )
-    : null;
+  const myActiveRequest = typedRequests.find(
+    (r) =>
+      r.user.id === authUser.id &&
+      (r.status === "pending" || r.status === "accepted")
+  );
 
   // Show "Enviar mensaje" if the current user has any request on this shift (any status)
-  const myRequest = authUser
-    ? typedRequests.find((r) => r.user.id === authUser.id)
-    : null;
+  const myRequest = typedRequests.find((r) => r.user.id === authUser.id);
   const showMessageButton = !isOwner && !!myRequest;
 
   return (
