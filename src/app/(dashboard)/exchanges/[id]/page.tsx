@@ -140,6 +140,15 @@ export default async function ExchangeDetailPage({
   if (!exchange) notFound();
 
   const typed = exchange as unknown as ExchangeDetail;
+  const now = new Date().toISOString();
+
+  await supabase
+    .from("notifications")
+    .update({ read: true, read_at: now })
+    .eq("user_id", authUser.id)
+    .eq("read", false)
+    .contains("data", { exchange_id: id });
+
   const isOwner = typed.user_a_id === authUser.id;
   const isRequester = typed.user_b_id === authUser.id;
   const otherUser = isOwner ? typed.requester : typed.owner;

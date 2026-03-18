@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getNotificationActionUrl } from "@/lib/notification-utils";
+import { formatRelativeTime } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,36 +22,37 @@ interface NotificationBellProps {
   initialUnreadCount: number;
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
+const NOTIFICATION_LIMIT = 12;
 
-  if (minutes < 1) return "ahora mismo";
-  if (minutes < 60) return `hace ${minutes}m`;
+function getNotificationSortDate(notification: Notification) {
+  return notification.updated_at ?? notification.created_at;
+}
 
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `hace ${hours}h`;
+function isNotificationVisible(notification: Notification) {
+  return !notification.resolved_at || !notification.read;
+}
 
-  return `hace ${Math.floor(hours / 24)}d`;
+function normalizeNotifications(notifications: Notification[]) {
+  return notifications
+    .filter(isNotificationVisible)
+    .sort(
+      (a, b) =>
+        new Date(getNotificationSortDate(b)).getTime() -
+        new Date(getNotificationSortDate(a)).getTime()
+    )
+    .slice(0, NOTIFICATION_LIMIT);
 }
 
 function mergeNotification(
   currentNotifications: Notification[],
   incomingNotification: Notification
 ) {
-  const nextNotifications = [
+  return normalizeNotifications([
     incomingNotification,
     ...currentNotifications.filter(
       (notification) => notification.id !== incomingNotification.id
     ),
-  ];
-
-  return nextNotifications
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    .slice(0, 10);
+  ]);
 }
 
 export function NotificationBell({
@@ -59,8 +61,9 @@ export function NotificationBell({
   initialUnreadCount,
 }: NotificationBellProps) {
   const router = useRouter();
-  const [notifications, setNotifications] =
-    useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>(
+    normalizeNotifications(initialNotifications)
+  );
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
 
   useEffect(() => {
@@ -71,9 +74,22 @@ export function NotificationBell({
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("read", false);
+        .eq("read", false)
+        .is("resolved_at", null);
 
       setUnreadCount(count ?? 0);
+    }
+
+    async function refreshNotifications() {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .or("resolved_at.is.null,read.eq.false")
+        .order("updated_at", { ascending: false })
+        .limit(NOTIFICATION_LIMIT);
+
+      setNotifications(normalizeNotifications((data ?? []) as Notification[]));
     }
 
     const channel = supabase
@@ -91,10 +107,8 @@ export function NotificationBell({
           setNotifications((prev) =>
             mergeNotification(prev, incomingNotification)
           );
-
-          if (!incomingNotification.read) {
-            setUnreadCount((prev) => prev + 1);
-          }
+          void refreshUnreadCount();
+          void refreshNotifications();
         }
       )
       .on(
@@ -111,6 +125,7 @@ export function NotificationBell({
             mergeNotification(prev, incomingNotification)
           );
           void refreshUnreadCount();
+          void refreshNotifications();
         }
       )
       .subscribe();
@@ -122,9 +137,11 @@ export function NotificationBell({
 
   async function markNotificationAsRead(notificationId: string) {
     const supabase = createClient();
+    const now = new Date().toISOString();
+
     await supabase
       .from("notifications")
-      .update({ read: true })
+      .update({ read: true, read_at: now })
       .eq("id", notificationId)
       .eq("user_id", userId)
       .eq("read", false);
@@ -132,11 +149,30 @@ export function NotificationBell({
     setNotifications((prev) =>
       prev.map((notification) =>
         notification.id === notificationId
-          ? { ...notification, read: true }
+          ? { ...notification, read: true, read_at: now }
           : notification
       )
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+  }
+
+  async function dismissNotification(notification: Notification) {
+    const supabase = createClient();
+    const now = new Date().toISOString();
+
+    await supabase
+      .from("notifications")
+      .update({ read: true, read_at: now, resolved_at: now })
+      .eq("id", notification.id)
+      .eq("user_id", userId);
+
+    setNotifications((prev) =>
+      prev.filter((current) => current.id !== notification.id)
+    );
+
+    if (!notification.read && !notification.resolved_at) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
   }
 
   async function handleNotificationSelect(notification: Notification) {
@@ -147,6 +183,7 @@ export function NotificationBell({
     const actionUrl = getNotificationActionUrl(notification);
     if (actionUrl) {
       router.push(actionUrl);
+      router.refresh();
     }
   }
 
@@ -154,15 +191,22 @@ export function NotificationBell({
     if (unreadCount === 0) return;
 
     const supabase = createClient();
+    const now = new Date().toISOString();
+
     await supabase
       .from("notifications")
-      .update({ read: true })
+      .update({ read: true, read_at: now })
       .eq("user_id", userId)
-      .eq("read", false);
+      .eq("read", false)
+      .is("resolved_at", null);
 
     setUnreadCount(0);
     setNotifications((prev) =>
-      prev.map((notification) => ({ ...notification, read: true }))
+      prev.map((notification) =>
+        notification.resolved_at
+          ? notification
+          : { ...notification, read: true, read_at: now }
+      )
     );
   }
 
@@ -179,7 +223,10 @@ export function NotificationBell({
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96">
+      <DropdownMenuContent
+        align="end"
+        className="w-[22rem] max-w-[calc(100vw-2rem)]"
+      >
         <DropdownMenuLabel className="flex items-center justify-between gap-3">
           <span>Notificaciones</span>
           {unreadCount > 0 && (
@@ -205,32 +252,48 @@ export function NotificationBell({
           notifications.map((notification) => (
             <DropdownMenuItem
               key={notification.id}
-              className="flex cursor-pointer flex-col items-start gap-1 py-3"
+              className="flex cursor-pointer flex-col items-start gap-2 py-3"
               onSelect={() => {
                 void handleNotificationSelect(notification);
               }}
             >
               <div className="flex w-full items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p
-                    className={`truncate text-sm ${
-                      notification.read ? "" : "font-semibold"
-                    }`}
-                  >
-                    {notification.title}
-                  </p>
-                  <div className="mt-1 flex items-start gap-2">
+                  <div className="flex items-start gap-2">
                     {!notification.read && (
                       <span className="mt-1 size-2 shrink-0 rounded-full bg-destructive" />
                     )}
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
-                      {notification.body}
-                    </p>
+                    <div className="min-w-0">
+                      <p
+                        className={`truncate text-sm ${
+                          notification.read ? "" : "font-semibold"
+                        }`}
+                      >
+                        {notification.title}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        {notification.body}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatRelativeTime(notification.created_at)}
-                </span>
+                <div className="flex shrink-0 items-start gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {formatRelativeTime(getNotificationSortDate(notification))}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Descartar notificación"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void dismissNotification(notification);
+                    }}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
               </div>
             </DropdownMenuItem>
           ))

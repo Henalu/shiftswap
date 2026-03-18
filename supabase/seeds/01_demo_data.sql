@@ -11,6 +11,16 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- Para promocionar un usuario existente a super_admin, ejecutar manualmente:
+-- UPDATE user_profiles
+-- SET role = 'super_admin',
+--     company_id = NULL,
+--     department_id = NULL,
+--     validation_status = 'approved',
+--     validated_at = NOW(),
+--     validation_notes = 'Bootstrapped as platform super admin'
+-- WHERE id = '<user_uuid>';
+
 -- Departments
 INSERT INTO departments (id, company_id, name, created_at)
 VALUES

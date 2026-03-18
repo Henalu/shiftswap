@@ -2,40 +2,52 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Camera, Info } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfile } from "./actions";
-import type { UserProfile, Department } from "@/types";
+import type { UserProfile } from "@/types";
 
 interface ProfileFormProps {
-  profile: UserProfile | null;
-  departments: Department[];
+  profile: Pick<
+    UserProfile,
+    "full_name" | "email" | "phone" | "avatar_url" | "employee_id"
+  >;
+  companyName: string;
+  departmentName: string;
   userId: string;
-  userEmail: string;
-  showSetupBanner?: boolean;
+}
+
+interface ReadonlyFieldProps {
+  label: string;
+  value: string;
+}
+
+function ReadonlyField({ label, value }: ReadonlyFieldProps) {
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="text-base text-foreground">{value}</p>
+    </div>
+  );
 }
 
 export function ProfileForm({
   profile,
-  departments,
+  companyName,
+  departmentName,
   userId,
-  userEmail,
-  showSetupBanner = false,
 }: ProfileFormProps) {
-  const isNew = profile === null;
-
-  const [fullName, setFullName] = useState(profile?.full_name ?? "");
-  const [phone, setPhone] = useState(profile?.phone ?? "");
-  const [departmentId, setDepartmentId] = useState(
-    profile?.department_id ?? departments[0]?.id ?? ""
-  );
+  const [fullName, setFullName] = useState(profile.full_name ?? "");
+  const [phone, setPhone] = useState(profile.phone ?? "");
+  const [email, setEmail] = useState(profile.email ?? "");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
-    profile?.avatar_url ?? null
+    profile.avatar_url ?? null
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -45,13 +57,13 @@ export function ProfileForm({
   const initials =
     fullName
       .split(" ")
-      .map((n) => n[0])
+      .map((name) => name[0])
       .join("")
       .toUpperCase()
       .slice(0, 2) || "?";
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
@@ -63,21 +75,22 @@ export function ProfileForm({
     setAvatarPreview(URL.createObjectURL(file));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
     if (!fullName.trim()) {
       toast.error("El nombre completo es obligatorio.");
       return;
     }
-    if (!departmentId) {
-      toast.error("Selecciona un departamento.");
+
+    if (!email.trim()) {
+      toast.error("El email de contacto es obligatorio.");
       return;
     }
 
     setSaving(true);
     let avatarUrl: string | undefined;
 
-    // Upload avatar to Supabase Storage if a new file was selected
     if (pendingFile) {
       const ext = pendingFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
       const path = `${userId}/avatar.${ext}`;
@@ -97,7 +110,6 @@ export function ProfileForm({
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(path);
 
-      // Append timestamp to bust CDN cache after re-upload
       avatarUrl = `${publicUrl}?t=${Date.now()}`;
       setPendingFile(null);
     }
@@ -105,7 +117,8 @@ export function ProfileForm({
     const formData = new FormData();
     formData.set("full_name", fullName.trim());
     formData.set("phone", phone.trim());
-    formData.set("department_id", departmentId);
+    formData.set("email", email.trim());
+
     if (avatarUrl !== undefined) {
       formData.set("avatar_url", avatarUrl);
     }
@@ -115,34 +128,14 @@ export function ProfileForm({
 
     if (result.error) {
       toast.error(result.error);
-    } else {
-      toast.success(
-        isNew ? "Perfil creado correctamente." : "Perfil actualizado correctamente."
-      );
+      return;
     }
+
+    toast.success("Perfil actualizado correctamente.");
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Contextual banner */}
-      {(isNew || showSetupBanner) && (
-        <div
-          className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${
-            showSetupBanner
-              ? "border-amber-200 bg-amber-50 text-amber-800"
-              : "border-blue-200 bg-blue-50 text-blue-800"
-          }`}
-        >
-          <Info className="mt-0.5 size-4 shrink-0" />
-          <p>
-            {showSetupBanner
-              ? "Para publicar turnos necesitas completar tu perfil con tu nombre y departamento."
-              : "Completa tu perfil para poder publicar y gestionar turnos."}
-          </p>
-        </div>
-      )}
-
-      {/* Avatar */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Foto de perfil</CardTitle>
@@ -190,7 +183,6 @@ export function ProfileForm({
         </CardContent>
       </Card>
 
-      {/* Personal info */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Información personal</CardTitle>
@@ -202,73 +194,63 @@ export function ProfileForm({
               <Input
                 id="full_name"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(event) => setFullName(event.target.value)}
                 required
                 placeholder="Tu nombre completo"
                 autoComplete="name"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">
-                Email{" "}
-                <span className="text-xs text-muted-foreground">
-                  (solo lectura)
-                </span>
-              </Label>
-              <Input
-                id="email"
-                value={userEmail}
-                readOnly
-                disabled
-                autoComplete="email"
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono (opcional)</Label>
+              <Label htmlFor="phone">Teléfono</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(event) => setPhone(event.target.value)}
                 placeholder="+34 600 000 000"
                 autoComplete="tel"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="department_id">Departamento</Label>
-              <select
-                id="department_id"
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                required
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-              >
-                {departments.length === 0 && (
-                  <option value="" disabled>
-                    Sin departamentos disponibles
-                  </option>
-                )}
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email de contacto</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              placeholder="tu@empresa.com"
+              autoComplete="email"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base">Información laboral</CardTitle>
+          <Badge
+            variant="secondary"
+            className="w-fit border border-emerald-200 bg-emerald-50 text-emerald-700"
+          >
+            Cuenta verificada
+          </Badge>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-3">
+          <ReadonlyField label="Empresa" value={companyName} />
+          <ReadonlyField
+            label="ID de empleado"
+            value={profile.employee_id?.trim() || "No disponible"}
+          />
+          <ReadonlyField label="Departamento" value={departmentName} />
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
         <Button type="submit" disabled={saving}>
           {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-          {saving
-            ? "Guardando..."
-            : isNew
-            ? "Crear perfil"
-            : "Guardar cambios"}
+          {saving ? "Guardando..." : "Guardar cambios"}
         </Button>
       </div>
     </form>

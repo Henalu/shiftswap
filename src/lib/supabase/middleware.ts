@@ -3,6 +3,8 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { hasAdminPanelAccess } from '@/lib/user-roles';
+import type { UserRole, ValidationStatus } from '@/types';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -33,15 +35,65 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+  const isAuthPage =
+    pathname.startsWith('/login') || pathname.startsWith('/register');
+  const isPendingValidationPage = pathname.startsWith('/pending-validation');
+  const isAuthApiRoute = pathname.startsWith('/api/auth');
+
   // Redirect unauthenticated users to login
   if (
     !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/register') &&
-    !request.nextUrl.pathname.startsWith('/api/auth')
+    !isAuthPage &&
+    !isAuthApiRoute
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  if (!user) {
+    return supabaseResponse;
+  }
+
+  const { data: rawAccountState } = await supabase
+    .from('user_profiles')
+    .select('validation_status, role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const accountState = rawAccountState as
+    | {
+        validation_status: ValidationStatus;
+        role: UserRole;
+      }
+    | null;
+  const validationStatus = accountState?.validation_status ?? null;
+  const role = accountState?.role ?? 'member';
+  const isBlockedByValidation =
+    validationStatus === 'pending' || validationStatus === 'rejected';
+
+  if (isAuthPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = isBlockedByValidation ? '/pending-validation' : '/shifts';
+    return NextResponse.redirect(url);
+  }
+
+  if (isBlockedByValidation && !isPendingValidationPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/pending-validation';
+    return NextResponse.redirect(url);
+  }
+
+  if (!isBlockedByValidation && isPendingValidationPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/shifts';
+    return NextResponse.redirect(url);
+  }
+
+  if (pathname.startsWith('/admin') && !hasAdminPanelAccess(role)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/shifts';
     return NextResponse.redirect(url);
   }
 

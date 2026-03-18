@@ -22,18 +22,30 @@ function formatTime(dateStr: string) {
   });
 }
 
+const BOTTOM_SCROLL_THRESHOLD = 80;
+
+function isNearBottom(container: HTMLDivElement) {
+  const distanceFromBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight;
+
+  return distanceFromBottom <= BOTTOM_SCROLL_THRESHOLD;
+}
+
 function mergeIncomingMessage(
   currentMessages: Message[],
   incomingMessage: Message
 ): Message[] {
-  const withoutOptimistic = currentMessages.filter(
+  const optimisticIndex = currentMessages.findIndex(
     (message) =>
-      !(
-        message.id.startsWith("temp_") &&
-        message.sender_id === incomingMessage.sender_id &&
-        message.content === incomingMessage.content
-      )
+      message.id.startsWith("temp_") &&
+      message.sender_id === incomingMessage.sender_id &&
+      message.content === incomingMessage.content
   );
+
+  const withoutOptimistic =
+    optimisticIndex === -1
+      ? currentMessages
+      : currentMessages.filter((_, index) => index !== optimisticIndex);
 
   if (withoutOptimistic.some((message) => message.id === incomingMessage.id)) {
     return withoutOptimistic;
@@ -50,6 +62,7 @@ async function markConversationAsRead(
   currentUserId: string
 ) {
   const supabase = createClient();
+  const now = new Date().toISOString();
 
   await supabase
     .from("messages")
@@ -60,7 +73,8 @@ async function markConversationAsRead(
 
   await supabase
     .from("notifications")
-    .update({ read: true })
+    .update({ read: true, read_at: now, resolved_at: now })
+    .eq("user_id", currentUserId)
     .eq("type", "new_message")
     .eq("read", false)
     .contains("data", { conversation_id: conversationId });
@@ -75,9 +89,15 @@ export function ChatView({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true);
   const latestCreatedAtRef = useRef<string | null>(
     initialMessages[initialMessages.length - 1]?.created_at ?? null
+  );
+  const previousLastMessageIdRef = useRef<string | null>(
+    initialMessages[initialMessages.length - 1]?.id ?? null
   );
 
   // Realtime subscription — delivers new messages in real time.
@@ -123,6 +143,13 @@ export function ChatView({
     void markConversationAsRead(conversationId, currentUserId);
   }, [conversationId, currentUserId]);
 
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    isNearBottomRef.current = isNearBottom(container);
+  }, []);
+
   // Fallback sync: if Realtime is not enabled for `messages` in the active
   // Supabase environment, poll the latest rows so the other participant still
   // sees new messages without refreshing the page.
@@ -163,10 +190,38 @@ export function ChatView({
     };
   }, [conversationId]);
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return;
+
+    const isInitialLoad = !hasInitialScrollRef.current;
+    const hasNewLastMessage = lastMessage.id !== previousLastMessageIdRef.current;
+    const shouldScroll =
+      isInitialLoad ||
+      (hasNewLastMessage &&
+        (isNearBottomRef.current || lastMessage.sender_id === currentUserId));
+
+    if (shouldScroll) {
+      bottomRef.current?.scrollIntoView({
+        behavior: isInitialLoad ? "auto" : "smooth",
+        block: "end",
+      });
+      isNearBottomRef.current = true;
+    }
+
+    if (isInitialLoad) {
+      hasInitialScrollRef.current = true;
+    }
+
+    previousLastMessageIdRef.current = lastMessage.id;
+  }, [currentUserId, messages]);
+
+  function handleMessagesScroll() {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    isNearBottomRef.current = isNearBottom(container);
+  }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -211,7 +266,11 @@ export function ChatView({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+      >
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No hay mensajes aún. ¡Inicia la conversación!

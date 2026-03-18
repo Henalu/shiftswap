@@ -7,20 +7,29 @@ import {
   CalendarCheck,
   MessageSquare,
   Repeat,
+  ShieldCheck,
   User,
 } from "lucide-react";
+import { hasAdminPanelAccess } from "@/lib/user-roles";
+import type { UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/shifts", label: "Turnos", icon: CalendarDays },
-  { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/exchanges", label: "Intercambios", icon: Repeat },
-  { href: "/profile", label: "Perfil", icon: User },
-];
+interface SidebarNavProps {
+  role: UserRole;
+}
 
-export function SidebarNav() {
+export function SidebarNav({ role }: SidebarNavProps) {
   const pathname = usePathname();
+  const navItems = [
+    { href: "/shifts", label: "Turnos", icon: CalendarDays },
+    { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
+    { href: "/chat", label: "Chat", icon: MessageSquare },
+    { href: "/exchanges", label: "Intercambios", icon: Repeat },
+    ...(hasAdminPanelAccess(role)
+      ? [{ href: "/admin/validations", label: "Admin", icon: ShieldCheck }]
+      : []),
+    { href: "/profile", label: "Perfil", icon: User },
+  ];
 
   return (
     <nav className="flex flex-col gap-1 p-4">

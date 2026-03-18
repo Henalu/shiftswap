@@ -7,7 +7,8 @@
 export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
 export type ExchangeStatus = 'pending_confirmation' | 'confirmed' | 'signed' | 'completed' | 'cancelled';
-export type UserRole = 'employee' | 'supervisor' | 'admin';
+export type ValidationStatus = 'pending' | 'approved' | 'rejected';
+export type UserRole = 'member' | 'department_admin' | 'hr_admin' | 'super_admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
 
 // ============================================
@@ -18,11 +19,18 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
-  department_id: string;
-  company_id: string;
+  department_id: string | null;
+  company_id: string | null;
   role: UserRole;
   avatar_url?: string;
   phone?: string;
+  employee_id?: string | null;
+  id_card_url?: string | null;
+  validation_status?: ValidationStatus;
+  validated_by?: string | null;
+  validated_at?: string | null;
+  validation_notes?: string | null;
+  is_admin?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -151,8 +159,16 @@ export type NotificationType =
   | 'shift_request'
   | 'request_accepted'
   | 'request_rejected'
+  | 'shift_cancelled'
   | 'new_message'
-  | 'exchange_confirmed';
+  | 'exchange_confirmed'
+  | 'exchange_signed'
+  | 'exchange_document_added'
+  | 'exchange_cancelled'
+  | 'exchange_cancellation_requested'
+  | 'exchange_cancellation_rejected'
+  | 'account_approved'
+  | 'account_rejected';
 
 export interface Notification {
   id: string;
@@ -161,6 +177,10 @@ export interface Notification {
   title: string;
   body: string;
   read: boolean;
+  read_at?: string | null;
+  resolved_at?: string | null;
+  dedupe_key?: string | null;
   data?: NotificationData;
   created_at: string;
+  updated_at?: string;
 }

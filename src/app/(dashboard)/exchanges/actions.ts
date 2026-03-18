@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createNotification } from "@/lib/notifications";
+import {
+  createNotification,
+  resolveNotifications,
+} from "@/lib/notifications";
 
 export interface ExchangeMutationResult {
   success?: true;
@@ -26,6 +29,24 @@ function revalidateExchangeViews(exchangeId: string, shiftId: string) {
   revalidatePath("/shifts/my");
 }
 
+async function resolveExchangeInbox(
+  exchangeId: string,
+  userIds: string[]
+): Promise<void> {
+  await resolveNotifications({
+    userIds,
+    types: [
+      "request_accepted",
+      "exchange_confirmed",
+      "exchange_document_added",
+      "exchange_signed",
+      "exchange_cancellation_requested",
+    ],
+    dataContains: { exchange_id: exchangeId },
+    unresolvedOnly: true,
+  });
+}
+
 export async function confirmExchange(formData: FormData): Promise<void> {
   const exchangeId = formData.get("exchange_id") as string;
   if (!exchangeId) return;
@@ -37,7 +58,6 @@ export async function confirmExchange(formData: FormData): Promise<void> {
 
   if (!user) return;
 
-  // Only user_b (the requester) can confirm
   const { data: exchange } = await supabase
     .from("exchanges")
     .select("id, shift_id, user_a_id, user_b_id, status")
@@ -62,12 +82,20 @@ export async function confirmExchange(formData: FormData): Promise<void> {
     userId: exchange.user_a_id,
     type: "exchange_confirmed",
     title: "Intercambio confirmado",
-    body: "El otro empleado ha confirmado el intercambio de turno.",
+    body: "La otra parte ha confirmado el intercambio de turno.",
+    dedupeKey: `exchange_confirmed:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: exchange.shift_id,
       action_url: `/exchanges/${exchangeId}`,
     },
+  });
+
+  await resolveNotifications({
+    userId: exchange.user_b_id,
+    types: ["request_accepted"],
+    dataContains: { exchange_id: exchangeId },
+    unresolvedOnly: true,
   });
 
   revalidateExchangeViews(exchangeId, exchange.shift_id);
@@ -152,6 +180,22 @@ export async function attachExchangeDocument(
     return { error: updateError.message };
   }
 
+  const otherUserId =
+    user.id === exchange.user_a_id ? exchange.user_b_id : exchange.user_a_id;
+
+  await createNotification({
+    userId: otherUserId,
+    type: "exchange_document_added",
+    title: "Nuevo documento adjunto",
+    body: "La otra parte ha añadido o actualizado el PDF del intercambio.",
+    dedupeKey: `exchange_document:${exchangeId}`,
+    data: {
+      exchange_id: exchangeId,
+      shift_id: exchange.shift_id,
+      action_url: `/exchanges/${exchangeId}`,
+    },
+  });
+
   revalidateExchangeViews(exchangeId, exchange.shift_id);
 
   return { success: true };
@@ -233,11 +277,20 @@ export async function signExchange(
       .eq("status", "confirmed");
 
     const otherUserId = isUserA ? exchange.user_b_id : exchange.user_a_id;
+
+    await resolveNotifications({
+      userIds: [exchange.user_a_id, exchange.user_b_id],
+      types: ["exchange_document_added", "exchange_confirmed"],
+      dataContains: { exchange_id: exchangeId },
+      unresolvedOnly: true,
+    });
+
     await createNotification({
       userId: otherUserId,
-      type: "exchange_confirmed",
+      type: "exchange_signed",
       title: "Intercambio firmado",
-      body: "Ambas partes han firmado el intercambio de turno.",
+      body: "Ambas partes han completado la firma del intercambio.",
+      dedupeKey: `exchange_signed:${exchangeId}`,
       data: {
         exchange_id: exchangeId,
         shift_id: exchange.shift_id,
@@ -304,9 +357,10 @@ export async function requestSignedExchangeCancellation(
 
   await createNotification({
     userId: otherUserId,
-    type: "exchange_confirmed",
-    title: "Solicitud de cancelación enviada",
+    type: "exchange_cancellation_requested",
+    title: "Solicitud de cancelación",
     body: "La otra parte ha solicitado cancelar un intercambio ya firmado.",
+    dedupeKey: `exchange_cancellation_requested:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: typedExchange.shift_id,
@@ -371,11 +425,23 @@ export async function confirmSignedExchangeCancellation(
     .update({ status: "cancelled" })
     .eq("id", typedExchange.shift_id);
 
+  await resolveExchangeInbox(exchangeId, [
+    typedExchange.user_a_id,
+    typedExchange.user_b_id,
+  ]);
+
+  await resolveNotifications({
+    userId: user.id,
+    dedupeKey: `exchange_cancellation_requested:${exchangeId}`,
+    unresolvedOnly: true,
+  });
+
   await createNotification({
     userId: requesterUserId,
-    type: "exchange_confirmed",
+    type: "exchange_cancelled",
     title: "Cancelación confirmada",
-    body: "La otra parte ha aceptado cancelar el intercambio firmado.",
+    body: "La otra parte ha confirmado la cancelación del intercambio firmado.",
+    dedupeKey: `exchange_cancelled:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: typedExchange.shift_id,
@@ -435,11 +501,18 @@ export async function rejectSignedExchangeCancellation(
 
   if (error) return;
 
+  await resolveNotifications({
+    userId: user.id,
+    dedupeKey: `exchange_cancellation_requested:${exchangeId}`,
+    unresolvedOnly: true,
+  });
+
   await createNotification({
     userId: requesterUserId,
-    type: "exchange_confirmed",
+    type: "exchange_cancellation_rejected",
     title: "Solicitud de cancelación rechazada",
     body: "La otra parte ha rechazado cancelar el intercambio firmado.",
+    dedupeKey: `exchange_cancellation_rejected:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: typedExchange.shift_id,
@@ -461,7 +534,6 @@ export async function cancelExchange(formData: FormData): Promise<void> {
 
   if (!user) return;
 
-  // Either participant can cancel
   const { data: exchange } = await supabase
     .from("exchanges")
     .select("id, shift_id, user_a_id, user_b_id, status")
@@ -478,7 +550,6 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     .eq("id", exchangeId);
 
   if (exchange.status === "pending_confirmation") {
-    // Revert shift to open and the accepted request back to pending
     await supabase
       .from("shifts")
       .update({ status: "open" })
@@ -491,22 +562,23 @@ export async function cancelExchange(formData: FormData): Promise<void> {
       .eq("interested_user_id", exchange.user_b_id)
       .eq("status", "accepted");
   } else {
-    // confirmed → cancelled
     await supabase
       .from("shifts")
       .update({ status: "cancelled" })
       .eq("id", exchange.shift_id);
   }
 
-  // Notify the other party
+  await resolveExchangeInbox(exchangeId, [exchange.user_a_id, exchange.user_b_id]);
+
   const otherUserId =
     user.id === exchange.user_a_id ? exchange.user_b_id : exchange.user_a_id;
 
   await createNotification({
     userId: otherUserId,
-    type: "exchange_confirmed",
+    type: "exchange_cancelled",
     title: "Intercambio cancelado",
-    body: "El intercambio de turno ha sido cancelado por la otra parte.",
+    body: "La otra parte ha cancelado el intercambio de turno.",
+    dedupeKey: `exchange_cancelled:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: exchange.shift_id,

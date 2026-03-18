@@ -73,6 +73,16 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     redirect(`/exchanges/${activeExchange.id}`);
   }
 
+  const now = new Date().toISOString();
+
+  await supabase
+    .from("notifications")
+    .update({ read: true, read_at: now })
+    .eq("user_id", authUser.id)
+    .in("type", ["shift_request", "request_rejected", "shift_cancelled"])
+    .eq("read", false)
+    .contains("data", { shift_id: id });
+
   const { data: requests } = await supabase
     .from("shift_requests")
     .select(

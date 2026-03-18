@@ -7,19 +7,12 @@ export function getNotificationActionUrl(
     return notification.data.action_url;
   }
 
-  if (
-    notification.type === "new_message" &&
-    typeof notification.data?.conversation_id === "string"
-  ) {
-    return `/chat/${notification.data.conversation_id}`;
+  if (typeof notification.data?.exchange_id === "string") {
+    return `/exchanges/${notification.data.exchange_id}`;
   }
 
-  if (
-    (notification.type === "request_accepted" ||
-      notification.type === "exchange_confirmed") &&
-    typeof notification.data?.exchange_id === "string"
-  ) {
-    return `/exchanges/${notification.data.exchange_id}`;
+  if (typeof notification.data?.conversation_id === "string") {
+    return `/chat/${notification.data.conversation_id}`;
   }
 
   if (typeof notification.data?.shift_id === "string") {

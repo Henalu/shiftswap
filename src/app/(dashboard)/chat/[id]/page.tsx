@@ -59,6 +59,8 @@ export default async function ConversationPage({ params }: PageProps) {
     .order("created_at", { ascending: true });
 
   // Mark incoming messages as read
+  const now = new Date().toISOString();
+
   await supabase
     .from("messages")
     .update({ read: true })
@@ -68,7 +70,7 @@ export default async function ConversationPage({ params }: PageProps) {
 
   await supabase
     .from("notifications")
-    .update({ read: true })
+    .update({ read: true, read_at: now, resolved_at: now })
     .eq("user_id", authUser.id)
     .eq("type", "new_message")
     .eq("read", false)
