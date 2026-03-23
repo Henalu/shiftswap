@@ -157,6 +157,9 @@ export default async function AdminValidationsPage({
         action={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{USER_ROLE_LABELS[accountState.role]}</Badge>
+            <Link href="/admin/exchanges">
+              <Button variant="outline">Aprobaciones</Button>
+            </Link>
             {isSuperAdmin(accountState.role) && (
               <Link href="/admin/users">
                 <Button variant="outline">Gestionar roles</Button>

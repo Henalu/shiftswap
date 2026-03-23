@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { recordExchangeEvent } from "@/lib/exchange-workflow";
 import { createClient } from "@/lib/supabase/server";
 import {
   createNotification,
@@ -106,7 +107,13 @@ export async function acceptRequest(formData: FormData): Promise<void> {
     .from("exchanges")
     .select("id")
     .eq("shift_id", shiftId)
-    .in("status", ["pending_confirmation", "confirmed", "signed", "completed"])
+    .in("status", [
+      "pending_confirmation",
+      "confirmed",
+      "pending_department_approval",
+      "approved",
+      "completed",
+    ])
     .limit(1)
     .maybeSingle();
 
@@ -150,6 +157,17 @@ export async function acceptRequest(formData: FormData): Promise<void> {
       .single();
 
     exchangeId = createdExchange?.id ?? null;
+  }
+
+  if (exchangeId) {
+    await recordExchangeEvent({
+      exchangeId,
+      actorId: user.id,
+      eventType: "exchange_created",
+      title: "Intercambio iniciado",
+      details: "El propietario ha aceptado la solicitud y se abre el expediente del cambio.",
+      toStatus: "pending_confirmation",
+    });
   }
 
   await createNotification({

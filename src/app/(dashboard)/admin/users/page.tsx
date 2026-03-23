@@ -83,6 +83,9 @@ export default async function AdminUsersPage() {
         action={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{USER_ROLE_LABELS[accountState.role]}</Badge>
+            <Link href="/admin/exchanges">
+              <Button variant="outline">Aprobaciones</Button>
+            </Link>
             <Link href="/admin/validations">
               <Button variant="outline">Volver a validaciones</Button>
             </Link>

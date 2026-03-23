@@ -110,7 +110,8 @@ export default async function MyShiftsPage() {
           .in("status", [
             "pending_confirmation",
             "confirmed",
-            "signed",
+            "pending_department_approval",
+            "approved",
             "completed",
           ])
           .order("created_at", { ascending: false });
@@ -169,7 +170,7 @@ export default async function MyShiftsPage() {
                 request.interested_user_id !== activeExchange?.user_b_id
             );
             const hasPendingCancellationRequest =
-              activeExchange?.status === "signed" &&
+              activeExchange?.status === "pending_department_approval" &&
               Boolean(activeExchange.cancellation_requested_by);
             const isCancellationRequester =
               hasPendingCancellationRequest &&
@@ -267,8 +268,8 @@ export default async function MyShiftsPage() {
                           ) : (
                             <>
                               Este caso ya se gestiona como intercambio. Usa la vista
-                              de detalle para consultar estado, chat, documento y
-                              acciones disponibles.
+                              de detalle para consultar firmas, aprobacion, historial
+                              y acciones disponibles.
                             </>
                           )}
                         </p>

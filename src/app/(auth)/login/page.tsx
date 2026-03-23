@@ -16,6 +16,16 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 
+function isRefreshTokenError(message: string | undefined): boolean {
+  if (!message) return false;
+
+  return (
+    message.includes("Refresh Token") ||
+    message.includes("refresh token") ||
+    message.includes("JWT")
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -29,10 +39,21 @@ export default function LoginPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    let { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    if (signInError && isRefreshTokenError(signInError.message)) {
+      await supabase.auth.signOut({ scope: "local" });
+
+      const retryResult = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      signInError = retryResult.error;
+    }
 
     setLoading(false);
 
@@ -40,6 +61,8 @@ export default function LoginPage() {
       setError(
         signInError.message === "Invalid login credentials"
           ? "Email o contrasena incorrectos."
+          : isRefreshTokenError(signInError.message)
+            ? "La sesion anterior estaba caducada o dañada. Intenta entrar de nuevo."
           : signInError.message
       );
       return;

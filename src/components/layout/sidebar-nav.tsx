@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   CalendarCheck,
   CalendarDays,
+  ClipboardCheck,
   MessageSquare,
   Repeat,
   ShieldCheck,
@@ -28,7 +29,10 @@ export function SidebarNav({ role }: SidebarNavProps) {
   ];
   const supportItems = [
     ...(hasAdminPanelAccess(role)
-      ? [{ href: "/admin/validations", label: "Administracion", icon: ShieldCheck }]
+      ? [
+          { href: "/admin/exchanges", label: "Aprobaciones", icon: ClipboardCheck },
+          { href: "/admin/validations", label: "Validaciones", icon: ShieldCheck },
+        ]
       : []),
     { href: "/profile", label: "Perfil", icon: User },
   ];

@@ -1,7 +1,9 @@
 import type {
+  ExchangeAgreementType,
   ExchangeStatus,
   RequestStatus,
   ShiftStatus,
+  ShiftDebtTransactionStatus,
   ShiftType,
 } from "@/types";
 
@@ -39,8 +41,10 @@ export const REQUEST_STATUS_LABELS = {
 
 export const EXCHANGE_STATUS_LABELS = {
   pending_confirmation: "Pendiente de confirmacion",
-  confirmed: "Confirmado",
-  signed: "Firmado",
+  confirmed: "Pendiente de firmas",
+  pending_department_approval: "Pendiente de aprobacion",
+  approved: "Aprobado",
+  rejected: "Rechazado",
   completed: "Completado",
   cancelled: "Cancelado",
 } as const satisfies Record<ExchangeStatus, string>;
@@ -74,13 +78,47 @@ export const EXCHANGE_STATUS_STYLES = {
     "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   confirmed:
     "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  signed:
+  pending_department_approval:
+    "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  approved:
     "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  rejected:
+    "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
   completed:
     "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   cancelled:
     "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 } as const satisfies Record<ExchangeStatus, string>;
+
+export const EXCHANGE_AGREEMENT_LABELS = {
+  hours_bank: "Bolsa de horas",
+  shift_exchange: "Intercambio de turno",
+} as const satisfies Record<ExchangeAgreementType, string>;
+
+export const EXCHANGE_AGREEMENT_STYLES = {
+  hours_bank:
+    "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  shift_exchange:
+    "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+} as const satisfies Record<ExchangeAgreementType, string>;
+
+export const SHIFT_DEBT_TRANSACTION_STATUS_LABELS = {
+  pending_approval: "Pendiente de aprobacion",
+  active: "Pendiente de compensacion",
+  voided: "Anulado",
+  settled: "Compensado",
+} as const satisfies Record<ShiftDebtTransactionStatus, string>;
+
+export const SHIFT_DEBT_TRANSACTION_STATUS_STYLES = {
+  pending_approval:
+    "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  active:
+    "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  voided:
+    "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  settled:
+    "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+} as const satisfies Record<ShiftDebtTransactionStatus, string>;
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_SHIFTS_PER_DAY = 3;

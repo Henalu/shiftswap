@@ -75,12 +75,15 @@ export default async function ChatPage() {
   if (shiftIds.length > 0) {
     const { data: exchanges } = await supabase
       .from("exchanges")
-      .select("shift_id, status")
+      .select("shift_id, status, created_at")
       .in("shift_id", shiftIds)
-      .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`);
+      .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`)
+      .order("created_at", { ascending: false });
 
     for (const exchange of exchanges ?? []) {
-      exchangesByShiftId.set(exchange.shift_id, exchange.status as ExchangeStatus);
+      if (!exchangesByShiftId.has(exchange.shift_id)) {
+        exchangesByShiftId.set(exchange.shift_id, exchange.status as ExchangeStatus);
+      }
     }
   }
 

@@ -6,6 +6,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { hasAdminPanelAccess } from '@/lib/user-roles';
 import type { UserRole, ValidationStatus } from '@/types';
 
+function clearSupabaseAuthCookies(
+  request: NextRequest,
+  response: NextResponse
+) {
+  for (const cookie of request.cookies.getAll()) {
+    if (!cookie.name.startsWith('sb-')) continue;
+
+    request.cookies.delete(cookie.name);
+    response.cookies.delete(cookie.name);
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -30,9 +42,9 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the session — important for Server Components
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
@@ -41,12 +53,26 @@ export async function updateSession(request: NextRequest) {
   const isPendingValidationPage = pathname.startsWith('/pending-validation');
   const isAuthApiRoute = pathname.startsWith('/api/auth');
 
-  // Redirect unauthenticated users to login
-  if (
-    !user &&
-    !isAuthPage &&
-    !isAuthApiRoute
-  ) {
+  if (authError) {
+    const shouldClearSession =
+      authError.message.includes('Refresh Token') ||
+      authError.message.includes('refresh token') ||
+      authError.message.includes('JWT');
+
+    if (shouldClearSession) {
+      clearSupabaseAuthCookies(request, supabaseResponse);
+    }
+
+    if (!isAuthPage && !isAuthApiRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
+
+    return supabaseResponse;
+  }
+
+  if (!user && !isAuthPage && !isAuthApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

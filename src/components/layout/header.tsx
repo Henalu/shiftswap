@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   CalendarCheck,
   CalendarDays,
+  ClipboardCheck,
   LogOut,
   MessageSquare,
   Repeat,
@@ -71,7 +72,10 @@ export function Header({
     { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/exchanges", label: "Intercambios", icon: Repeat },
     ...(hasAdminPanelAccess(role)
-      ? [{ href: "/admin/validations", label: "Admin", icon: ShieldCheck }]
+      ? [
+          { href: "/admin/exchanges", label: "Aprobaciones", icon: ClipboardCheck },
+          { href: "/admin/validations", label: "Validaciones", icon: ShieldCheck },
+        ]
       : []),
     { href: "/profile", label: "Perfil", icon: User },
   ];

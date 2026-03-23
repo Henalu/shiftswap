@@ -18,7 +18,7 @@ interface UserScope {
   department_id: string | null;
 }
 
-interface ScopedRoleUser extends UserScope {
+export interface ScopedRoleUser extends UserScope {
   role: UserRole;
 }
 
@@ -66,4 +66,11 @@ export function canAccessScopedProfile(
     actor.company_id === target.company_id &&
     actor.department_id === target.department_id
   );
+}
+
+export function canAccessScopedDepartment(
+  actor: ScopedRoleUser | null | undefined,
+  target: UserScope | null | undefined
+): boolean {
+  return canAccessScopedProfile(actor, target);
 }

@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import {
   ArrowLeftRight,
   CalendarDays,
+  FileSignature,
   MessageSquare,
   SearchX,
+  ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,14 +20,12 @@ import {
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
-import { formatShortDate, formatTimeRange } from "@/lib/utils";
+import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
+import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import {
   cancelExchange,
   confirmExchange,
-  confirmSignedExchangeCancellation,
-  rejectSignedExchangeCancellation,
-  requestSignedExchangeCancellation,
 } from "./actions";
 import type { ExchangeStatus, ShiftType } from "@/types";
 
@@ -36,6 +36,11 @@ interface ExchangeRow {
   user_b_id: string;
   status: ExchangeStatus;
   confirmed_at: string | null;
+  submitted_for_approval_at: string | null;
+  department_reviewed_at: string | null;
+  department_decision_notes: string | null;
+  signed_by_user_a_at: string | null;
+  signed_by_user_b_at: string | null;
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
   created_at: string;
@@ -51,6 +56,55 @@ interface ExchangeRow {
   requester: { id: string; full_name: string; email: string };
 }
 
+function renderExchangeMessage(
+  exchange: ExchangeRow,
+  authUserId: string
+): string {
+  const isOwner = exchange.user_a_id === authUserId;
+  const otherUser = isOwner ? exchange.requester : exchange.owner;
+  const hasPendingCancellationRequest =
+    exchange.status === "pending_department_approval" &&
+    Boolean(exchange.cancellation_requested_by);
+
+  if (exchange.status === "pending_confirmation") {
+    return isOwner
+      ? `Esperando la confirmacion final de ${otherUser.full_name} para abrir la solicitud formal.`
+      : `${otherUser.full_name} ya ha aceptado el cambio. Confirma ahora para pasar a la firma interna.`;
+  }
+
+  if (exchange.status === "confirmed") {
+    const currentUserSigned = isOwner
+      ? Boolean(exchange.signed_by_user_a_at)
+      : Boolean(exchange.signed_by_user_b_at);
+
+    return currentUserSigned
+      ? "Tu firma ya esta registrada. Falta que la otra parte complete la suya para enviar el expediente a aprobacion."
+      : "El acuerdo ya existe. Tu siguiente paso es firmar la solicitud dentro de la app.";
+  }
+
+  if (exchange.status === "pending_department_approval") {
+    if (hasPendingCancellationRequest) {
+      return "Hay una retirada pendiente entre participantes. El expediente queda en pausa hasta resolverla.";
+    }
+
+    return "Las dos firmas ya estan registradas. Ahora toca esperar la decision del responsable del departamento.";
+  }
+
+  if (exchange.status === "approved") {
+    return "El intercambio ya ha sido aprobado. Puedes abrir el expediente para revisar la resolucion y exportar el resumen.";
+  }
+
+  if (exchange.status === "rejected") {
+    return "El departamento ha rechazado la solicitud. Revisa las observaciones y decide si vuelves a intentarlo.";
+  }
+
+  if (exchange.status === "cancelled") {
+    return "El expediente se ha cancelado antes de cerrarse.";
+  }
+
+  return "Este intercambio ya no requiere nuevas acciones.";
+}
+
 export default async function ExchangesPage() {
   const supabase = await createClient();
   const {
@@ -64,9 +118,17 @@ export default async function ExchangesPage() {
     .select(
       `
       id, shift_id, user_a_id, user_b_id, status, confirmed_at,
+      submitted_for_approval_at, department_reviewed_at, department_decision_notes,
+      signed_by_user_a_at, signed_by_user_b_at,
       cancellation_requested_by, cancellation_requested_at, created_at,
-      shift:shifts!shift_id(id, date, start_time, end_time, shift_type,
-        department:departments!department_id(id, name)),
+      shift:shifts!shift_id(
+        id,
+        date,
+        start_time,
+        end_time,
+        shift_type,
+        department:departments!department_id(id, name)
+      ),
       owner:user_profiles!user_a_id(id, full_name, email),
       requester:user_profiles!user_b_id(id, full_name, email)
     `
@@ -74,12 +136,51 @@ export default async function ExchangesPage() {
     .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`)
     .order("created_at", { ascending: false });
 
-  const typedExchanges = (exchanges ?? []) as unknown as ExchangeRow[];
-  const pending = typedExchanges.filter(
+  const typedExchanges = ((exchanges ?? []) as unknown[]).map((exchange) => {
+    const typed = exchange as unknown as ExchangeRow & {
+      shift:
+        | (ExchangeRow["shift"] & {
+            department:
+              | ExchangeRow["shift"]["department"]
+              | ExchangeRow["shift"]["department"][];
+          })
+        | ExchangeRow["shift"][];
+      owner: ExchangeRow["owner"] | ExchangeRow["owner"][];
+      requester: ExchangeRow["requester"] | ExchangeRow["requester"][];
+    };
+    const shift = pickFirstRelation(typed.shift);
+
+    return {
+      ...typed,
+      shift: shift
+        ? {
+            ...shift,
+            department: pickFirstRelation(shift.department) ?? shift.department,
+          }
+        : null,
+      owner: pickFirstRelation(typed.owner),
+      requester: pickFirstRelation(typed.requester),
+    };
+  }).filter(
+    (
+      exchange
+    ): exchange is ExchangeRow =>
+      Boolean(exchange.shift) && Boolean(exchange.owner) && Boolean(exchange.requester)
+  );
+  const pendingConfirmation = typedExchanges.filter(
     (exchange) => exchange.status === "pending_confirmation"
   );
-  const others = typedExchanges.filter(
-    (exchange) => exchange.status !== "pending_confirmation"
+  const activeWorkflow = typedExchanges.filter(
+    (exchange) =>
+      exchange.status === "confirmed" ||
+      exchange.status === "pending_department_approval"
+  );
+  const resolvedWorkflow = typedExchanges.filter(
+    (exchange) =>
+      exchange.status === "approved" ||
+      exchange.status === "rejected" ||
+      exchange.status === "cancelled" ||
+      exchange.status === "completed"
   );
 
   return (
@@ -87,14 +188,14 @@ export default async function ExchangesPage() {
       <PageHeader
         eyebrow="Acuerdos"
         title="Intercambios"
-        description="Consulta que acuerdos estan pendientes, cuales requieren accion inmediata y cuales ya han quedado cerrados o firmados."
+        description="Sigue cada expediente desde la confirmacion inicial hasta la firma, la aprobacion departamental y la resolucion final."
       />
 
       {typedExchanges.length === 0 ? (
         <EmptyState
           icon={<SearchX className="size-5" />}
           title="Todavia no tienes intercambios"
-          description="Cuando el propietario de un turno acepte tu solicitud, el intercambio aparecera aqui con su contexto y proximos pasos."
+          description="Cuando el propietario de un turno acepte tu solicitud, el expediente aparecera aqui con sus siguientes pasos."
           action={
             <Link href="/shifts">
               <Button variant="outline">Explorar turnos</Button>
@@ -103,19 +204,20 @@ export default async function ExchangesPage() {
         />
       ) : (
         <>
-          {pending.length > 0 && (
+          {pendingConfirmation.length > 0 && (
             <section className="space-y-4">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
                   Pendientes de confirmacion
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Intercambios que todavia necesitan una respuesta para avanzar.
+                  Intercambios que aun necesitan la aceptacion final de la otra
+                  parte para arrancar el expediente formal.
                 </p>
               </div>
 
               <div className="space-y-4">
-                {pending.map((exchange) => {
+                {pendingConfirmation.map((exchange) => {
                   const isOwner = exchange.user_a_id === authUser.id;
                   const isRequester = exchange.user_b_id === authUser.id;
                   const otherUser = isOwner ? exchange.requester : exchange.owner;
@@ -134,7 +236,11 @@ export default async function ExchangesPage() {
                               {formatShortDate(exchange.shift.date)} · {timeRange}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              <Badge className={SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]}>
+                              <Badge
+                                className={
+                                  SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]
+                                }
+                              >
                                 {SHIFT_TYPE_LABELS[exchange.shift.shift_type as ShiftType]}
                               </Badge>
                               <Badge variant="outline" className="text-foreground">
@@ -148,38 +254,33 @@ export default async function ExchangesPage() {
 
                           <div className="flex flex-wrap items-center gap-2">
                             {isRequester && (
-                              <>
-                                <form action={confirmExchange}>
-                                  <input type="hidden" name="exchange_id" value={exchange.id} />
-                                  <Button type="submit" size="sm">
-                                    Confirmar
-                                  </Button>
-                                </form>
-                                <form action={cancelExchange}>
-                                  <input type="hidden" name="exchange_id" value={exchange.id} />
-                                  <Button type="submit" variant="outline" size="sm">
-                                    Cancelar
-                                  </Button>
-                                </form>
-                              </>
+                              <form action={confirmExchange}>
+                                <input type="hidden" name="exchange_id" value={exchange.id} />
+                                <Button type="submit" size="sm">
+                                  Confirmar
+                                </Button>
+                              </form>
                             )}
 
                             <form action={startConversation}>
                               <input type="hidden" name="shift_id" value={exchange.shift_id} />
-                              <input
-                                type="hidden"
-                                name="other_user_id"
-                                value={otherUser.id}
-                              />
+                              <input type="hidden" name="other_user_id" value={otherUser.id} />
                               <Button type="submit" variant="secondary" size="sm">
                                 <MessageSquare className="size-4" />
                                 Chat
                               </Button>
                             </form>
 
+                            <form action={cancelExchange}>
+                              <input type="hidden" name="exchange_id" value={exchange.id} />
+                              <Button type="submit" variant="outline" size="sm">
+                                Cancelar
+                              </Button>
+                            </form>
+
                             <Link href={`/exchanges/${exchange.id}`}>
                               <Button variant="ghost" size="sm">
-                                Ver detalle
+                                Ver expediente
                               </Button>
                             </Link>
                           </div>
@@ -191,18 +292,7 @@ export default async function ExchangesPage() {
                             <ArrowLeftRight className="size-4 text-primary" />
                             Estado actual
                           </div>
-                          {isOwner ? (
-                            <>
-                              Esperando que <strong>{otherUser.full_name}</strong>{" "}
-                              confirme el intercambio para cerrar el acuerdo.
-                            </>
-                          ) : (
-                            <>
-                              <strong>{otherUser.full_name}</strong> ya ha aceptado
-                              tu solicitud. Confirma ahora para dejar el intercambio
-                              listo.
-                            </>
-                          )}
+                          {renderExchangeMessage(exchange, authUser.id)}
                         </div>
                       </CardContent>
                     </Card>
@@ -212,40 +302,29 @@ export default async function ExchangesPage() {
             </section>
           )}
 
-          {others.length > 0 && (
+          {activeWorkflow.length > 0 && (
             <section className="space-y-4">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  Historial y seguimiento
+                  Solicitud formal en curso
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Intercambios confirmados, firmados o cancelados con sus acciones
-                  disponibles.
+                  Expedientes que ya han pasado la negociacion y estan en fase
+                  de firma o revision departamental.
                 </p>
               </div>
 
               <div className="space-y-4">
-                {others.map((exchange) => {
+                {activeWorkflow.map((exchange) => {
                   const isOwner = exchange.user_a_id === authUser.id;
                   const otherUser = isOwner ? exchange.requester : exchange.owner;
                   const timeRange = formatTimeRange(
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
-                  const hasPendingCancellationRequest =
-                    exchange.status === "signed" &&
-                    Boolean(exchange.cancellation_requested_by);
-                  const isCancellationRequester =
-                    exchange.cancellation_requested_by === authUser.id;
-                  const canOpenChat =
-                    exchange.status === "confirmed" || exchange.status === "signed";
-                  const canCancelDirectly = exchange.status === "confirmed";
-                  const canRequestSignedCancellation =
-                    exchange.status === "signed" && !hasPendingCancellationRequest;
-                  const canRespondToSignedCancellation =
-                    exchange.status === "signed" &&
-                    hasPendingCancellationRequest &&
-                    !isCancellationRequester;
+                  const currentUserSigned = isOwner
+                    ? Boolean(exchange.signed_by_user_a_at)
+                    : Boolean(exchange.signed_by_user_b_at);
 
                   return (
                     <Card key={exchange.id}>
@@ -257,7 +336,11 @@ export default async function ExchangesPage() {
                               {formatShortDate(exchange.shift.date)} · {timeRange}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              <Badge className={SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]}>
+                              <Badge
+                                className={
+                                  SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]
+                                }
+                              >
                                 {SHIFT_TYPE_LABELS[exchange.shift.shift_type as ShiftType]}
                               </Badge>
                               <Badge variant="outline" className="text-foreground">
@@ -266,103 +349,127 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
-                              {hasPendingCancellationRequest && (
-                                <Badge variant="outline">Cancelacion pendiente</Badge>
+                              {exchange.status === "confirmed" && !currentUserSigned && (
+                                <Badge variant="outline">
+                                  <FileSignature className="size-3.5" />
+                                  Falta tu firma
+                                </Badge>
+                              )}
+                              {exchange.status === "pending_department_approval" && (
+                                <Badge variant="outline">
+                                  <ShieldCheck className="size-3.5" />
+                                  En revision
+                                </Badge>
                               )}
                             </div>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            {canOpenChat && (
-                              <form action={startConversation}>
-                                <input type="hidden" name="shift_id" value={exchange.shift_id} />
-                                <input
-                                  type="hidden"
-                                  name="other_user_id"
-                                  value={otherUser.id}
-                                />
-                                <Button type="submit" variant="secondary" size="sm">
-                                  <MessageSquare className="size-4" />
-                                  Chat
-                                </Button>
-                              </form>
-                            )}
-
-                            {canCancelDirectly && (
-                              <form action={cancelExchange}>
-                                <input type="hidden" name="exchange_id" value={exchange.id} />
-                                <Button type="submit" variant="outline" size="sm">
-                                  Cancelar
-                                </Button>
-                              </form>
-                            )}
-
-                            {canRequestSignedCancellation && (
-                              <form action={requestSignedExchangeCancellation}>
-                                <input type="hidden" name="exchange_id" value={exchange.id} />
-                                <Button type="submit" variant="outline" size="sm">
-                                  Solicitar cancelacion
-                                </Button>
-                              </form>
-                            )}
-
-                            {exchange.status === "signed" && isCancellationRequester && (
-                              <Button type="button" variant="outline" size="sm" disabled>
-                                Solicitud enviada
+                            <form action={startConversation}>
+                              <input type="hidden" name="shift_id" value={exchange.shift_id} />
+                              <input type="hidden" name="other_user_id" value={otherUser.id} />
+                              <Button type="submit" variant="secondary" size="sm">
+                                <MessageSquare className="size-4" />
+                                Chat
                               </Button>
-                            )}
-
-                            {canRespondToSignedCancellation && (
-                              <>
-                                <form action={confirmSignedExchangeCancellation}>
-                                  <input type="hidden" name="exchange_id" value={exchange.id} />
-                                  <Button type="submit" variant="outline" size="sm">
-                                    Confirmar cancelacion
-                                  </Button>
-                                </form>
-                                <form action={rejectSignedExchangeCancellation}>
-                                  <input type="hidden" name="exchange_id" value={exchange.id} />
-                                  <Button type="submit" variant="ghost" size="sm">
-                                    Rechazar
-                                  </Button>
-                                </form>
-                              </>
-                            )}
+                            </form>
 
                             <Link href={`/exchanges/${exchange.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Ver detalle
+                              <Button size="sm">
+                                {exchange.status === "confirmed"
+                                  ? currentUserSigned
+                                    ? "Ver firmas"
+                                    : "Firmar solicitud"
+                                  : "Abrir expediente"}
                               </Button>
                             </Link>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm leading-6 text-muted-foreground">
-                          {exchange.status === "signed" &&
-                          hasPendingCancellationRequest ? (
-                            isCancellationRequester ? (
-                              <>
-                                Has solicitado cancelar este intercambio. Queda
-                                pendiente de respuesta por {otherUser.full_name}.
-                              </>
-                            ) : (
-                              <>
-                                {otherUser.full_name} ha solicitado cancelar este
-                                intercambio. Puedes confirmarlo o rechazarlo.
-                              </>
-                            )
-                          ) : exchange.status === "signed" ? (
-                            <>Con {otherUser.full_name} · Intercambio firmado.</>
-                          ) : (
-                            <>
-                              Con {otherUser.full_name}
-                              {exchange.confirmed_at && (
-                                <> · Confirmado el {formatShortDate(exchange.confirmed_at)}</>
-                              )}
-                            </>
-                          )}
-                        </p>
+                        <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                          <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                            <ArrowLeftRight className="size-4 text-primary" />
+                            Estado actual
+                          </div>
+                          {renderExchangeMessage(exchange, authUser.id)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {resolvedWorkflow.length > 0 && (
+            <section className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
+                  Historial y resoluciones
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Intercambios ya aprobados, rechazados, cancelados o cerrados.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {resolvedWorkflow.map((exchange) => {
+                  const timeRange = formatTimeRange(
+                    exchange.shift.start_time,
+                    exchange.shift.end_time
+                  );
+
+                  return (
+                    <Card key={exchange.id}>
+                      <CardHeader className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <CalendarDays className="size-4" />
+                              {formatShortDate(exchange.shift.date)} · {timeRange}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge
+                                className={
+                                  SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]
+                                }
+                              >
+                                {SHIFT_TYPE_LABELS[exchange.shift.shift_type as ShiftType]}
+                              </Badge>
+                              <Badge variant="outline" className="text-foreground">
+                                {exchange.shift.department.name}
+                              </Badge>
+                              <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
+                                {EXCHANGE_STATUS_LABELS[exchange.status]}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <Link href={`/exchanges/${exchange.id}`}>
+                            <Button variant="ghost" size="sm">
+                              Ver expediente
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                          <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                            <ArrowLeftRight className="size-4 text-primary" />
+                            Resolucion
+                          </div>
+                          {renderExchangeMessage(exchange, authUser.id)}
+                        </div>
+
+                        {exchange.department_decision_notes && (
+                          <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                            <p className="mb-2 text-sm font-semibold text-foreground">
+                              Observaciones
+                            </p>
+                            {exchange.department_decision_notes}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );

@@ -1,246 +1,79 @@
-import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { getHoursBankTransactionStatusForExchange } from "@/lib/exchange-compensation";
 import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  renderToBuffer,
-} from "@react-pdf/renderer";
+  canAccessExchange,
+  EXCHANGE_EXPORTABLE_STATUSES,
+  getAuthenticatedExchangeActor,
+} from "@/lib/exchange-workflow";
+import { ExchangeCorporatePdf, type ExchangePdfData } from "@/lib/exchange-pdf-document";
+import { getExchangePdfDownloadName } from "@/lib/exchange-documents";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { pickFirstRelation } from "@/lib/supabase-relations";
+import { createClient } from "@/lib/supabase/server";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
-const styles = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 11,
-    paddingTop: 50,
-    paddingBottom: 60,
-    paddingHorizontal: 50,
-    color: "#1a1a1a",
-  },
-  header: {
-    marginBottom: 32,
-    borderBottomWidth: 2,
-    borderBottomColor: "#2563eb",
-    paddingBottom: 16,
-  },
-  appName: {
-    fontSize: 22,
-    fontFamily: "Helvetica-Bold",
-    color: "#2563eb",
-    marginBottom: 4,
-  },
-  docTitle: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: "#6b7280",
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingBottom: 4,
-  },
-  row: {
-    flexDirection: "row",
-    marginBottom: 6,
-  },
-  label: {
-    width: 160,
-    color: "#6b7280",
-  },
-  value: {
-    flex: 1,
-    fontFamily: "Helvetica-Bold",
-  },
-  signatureSection: {
-    marginTop: 40,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  signatureBox: {
-    width: "45%",
-  },
-  signatureLine: {
-    borderTopWidth: 1,
-    borderTopColor: "#1a1a1a",
-    marginTop: 48,
-    marginBottom: 6,
-  },
-  signatureName: {
-    fontSize: 10,
-    color: "#6b7280",
-  },
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 50,
-    right: 50,
-    fontSize: 9,
-    color: "#9ca3af",
-    textAlign: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingTop: 8,
-  },
-});
+export const runtime = "nodejs";
 
-interface ExchangeData {
+const ARCELOR_LOGO_ASSET_PATH = ["public", "brand", "arcelormittal-logo.png"];
+
+interface ExchangeDocumentDetail {
   id: string;
-  status: string;
-  confirmed_at: string | null;
+  status: ExchangeStatus;
+  agreement_type: ExchangeAgreementType | null;
+  compensation_shift_date: string | null;
+  compensation_shift_type: ShiftType | null;
   created_at: string;
+  confirmed_at: string | null;
+  signed_by_user_a_at: string | null;
+  signed_by_user_b_at: string | null;
+  signed_by_user_a_name: string | null;
+  signed_by_user_b_name: string | null;
+  submitted_for_approval_at: string | null;
+  department_reviewed_at: string | null;
+  department_decision_notes: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
   shift: {
     date: string;
     start_time: string;
     end_time: string;
-    shift_type: string;
-    department: { name: string };
+    shift_type: ShiftType;
+    department: {
+      id: string;
+      name: string;
+      company_id: string;
+      company: { name: string } | null;
+    };
   };
-  owner: { full_name: string; email: string };
-  requester: { full_name: string; email: string };
+  owner: {
+    id: string;
+    full_name: string;
+    email: string;
+    employee_id: string | null;
+  };
+  requester: {
+    id: string;
+    full_name: string;
+    email: string;
+    employee_id: string | null;
+  };
+  departmentApprover: {
+    full_name: string;
+    email: string;
+  } | null;
+  user_a_id: string;
+  user_b_id: string;
 }
 
-const SHIFT_TYPE_LABELS: Record<string, string> = {
-  morning: "Mañana",
-  afternoon: "Tarde",
-  night: "Noche",
-};
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("es-ES", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function formatTime(time: string): string {
-  if (time?.includes(":")) {
-    const [h, m] = time.split(":");
-    return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
-  }
-  return time;
-}
-
-function ExchangePdf({ exchange }: { exchange: ExchangeData }) {
-  const timeRange = `${formatTime(exchange.shift.start_time)} – ${formatTime(exchange.shift.end_time)}`;
-  const confirmedAt = exchange.confirmed_at
-    ? formatDate(exchange.confirmed_at)
-    : "—";
-
-  return (
-    <Document
-      title={`Confirmacion de intercambio de turno - ShiftSwap`}
-      author="ShiftSwap"
-    >
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.appName}>ShiftSwap</Text>
-          <Text style={styles.docTitle}>
-            Documento de confirmación de intercambio de turno
-          </Text>
-        </View>
-
-        {/* Shift details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Turno intercambiado</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Fecha:</Text>
-            <Text style={styles.value}>{formatDate(exchange.shift.date)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Horario:</Text>
-            <Text style={styles.value}>{timeRange}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Tipo:</Text>
-            <Text style={styles.value}>
-              {SHIFT_TYPE_LABELS[exchange.shift.shift_type] ?? exchange.shift.shift_type}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Departamento:</Text>
-            <Text style={styles.value}>{exchange.shift.department.name}</Text>
-          </View>
-        </View>
-
-        {/* Participants */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Empleados</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Propietario del turno:</Text>
-            <Text style={styles.value}>
-              {exchange.owner.full_name} ({exchange.owner.email})
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Solicitante:</Text>
-            <Text style={styles.value}>
-              {exchange.requester.full_name} ({exchange.requester.email})
-            </Text>
-          </View>
-        </View>
-
-        {/* Confirmation */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Confirmación</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Estado:</Text>
-            <Text style={styles.value}>
-              {exchange.status === "signed" ? "Firmado" : "Confirmado"}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Fecha de confirmación:</Text>
-            <Text style={styles.value}>{confirmedAt}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Nº referencia:</Text>
-            <Text style={styles.value}>{exchange.id}</Text>
-          </View>
-        </View>
-
-        {/* Signatures */}
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureName}>
-              {exchange.owner.full_name}
-            </Text>
-            <Text style={styles.signatureName}>Propietario del turno</Text>
-          </View>
-          <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureName}>
-              {exchange.requester.full_name}
-            </Text>
-            <Text style={styles.signatureName}>Solicitante</Text>
-          </View>
-        </View>
-
-        {/* Footer */}
-        <Text style={styles.footer}>
-          Documento generado automáticamente por ShiftSwap el{" "}
-          {new Date().toLocaleDateString("es-ES")} · Ref: {exchange.id}
-        </Text>
-      </Page>
-    </Document>
-  );
+async function loadArcelorLogoDataUri(): Promise<string> {
+  const logoBuffer = await readFile(path.join(process.cwd(), ...ARCELOR_LOGO_ASSET_PATH));
+  return `data:image/png;base64,${logoBuffer.toString("base64")}`;
 }
 
 export async function GET(
-  _request: NextRequest,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -254,42 +87,174 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { data: exchange } = await supabase
+  const actor = await getAuthenticatedExchangeActor(authUser.id);
+  if (!actor) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const adminClient = createAdminClient();
+  const { data: exchange } = await adminClient
     .from("exchanges")
     .select(
       `
-      id, confirmed_at, created_at, status,
-      shift:shifts!shift_id(date, start_time, end_time, shift_type,
-        department:departments!department_id(name)),
-      owner:user_profiles!user_a_id(full_name, email),
-      requester:user_profiles!user_b_id(full_name, email)
+      id, status, agreement_type, compensation_shift_date, compensation_shift_type,
+      created_at, confirmed_at,
+      signed_by_user_a_at, signed_by_user_b_at,
+      signed_by_user_a_name, signed_by_user_b_name,
+      submitted_for_approval_at, department_reviewed_at,
+      department_decision_notes, approved_at, rejected_at,
+      user_a_id, user_b_id,
+      shift:shifts!shift_id(
+        date,
+        start_time,
+        end_time,
+        shift_type,
+        department:departments!department_id(
+          id,
+          name,
+          company_id,
+          company:companies!company_id(name)
+        )
+      ),
+      owner:user_profiles!user_a_id(id, full_name, email, employee_id),
+      requester:user_profiles!user_b_id(id, full_name, email, employee_id),
+      departmentApprover:user_profiles!department_approver_id(full_name, email)
     `
     )
     .eq("id", id)
-    .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`)
-    .single();
+    .maybeSingle();
 
-  if (!exchange) {
+  const rawExchange = (exchange as unknown as
+    | (ExchangeDocumentDetail & {
+        shift:
+          | (ExchangeDocumentDetail["shift"] & {
+              department:
+                | (ExchangeDocumentDetail["shift"]["department"] & {
+                    company:
+                      | ExchangeDocumentDetail["shift"]["department"]["company"]
+                      | ExchangeDocumentDetail["shift"]["department"]["company"][];
+                  })
+                | ExchangeDocumentDetail["shift"]["department"][];
+            })
+          | ExchangeDocumentDetail["shift"][];
+        owner:
+          | ExchangeDocumentDetail["owner"]
+          | ExchangeDocumentDetail["owner"][];
+        requester:
+          | ExchangeDocumentDetail["requester"]
+          | ExchangeDocumentDetail["requester"][];
+        departmentApprover:
+          | ExchangeDocumentDetail["departmentApprover"]
+          | ExchangeDocumentDetail["departmentApprover"][];
+      })
+    | null) ?? null;
+
+  const shift = rawExchange ? pickFirstRelation(rawExchange.shift) : null;
+  const typedExchange =
+    rawExchange && shift
+      ? ({
+          ...rawExchange,
+          shift: {
+            ...shift,
+            department: {
+              ...(pickFirstRelation(shift.department) ?? shift.department),
+              company:
+                pickFirstRelation(
+                  (pickFirstRelation(shift.department) ?? shift.department).company
+                ) ??
+                (pickFirstRelation(shift.department) ?? shift.department).company,
+            },
+          },
+          owner: pickFirstRelation(rawExchange.owner),
+          requester: pickFirstRelation(rawExchange.requester),
+          departmentApprover: pickFirstRelation(rawExchange.departmentApprover),
+        } as ExchangeDocumentDetail)
+      : null;
+
+  if (!typedExchange || !typedExchange.owner || !typedExchange.requester) {
     return new Response("Not found", { status: 404 });
   }
 
-  const typed = exchange as unknown as ExchangeData;
-
   if (
-    typed.status !== "confirmed" &&
-    typed.status !== "signed" &&
-    typed.status !== "completed"
+    !canAccessExchange(actor, {
+      user_a_id: typedExchange.user_a_id,
+      user_b_id: typedExchange.user_b_id,
+      company_id: typedExchange.shift.department.company_id,
+      department_id: typedExchange.shift.department.id,
+    })
   ) {
-    return new Response("Exchange not confirmed yet", { status: 400 });
+    return new Response("Not found", { status: 404 });
   }
 
-  const buffer = await renderToBuffer(<ExchangePdf exchange={typed} />);
-  const pdfBytes = new Uint8Array(buffer);
+  if (!EXCHANGE_EXPORTABLE_STATUSES.includes(typedExchange.status)) {
+    return new Response("Exchange not ready for export", { status: 400 });
+  }
 
-  return new Response(pdfBytes, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="intercambio-${id.slice(0, 8)}.pdf"`,
-    },
-  });
+  try {
+    const logoDataUri = await loadArcelorLogoDataUri();
+    const pdfBuffer = await renderToBuffer(
+      <ExchangeCorporatePdf
+        exchange={{
+          id: typedExchange.id,
+          status: typedExchange.status,
+          agreement_type: typedExchange.agreement_type,
+          created_at: typedExchange.created_at,
+          confirmed_at: typedExchange.confirmed_at,
+          submitted_for_approval_at: typedExchange.submitted_for_approval_at,
+          department_reviewed_at: typedExchange.department_reviewed_at,
+          department_decision_notes: typedExchange.department_decision_notes,
+          approved_at: typedExchange.approved_at,
+          rejected_at: typedExchange.rejected_at,
+          signed_by_user_a_at: typedExchange.signed_by_user_a_at,
+          signed_by_user_b_at: typedExchange.signed_by_user_b_at,
+          signed_by_user_a_name: typedExchange.signed_by_user_a_name,
+          signed_by_user_b_name: typedExchange.signed_by_user_b_name,
+          shift: {
+            date: typedExchange.shift.date,
+            start_time: typedExchange.shift.start_time,
+            end_time: typedExchange.shift.end_time,
+            shift_type: typedExchange.shift.shift_type,
+            department_name: typedExchange.shift.department.name,
+            company_name:
+              typedExchange.shift.department.company?.name ?? "ArcelorMittal",
+            target_shift_type: typedExchange.compensation_shift_type,
+            target_shift_date: typedExchange.compensation_shift_date,
+          },
+          owner: {
+            full_name: typedExchange.owner.full_name,
+            employee_id: typedExchange.owner.employee_id,
+            category: null,
+            position: null,
+          },
+          requester: {
+            full_name: typedExchange.requester.full_name,
+            employee_id: typedExchange.requester.employee_id,
+            category: null,
+            position: null,
+          },
+          departmentApprover: typedExchange.departmentApprover,
+          hours_bank_status:
+            typedExchange.agreement_type === "hours_bank"
+              ? getHoursBankTransactionStatusForExchange(typedExchange.status)
+              : null,
+        } satisfies ExchangePdfData}
+        logoDataUri={logoDataUri}
+      />
+    );
+
+    return new Response(new Uint8Array(pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${getExchangePdfDownloadName(
+          id
+        )}"`,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "[api/exchanges/[id]/pdf] Failed to generate corporate exchange PDF",
+      error
+    );
+    return new Response("PDF generation failed", { status: 500 });
+  }
 }

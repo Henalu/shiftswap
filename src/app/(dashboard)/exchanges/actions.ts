@@ -1,11 +1,27 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import {
-  createNotification,
-  resolveNotifications,
-} from "@/lib/notifications";
+  EXCHANGE_DOCUMENT_MAX_SIZE,
+  getExchangeDocumentKind,
+  getExchangeDocumentStoragePath,
+} from "@/lib/exchange-documents";
+import {
+  getScopedExchangeApproverIds,
+  recordExchangeEvent,
+} from "@/lib/exchange-workflow";
+import {
+  getAgreementSummary,
+  getMinimumCompensationDate,
+  isCompensationDateValid,
+  isExchangeAgreementType,
+  isShiftType,
+  syncHoursBankDebtTransactionStatus,
+  upsertHoursBankDebtTransaction,
+} from "@/lib/exchange-compensation";
+import { createClient } from "@/lib/supabase/server";
+import { createNotification, resolveNotifications } from "@/lib/notifications";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 export interface ExchangeMutationResult {
   success?: true;
@@ -17,16 +33,32 @@ interface ExchangeParticipantRow {
   shift_id: string;
   user_a_id: string;
   user_b_id: string;
-  status: string;
+  status: ExchangeStatus;
+  agreement_type?: ExchangeAgreementType | null;
+  compensation_shift_date?: string | null;
+  compensation_shift_type?: ShiftType | null;
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
+  signed_by_user_a_at?: string | null;
+  signed_by_user_b_at?: string | null;
+}
+
+interface ShiftScopeRow {
+  department_id: string;
+  department: {
+    company_id: string;
+  } | null;
 }
 
 function revalidateExchangeViews(exchangeId: string, shiftId: string) {
   revalidatePath("/exchanges");
   revalidatePath(`/exchanges/${exchangeId}`);
   revalidatePath(`/shifts/${shiftId}`);
+  revalidatePath("/shifts");
   revalidatePath("/shifts/my");
+  revalidatePath("/chat");
+  revalidatePath("/admin");
+  revalidatePath("/admin/exchanges");
 }
 
 async function resolveExchangeInbox(
@@ -41,10 +73,64 @@ async function resolveExchangeInbox(
       "exchange_document_added",
       "exchange_signed",
       "exchange_cancellation_requested",
+      "exchange_pending_approval",
+      "exchange_department_approved",
+      "exchange_department_rejected",
     ],
     dataContains: { exchange_id: exchangeId },
     unresolvedOnly: true,
   });
+}
+
+async function reopenShiftAfterExchangeReset(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  shiftId: string,
+  requesterId: string
+): Promise<void> {
+  await supabase.from("shifts").update({ status: "open" }).eq("id", shiftId);
+
+  await supabase
+    .from("shift_requests")
+    .update({ status: "pending" })
+    .eq("shift_id", shiftId)
+    .eq("interested_user_id", requesterId)
+    .eq("status", "accepted");
+}
+
+async function getShiftScope(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  shiftId: string
+): Promise<{ company_id: string | null; department_id: string | null }> {
+  const { data } = await supabase
+    .from("shifts")
+    .select(
+      `
+      department_id,
+      department:departments!department_id(company_id)
+    `
+    )
+    .eq("id", shiftId)
+    .single();
+
+  const typed = (data as ShiftScopeRow | null) ?? null;
+
+  return {
+    company_id: typed?.department?.company_id ?? null,
+    department_id: typed?.department_id ?? null,
+  };
+}
+
+async function getUserFullName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string> {
+  const { data } = await supabase
+    .from("user_profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return data?.full_name ?? "Empleado";
 }
 
 export async function confirmExchange(formData: FormData): Promise<void> {
@@ -68,9 +154,11 @@ export async function confirmExchange(formData: FormData): Promise<void> {
 
   if (!exchange) return;
 
+  const now = new Date().toISOString();
+
   await supabase
     .from("exchanges")
-    .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+    .update({ status: "confirmed", confirmed_at: now })
     .eq("id", exchangeId);
 
   await supabase
@@ -81,8 +169,8 @@ export async function confirmExchange(formData: FormData): Promise<void> {
   await createNotification({
     userId: exchange.user_a_id,
     type: "exchange_confirmed",
-    title: "Intercambio confirmado",
-    body: "La otra parte ha confirmado el intercambio de turno.",
+    title: "Acuerdo confirmado",
+    body: "La otra parte ha confirmado el intercambio. Ya podeis firmar la solicitud dentro de la app.",
     dedupeKey: `exchange_confirmed:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
@@ -98,6 +186,16 @@ export async function confirmExchange(formData: FormData): Promise<void> {
     unresolvedOnly: true,
   });
 
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "agreement_confirmed",
+    title: "Acuerdo confirmado por ambas partes",
+    details: "El intercambio ya puede pasar a la solicitud formal y a la firma interna.",
+    fromStatus: "pending_confirmation",
+    toStatus: "confirmed",
+  });
+
   revalidateExchangeViews(exchangeId, exchange.shift_id);
 }
 
@@ -107,21 +205,19 @@ export async function attachExchangeDocument(
   const exchangeId = formData.get("exchange_id") as string;
   const file = formData.get("document");
 
-  if (!exchangeId) return { error: "Intercambio inválido." };
+  if (!exchangeId) return { error: "Intercambio invalido." };
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Selecciona un PDF para adjuntar." };
+    return { error: "Selecciona un documento para adjuntar." };
   }
 
-  const fileName = file.name.toLowerCase();
-  const isPdf =
-    file.type === "application/pdf" || fileName.endsWith(".pdf");
+  const documentKind = getExchangeDocumentKind(file);
 
-  if (!isPdf) {
-    return { error: "Solo se permiten archivos PDF." };
+  if (!documentKind) {
+    return { error: "Solo se permiten archivos PDF o Word (.doc, .docx)." };
   }
 
-  if (file.size > 10 * 1024 * 1024) {
-    return { error: "El PDF no puede superar los 10 MB." };
+  if (file.size > EXCHANGE_DOCUMENT_MAX_SIZE) {
+    return { error: "El documento no puede superar los 10 MB." };
   }
 
   const supabase = await createClient();
@@ -133,33 +229,45 @@ export async function attachExchangeDocument(
 
   const { data: exchange } = await supabase
     .from("exchanges")
-    .select(
-      "id, shift_id, user_a_id, user_b_id, status, signed_by_user_a_at, signed_by_user_b_at"
-    )
+    .select("id, shift_id, user_a_id, user_b_id, status")
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "confirmed")
+    .in("status", ["confirmed", "pending_department_approval"])
     .single();
 
   if (!exchange) {
     return {
       error:
-        "Solo puedes adjuntar un PDF en intercambios confirmados en los que participas.",
+        "Solo puedes adjuntar soporte en solicitudes activas en las que participas.",
     };
   }
 
-  const path = `${exchangeId}/document.pdf`;
+  const path = getExchangeDocumentStoragePath(
+    exchangeId,
+    documentKind.extension
+  );
   const bytes = new Uint8Array(await file.arrayBuffer());
+
+  const { data: existingDocuments } = await supabase.storage
+    .from("exchange-documents")
+    .list(exchangeId);
+
+  const filesToRemove =
+    existingDocuments?.map((document) => `${exchangeId}/${document.name}`) ?? [];
+
+  if (filesToRemove.length > 0) {
+    await supabase.storage.from("exchange-documents").remove(filesToRemove);
+  }
 
   const { error: uploadError } = await supabase.storage
     .from("exchange-documents")
     .upload(path, bytes, {
-      contentType: "application/pdf",
+      contentType: documentKind.mimeType,
       upsert: true,
     });
 
   if (uploadError) {
-    return { error: `No se pudo subir el PDF: ${uploadError.message}` };
+    return { error: `No se pudo subir el documento: ${uploadError.message}` };
   }
 
   const {
@@ -170,9 +278,6 @@ export async function attachExchangeDocument(
     .from("exchanges")
     .update({
       document_url: `${publicUrl}?t=${Date.now()}`,
-      signed_by_user_a_at: null,
-      signed_by_user_b_at: null,
-      status: "confirmed",
     })
     .eq("id", exchangeId);
 
@@ -186,13 +291,24 @@ export async function attachExchangeDocument(
   await createNotification({
     userId: otherUserId,
     type: "exchange_document_added",
-    title: "Nuevo documento adjunto",
-    body: "La otra parte ha añadido o actualizado el PDF del intercambio.",
+    title: "Nuevo soporte adjunto",
+    body: "La otra parte ha subido o reemplazado un documento de apoyo para la solicitud.",
     dedupeKey: `exchange_document:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: exchange.shift_id,
       action_url: `/exchanges/${exchangeId}`,
+    },
+  });
+
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "support_document_attached",
+    title: "Soporte adicional adjuntado",
+    details: "Se ha subido un documento de apoyo para complementar la solicitud.",
+    metadata: {
+      extension: documentKind.extension,
     },
   });
 
@@ -205,7 +321,7 @@ export async function signExchange(
   formData: FormData
 ): Promise<ExchangeMutationResult> {
   const exchangeId = formData.get("exchange_id") as string;
-  if (!exchangeId) return { error: "Intercambio inválido." };
+  if (!exchangeId) return { error: "Intercambio invalido." };
 
   const supabase = await createClient();
   const {
@@ -218,8 +334,9 @@ export async function signExchange(
     .from("exchanges")
     .select(
       `
-      id, shift_id, user_a_id, user_b_id, status, document_url,
-      signed_by_user_a_at, signed_by_user_b_at
+      id, shift_id, user_a_id, user_b_id, status,
+      signed_by_user_a_at, signed_by_user_b_at,
+      agreement_type, compensation_shift_date, compensation_shift_type
     `
     )
     .eq("id", exchangeId)
@@ -228,11 +345,7 @@ export async function signExchange(
     .single();
 
   if (!exchange) {
-    return { error: "Este intercambio ya no admite nuevas firmas." };
-  }
-
-  if (!exchange.document_url) {
-    return { error: "Adjunta primero un PDF para poder firmar." };
+    return { error: "Esta solicitud ya no admite nuevas firmas." };
   }
 
   const now = new Date().toISOString();
@@ -245,9 +358,89 @@ export async function signExchange(
     return { success: true };
   }
 
-  const updatePayload = isUserA
-    ? { signed_by_user_a_at: now }
-    : { signed_by_user_b_at: now };
+  const signerName = await getUserFullName(supabase, user.id);
+  let updatePayload:
+    | {
+        signed_by_user_a_at: string;
+        signed_by_user_a_name: string;
+      }
+    | {
+        signed_by_user_b_at: string;
+        signed_by_user_b_name: string;
+        agreement_type: ExchangeAgreementType;
+        compensation_shift_date: string | null;
+        compensation_shift_type: ShiftType | null;
+      };
+  let signatureDetails = "La firma se ha registrado dentro de la app.";
+
+  if (isUserA) {
+    updatePayload = { signed_by_user_a_at: now, signed_by_user_a_name: signerName };
+  } else {
+    const agreementTypeValue = (
+      formData.get("agreement_type") as string | null
+    )?.trim();
+
+    if (!isExchangeAgreementType(agreementTypeValue)) {
+      return {
+        error:
+          "Selecciona si el acuerdo es bolsa de horas o intercambio de turno antes de firmar.",
+      };
+    }
+
+    let compensationShiftDate: string | null = null;
+    let compensationShiftType: ShiftType | null = null;
+
+    if (agreementTypeValue === "shift_exchange") {
+      const compensationDateValue = (
+        formData.get("compensation_shift_date") as string | null
+      )?.trim();
+      const compensationShiftTypeValue = (
+        formData.get("compensation_shift_type") as string | null
+      )?.trim();
+      const minimumCompensationDate = getMinimumCompensationDate();
+
+      if (!compensationDateValue) {
+        return { error: "Indica la fecha futura del turno acordado." };
+      }
+
+      if (
+        !isCompensationDateValid(
+          compensationDateValue,
+          minimumCompensationDate
+        )
+      ) {
+        return {
+          error:
+            "La fecha del intercambio debe ser al menos desde manana en adelante.",
+        };
+      }
+
+      if (!isShiftType(compensationShiftTypeValue)) {
+        return {
+          error: "Selecciona si la compensacion futura es de manana, tarde o noche.",
+        };
+      }
+
+      compensationShiftDate = compensationDateValue;
+      compensationShiftType = compensationShiftTypeValue;
+    }
+
+    updatePayload = {
+      signed_by_user_b_at: now,
+      signed_by_user_b_name: signerName,
+      agreement_type: agreementTypeValue,
+      compensation_shift_date: compensationShiftDate,
+      compensation_shift_type: compensationShiftType,
+    };
+    const ownerName = await getUserFullName(supabase, exchange.user_a_id);
+    signatureDetails = getAgreementSummary({
+      agreementType: agreementTypeValue,
+      compensationShiftType,
+      compensationShiftDate,
+      ownerName,
+      requesterName: signerName,
+    });
+  }
 
   const { error: signError } = await supabase
     .from("exchanges")
@@ -258,9 +451,19 @@ export async function signExchange(
     return { error: signError.message };
   }
 
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "participant_signed",
+    title: `${signerName} ha firmado la solicitud`,
+    details: signatureDetails,
+  });
+
   const { data: latestExchange } = await supabase
     .from("exchanges")
-    .select("status, signed_by_user_a_at, signed_by_user_b_at")
+    .select(
+      "status, shift_id, user_a_id, user_b_id, signed_by_user_a_at, signed_by_user_b_at, agreement_type, compensation_shift_date, compensation_shift_type"
+    )
     .eq("id", exchangeId)
     .single();
 
@@ -270,13 +473,23 @@ export async function signExchange(
     latestExchange.signed_by_user_a_at &&
     latestExchange.signed_by_user_b_at
   ) {
+    const ownerName = await getUserFullName(supabase, latestExchange.user_a_id);
+    const requesterName = await getUserFullName(
+      supabase,
+      latestExchange.user_b_id
+    );
+
     await supabase
       .from("exchanges")
-      .update({ status: "signed" })
+      .update({
+        status: "pending_department_approval",
+        submitted_for_approval_at: now,
+      })
       .eq("id", exchangeId)
       .eq("status", "confirmed");
 
-    const otherUserId = isUserA ? exchange.user_b_id : exchange.user_a_id;
+    const scope = await getShiftScope(supabase, exchange.shift_id);
+    const approverIds = await getScopedExchangeApproverIds(scope);
 
     await resolveNotifications({
       userIds: [exchange.user_a_id, exchange.user_b_id],
@@ -285,18 +498,68 @@ export async function signExchange(
       unresolvedOnly: true,
     });
 
-    await createNotification({
-      userId: otherUserId,
-      type: "exchange_signed",
-      title: "Intercambio firmado",
-      body: "Ambas partes han completado la firma del intercambio.",
-      dedupeKey: `exchange_signed:${exchangeId}`,
-      data: {
-        exchange_id: exchangeId,
-        shift_id: exchange.shift_id,
-        action_url: `/exchanges/${exchangeId}`,
-      },
+    await recordExchangeEvent({
+      exchangeId,
+      actorId: user.id,
+      eventType: "submitted_for_approval",
+      title: "Solicitud enviada a aprobacion departamental",
+      details: getAgreementSummary({
+        agreementType: latestExchange.agreement_type,
+        compensationShiftType: latestExchange.compensation_shift_type,
+        compensationShiftDate: latestExchange.compensation_shift_date,
+        ownerName,
+        requesterName,
+      }),
+      fromStatus: "confirmed",
+      toStatus: "pending_department_approval",
     });
+
+    if (latestExchange.agreement_type === "hours_bank") {
+      await upsertHoursBankDebtTransaction({
+        exchangeId,
+        exchangeStatus: "pending_department_approval",
+        debtorUserId: latestExchange.user_a_id,
+        creditorUserId: latestExchange.user_b_id,
+        debtorName: ownerName,
+        creditorName: requesterName,
+      });
+    }
+
+    const participantIds = [exchange.user_a_id, exchange.user_b_id];
+
+    for (const participantId of participantIds) {
+      await createNotification({
+        userId: participantId,
+        type: "exchange_pending_approval",
+        title: "Solicitud enviada a aprobacion",
+        body: "La solicitud ya esta firmada por ambas partes y queda pendiente de revision del departamento.",
+        dedupeKey: `exchange_pending_approval:${exchangeId}`,
+        data: {
+          exchange_id: exchangeId,
+          shift_id: exchange.shift_id,
+          action_url: `/exchanges/${exchangeId}`,
+        },
+      });
+    }
+
+    for (const approverId of approverIds) {
+      if (participantIds.includes(approverId)) {
+        continue;
+      }
+
+      await createNotification({
+        userId: approverId,
+        type: "exchange_pending_approval",
+        title: "Solicitud pendiente de aprobacion",
+        body: "Hay un cambio de turno listo para revisar y resolver desde la app.",
+        dedupeKey: `exchange_pending_approval:${exchangeId}`,
+        data: {
+          exchange_id: exchangeId,
+          shift_id: exchange.shift_id,
+          action_url: `/admin/exchanges`,
+        },
+      });
+    }
   }
 
   revalidateExchangeViews(exchangeId, exchange.shift_id);
@@ -324,7 +587,7 @@ export async function requestSignedExchangeCancellation(
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .single();
 
   const typedExchange = exchange as ExchangeParticipantRow | null;
@@ -345,7 +608,7 @@ export async function requestSignedExchangeCancellation(
       cancellation_requested_at: requestedAt,
     })
     .eq("id", exchangeId)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .is("cancellation_requested_by", null);
 
   if (error) return;
@@ -358,14 +621,22 @@ export async function requestSignedExchangeCancellation(
   await createNotification({
     userId: otherUserId,
     type: "exchange_cancellation_requested",
-    title: "Solicitud de cancelación",
-    body: "La otra parte ha solicitado cancelar un intercambio ya firmado.",
+    title: "Solicitud de retirada",
+    body: "La otra parte ha pedido retirar la solicitud antes de la decision del departamento.",
     dedupeKey: `exchange_cancellation_requested:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: typedExchange.shift_id,
       action_url: `/exchanges/${exchangeId}`,
     },
+  });
+
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "cancellation_requested",
+    title: "Retirada solicitada",
+    details: "Una de las partes ha pedido cancelar la solicitud antes de la aprobacion.",
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -391,7 +662,7 @@ export async function confirmSignedExchangeCancellation(
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .not("cancellation_requested_by", "is", null)
     .single();
 
@@ -415,15 +686,18 @@ export async function confirmSignedExchangeCancellation(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .eq("cancellation_requested_by", typedExchange.cancellation_requested_by);
 
   if (cancelError) return;
 
-  await supabase
-    .from("shifts")
-    .update({ status: "cancelled" })
-    .eq("id", typedExchange.shift_id);
+  await syncHoursBankDebtTransactionStatus(exchangeId, "voided");
+
+  await reopenShiftAfterExchangeReset(
+    supabase,
+    typedExchange.shift_id,
+    typedExchange.user_b_id
+  );
 
   await resolveExchangeInbox(exchangeId, [
     typedExchange.user_a_id,
@@ -439,8 +713,8 @@ export async function confirmSignedExchangeCancellation(
   await createNotification({
     userId: requesterUserId,
     type: "exchange_cancelled",
-    title: "Cancelación confirmada",
-    body: "La otra parte ha confirmado la cancelación del intercambio firmado.",
+    title: "Solicitud retirada",
+    body: "La otra parte ha confirmado la retirada del intercambio y el turno vuelve a quedar libre.",
     dedupeKey: `exchange_cancelled:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
@@ -449,8 +723,17 @@ export async function confirmSignedExchangeCancellation(
     },
   });
 
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "exchange_cancelled",
+    title: "Solicitud cancelada",
+    details: "La retirada ha sido confirmada por la otra parte y el expediente se cierra.",
+    fromStatus: "pending_department_approval",
+    toStatus: "cancelled",
+  });
+
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
-  revalidatePath("/shifts");
 }
 
 export async function rejectSignedExchangeCancellation(
@@ -473,7 +756,7 @@ export async function rejectSignedExchangeCancellation(
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .not("cancellation_requested_by", "is", null)
     .single();
 
@@ -496,7 +779,7 @@ export async function rejectSignedExchangeCancellation(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "signed")
+    .eq("status", "pending_department_approval")
     .eq("cancellation_requested_by", typedExchange.cancellation_requested_by);
 
   if (error) return;
@@ -510,14 +793,22 @@ export async function rejectSignedExchangeCancellation(
   await createNotification({
     userId: requesterUserId,
     type: "exchange_cancellation_rejected",
-    title: "Solicitud de cancelación rechazada",
-    body: "La otra parte ha rechazado cancelar el intercambio firmado.",
+    title: "Retirada no aceptada",
+    body: "La otra parte ha decidido mantener la solicitud activa.",
     dedupeKey: `exchange_cancellation_rejected:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
       shift_id: typedExchange.shift_id,
       action_url: `/exchanges/${exchangeId}`,
     },
+  });
+
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "cancellation_rejected",
+    title: "Retirada rechazada",
+    details: "La solicitud continua activa y sigue pendiente de revision departamental.",
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -549,24 +840,7 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     .update({ status: "cancelled" })
     .eq("id", exchangeId);
 
-  if (exchange.status === "pending_confirmation") {
-    await supabase
-      .from("shifts")
-      .update({ status: "open" })
-      .eq("id", exchange.shift_id);
-
-    await supabase
-      .from("shift_requests")
-      .update({ status: "pending" })
-      .eq("shift_id", exchange.shift_id)
-      .eq("interested_user_id", exchange.user_b_id)
-      .eq("status", "accepted");
-  } else {
-    await supabase
-      .from("shifts")
-      .update({ status: "cancelled" })
-      .eq("id", exchange.shift_id);
-  }
+  await reopenShiftAfterExchangeReset(supabase, exchange.shift_id, exchange.user_b_id);
 
   await resolveExchangeInbox(exchangeId, [exchange.user_a_id, exchange.user_b_id]);
 
@@ -577,7 +851,7 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     userId: otherUserId,
     type: "exchange_cancelled",
     title: "Intercambio cancelado",
-    body: "La otra parte ha cancelado el intercambio de turno.",
+    body: "La otra parte ha cancelado este expediente y el turno vuelve a quedar disponible.",
     dedupeKey: `exchange_cancelled:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
@@ -586,6 +860,15 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     },
   });
 
+  await recordExchangeEvent({
+    exchangeId,
+    actorId: user.id,
+    eventType: "exchange_cancelled",
+    title: "Expediente cancelado",
+    details: "La solicitud se ha cancelado antes de enviarse al departamento.",
+    fromStatus: exchange.status,
+    toStatus: "cancelled",
+  });
+
   revalidateExchangeViews(exchangeId, exchange.shift_id);
-  revalidatePath("/shifts");
 }

@@ -66,7 +66,13 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     .from("exchanges")
     .select("id")
     .eq("shift_id", id)
-    .in("status", ["pending_confirmation", "confirmed", "signed", "completed"])
+    .in("status", [
+      "pending_confirmation",
+      "confirmed",
+      "pending_department_approval",
+      "approved",
+      "completed",
+    ])
     .or(`user_a_id.eq.${authUser.id},user_b_id.eq.${authUser.id}`)
     .limit(1)
     .maybeSingle();
