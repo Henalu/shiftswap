@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SHIFT_TYPE_LABELS } from "@/lib/constants";
+import { FORM_CONTROL_CLASSNAME, PANEL_CLASSNAME, cn } from "@/lib/utils";
 import type { ShiftType } from "@/types";
 
 interface Department {
@@ -23,6 +26,7 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
   function submit() {
     const form = formRef.current;
     if (!form) return;
+
     const data = new FormData(form);
     const params = new URLSearchParams();
     for (const [key, value] of data.entries()) {
@@ -41,95 +45,116 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
     <form
       key={searchParams.toString()}
       ref={formRef}
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         submit();
       }}
-      className="flex flex-wrap items-end gap-3"
+      className={cn(PANEL_CLASSNAME, "space-y-4 p-5")}
     >
-      <div className="flex flex-col gap-1">
-        <label htmlFor="filter-department" className="text-xs font-medium text-muted-foreground">
-          Departamento
-        </label>
-        <select
-          id="filter-department"
-          name="department_id"
-          defaultValue={searchParams.get("department_id") ?? ""}
-          onChange={submit}
-          className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <option value="">Todos</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <SlidersHorizontal className="size-4 text-primary" />
+            Filtra los turnos
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ajusta departamento, tipo o rango de fechas para comparar mas rapido.
+          </p>
+        </div>
+        {hasFilters && (
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/shifts">Limpiar filtros</Link>
+          </Button>
+        )}
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="filter-type" className="text-xs font-medium text-muted-foreground">
-          Tipo de turno
-        </label>
-        <select
-          id="filter-type"
-          name="shift_type"
-          defaultValue={searchParams.get("shift_type") ?? ""}
-          onChange={submit}
-          className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <option value="">Todos</option>
-          {(Object.entries(SHIFT_TYPE_LABELS) as [ShiftType, string][]).map(
-            ([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="space-y-2">
+          <label
+            htmlFor="filter-department"
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Departamento
+          </label>
+          <select
+            id="filter-department"
+            name="department_id"
+            defaultValue={searchParams.get("department_id") ?? ""}
+            onChange={submit}
+            className={FORM_CONTROL_CLASSNAME}
+          >
+            <option value="">Todos</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
               </option>
-            )
-          )}
-        </select>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="filter-type"
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Tipo
+          </label>
+          <select
+            id="filter-type"
+            name="shift_type"
+            defaultValue={searchParams.get("shift_type") ?? ""}
+            onChange={submit}
+            className={FORM_CONTROL_CLASSNAME}
+          >
+            <option value="">Todos</option>
+            {(Object.entries(SHIFT_TYPE_LABELS) as [ShiftType, string][]).map(
+              ([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="filter-from"
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Desde
+          </label>
+          <input
+            id="filter-from"
+            type="date"
+            name="from"
+            defaultValue={searchParams.get("from") ?? ""}
+            className={FORM_CONTROL_CLASSNAME}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="filter-to"
+            className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Hasta
+          </label>
+          <input
+            id="filter-to"
+            type="date"
+            name="to"
+            defaultValue={searchParams.get("to") ?? ""}
+            className={FORM_CONTROL_CLASSNAME}
+          />
+        </div>
+
+        <div className="flex items-end">
+          <Button type="submit" variant="outline" className="w-full">
+            Aplicar filtros
+          </Button>
+        </div>
       </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="filter-from" className="text-xs font-medium text-muted-foreground">
-          Desde
-        </label>
-        <input
-          id="filter-from"
-          type="date"
-          name="from"
-          defaultValue={searchParams.get("from") ?? ""}
-          className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="filter-to" className="text-xs font-medium text-muted-foreground">
-          Hasta
-        </label>
-        <input
-          id="filter-to"
-          type="date"
-          name="to"
-          defaultValue={searchParams.get("to") ?? ""}
-          className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-      </div>
-
-      <button
-        type="submit"
-        className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm font-medium transition-colors hover:bg-muted"
-      >
-        Filtrar
-      </button>
-
-      {hasFilters && (
-        <Link
-          href="/shifts"
-          className="h-9 flex items-center px-3 rounded-lg text-sm text-muted-foreground underline-offset-4 hover:underline"
-        >
-          Limpiar
-        </Link>
-      )}
     </form>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toggleInterest } from "./actions";
 
 interface InterestButtonProps {
@@ -11,34 +11,39 @@ interface InterestButtonProps {
   requestId: string | null;
 }
 
-export function InterestButton({ shiftId, initialInterested, requestId: initialRequestId }: InterestButtonProps) {
+export function InterestButton({
+  shiftId,
+  initialInterested,
+  requestId: initialRequestId,
+}: InterestButtonProps) {
   const [state, formAction, isPending] = useActionState(toggleInterest, null);
 
   const interested = state?.success ? !!state.interested : initialInterested;
-  const currentRequestId = state?.success ? (state.requestId ?? null) : initialRequestId;
+  const currentRequestId = state?.success
+    ? (state.requestId ?? null)
+    : initialRequestId;
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="shift_id" value={shiftId} />
       {currentRequestId && (
         <input type="hidden" name="request_id" value={currentRequestId} />
       )}
       <Button
         type="submit"
-        variant={interested ? "outline" : "default"}
+        variant={interested ? "secondary" : "default"}
         size="sm"
         disabled={isPending}
+        aria-pressed={interested}
+        className="min-w-[10rem]"
       >
         <Heart
-          className="mr-2 size-4"
+          className="size-4"
           fill={interested ? "currentColor" : "none"}
-          style={interested ? { color: "#f472b6" } : undefined}
         />
-        {isPending ? "..." : interested ? "Interesado" : "Me interesa"}
+        {isPending ? "Actualizando..." : interested ? "Interesado" : "Me interesa"}
       </Button>
-      {state?.error && (
-        <p className="mt-2 text-sm text-destructive">{state.error}</p>
-      )}
+      {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
     </form>
   );
 }

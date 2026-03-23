@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
 
@@ -100,10 +100,6 @@ export function ChatView({
     initialMessages[initialMessages.length - 1]?.id ?? null
   );
 
-  // Realtime subscription — delivers new messages in real time.
-  // NOTE: No server-side filter — messages table lacks REPLICA IDENTITY FULL,
-  // so postgres_changes column filters are unreliable. We filter client-side.
-  // RLS already ensures only messages from the user's own conversations arrive.
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -117,7 +113,6 @@ export function ChatView({
         },
         (payload) => {
           const incoming = payload.new as Message;
-          // Client-side filter: ignore messages from other conversations
           if (incoming.conversation_id !== conversationId) return;
 
           setMessages((prev) => mergeIncomingMessage(prev, incoming));
@@ -150,9 +145,6 @@ export function ChatView({
     isNearBottomRef.current = isNearBottom(container);
   }, []);
 
-  // Fallback sync: if Realtime is not enabled for `messages` in the active
-  // Supabase environment, poll the latest rows so the other participant still
-  // sees new messages without refreshing the page.
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
@@ -223,16 +215,15 @@ export function ChatView({
     isNearBottomRef.current = isNearBottom(container);
   }
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSend(event: React.FormEvent) {
+    event.preventDefault();
     const trimmed = content.trim();
     if (!trimmed || sending) return;
 
     setSending(true);
     setContent("");
 
-    // Optimistic update — message appears immediately
-    const optimisticMsg: Message = {
+    const optimisticMessage: Message = {
       id: `temp_${Date.now()}`,
       conversation_id: conversationId,
       sender_id: currentUserId,
@@ -240,7 +231,7 @@ export function ChatView({
       read: false,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimisticMsg]);
+    setMessages((prev) => [...prev, optimisticMessage]);
 
     const supabase = createClient();
     await supabase.from("messages").insert({
@@ -259,48 +250,57 @@ export function ChatView({
   }
 
   return (
-    <div className="flex h-[calc(100dvh-12rem)] flex-col rounded-lg border md:h-[calc(100dvh-8rem)]">
-      {/* Chat header */}
-      <div className="border-b px-4 py-3">
-        <p className="font-medium">{otherUserName}</p>
+    <div className="overflow-hidden rounded-[1.75rem] border border-border/80 bg-card/96 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_20px_40px_-28px_rgba(15,23,42,0.18)]">
+      <div className="border-b border-border/70 px-5 py-4">
+        <p className="text-sm font-semibold text-foreground">{otherUserName}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Conversacion activa sobre un posible intercambio.
+        </p>
       </div>
 
-      {/* Messages */}
       <div
         ref={messagesContainerRef}
         onScroll={handleMessagesScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-3"
+        className="flex h-[min(60vh,42rem)] flex-1 flex-col gap-3 overflow-y-auto bg-[linear-gradient(180deg,transparent,rgba(248,250,252,0.65))] px-4 py-5 sm:px-5"
       >
         {messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No hay mensajes aún. ¡Inicia la conversación!
-          </p>
+          <div className="flex flex-1 items-center justify-center px-6 py-10 text-center">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-foreground">
+                No hay mensajes aun
+              </p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Usa este chat para aclarar detalles del turno y avanzar con el
+                intercambio.
+              </p>
+            </div>
+          </div>
         ) : (
-          messages.map((msg) => {
-            const isMine = msg.sender_id === currentUserId;
+          messages.map((message) => {
+            const isMine = message.sender_id === currentUserId;
             return (
               <div
-                key={msg.id}
+                key={message.id}
                 className={cn("flex", isMine ? "justify-end" : "justify-start")}
               >
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2 text-sm",
+                    "max-w-[85%] rounded-[1.4rem] px-4 py-3 text-sm shadow-sm sm:max-w-[70%]",
                     isMine
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted text-foreground rounded-bl-sm"
+                      ? "rounded-br-md bg-primary text-primary-foreground"
+                      : "rounded-bl-md border border-border/70 bg-background text-foreground"
                   )}
                 >
-                  <p>{msg.content}</p>
+                  <p className="leading-6">{message.content}</p>
                   <p
                     className={cn(
-                      "mt-1 text-[10px]",
+                      "mt-2 text-xs",
                       isMine
-                        ? "text-right text-primary-foreground/70"
+                        ? "text-right text-primary-foreground/75"
                         : "text-muted-foreground"
                     )}
                   >
-                    {formatTime(msg.created_at)}
+                    {formatTime(message.created_at)}
                   </p>
                 </div>
               </div>
@@ -310,21 +310,23 @@ export function ChatView({
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t p-4">
-        <form onSubmit={handleSend} className="flex gap-2">
-          <Input
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Escribe un mensaje..."
-            disabled={sending}
-            className="flex-1"
-            autoComplete="off"
-          />
+      <div className="border-t border-border/70 bg-background/95 p-4">
+        <form onSubmit={handleSend} className="flex items-end gap-3">
+          <div className="flex-1">
+            <Input
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="Escribe un mensaje claro y breve..."
+              disabled={sending}
+              className="h-12"
+              autoComplete="off"
+            />
+          </div>
           <Button
             type="submit"
             size="icon"
             disabled={!content.trim() || sending}
+            aria-label="Enviar mensaje"
           >
             <Send className="size-4" />
           </Button>

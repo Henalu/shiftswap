@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ShieldCheck, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import { isSuperAdmin, USER_ROLE_LABELS } from "@/lib/user-roles";
@@ -67,83 +76,95 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Roles de usuario
-            </h1>
+      <PageHeader
+        eyebrow="Administracion"
+        title="Roles de usuario"
+        description="Asigna permisos con rapidez y deja claro el alcance de cada cuenta aprobada dentro del producto."
+        action={
+          <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{USER_ROLE_LABELS[accountState.role]}</Badge>
+            <Link href="/admin/validations">
+              <Button variant="outline">Volver a validaciones</Button>
+            </Link>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Asigna permisos de administración y alcance a los usuarios ya
-            validados.
-          </p>
-        </div>
+        }
+      />
 
-        <Button asChild variant="outline">
-          <Link href="/admin/validations">Volver a validaciones</Link>
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {approvedUsers.length === 0
+          ? "No hay usuarios aprobados para gestionar todavia."
+          : `${approvedUsers.length} usuario${approvedUsers.length !== 1 ? "s" : ""} aprobado${approvedUsers.length !== 1 ? "s" : ""} listo${approvedUsers.length !== 1 ? "s" : ""} para ajuste de rol.`}
+      </p>
 
       {approvedUsers.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No hay usuarios aprobados</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Cuando existan cuentas activas podrás asignarles roles desde aquí.
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Users className="size-5" />}
+          title="Todavia no hay cuentas activas"
+          description="Cuando existan usuarios aprobados podras asignar aqui permisos administrativos y revisar su alcance."
+          action={
+            <Link href="/admin/validations">
+              <Button variant="outline">Ir a validaciones</Button>
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-4">
-          {approvedUsers.map((profile) => (
-            <Card key={profile.id}>
-              <CardContent className="grid gap-4 p-6 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <h2 className="text-lg font-semibold">{profile.full_name}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {profile.email}
-                    </p>
+          {approvedUsers.map((profile) => {
+            const companyLabel = profile.company_id
+              ? companyMap.get(profile.company_id) ?? "Sin empresa"
+              : "Global";
+            const departmentLabel = profile.department_id
+              ? departmentMap.get(profile.department_id) ?? "Sin departamento"
+              : "Sin departamento";
+
+            return (
+              <Card key={profile.id}>
+                <CardHeader className="gap-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CardTitle>{profile.full_name}</CardTitle>
+                        <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
+                          <ShieldCheck className="size-3.5" />
+                          {USER_ROLE_LABELS[profile.role]}
+                        </Badge>
+                      </div>
+                      <CardDescription>{profile.email}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Empresa
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-foreground">
+                        {companyLabel}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Departamento
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-foreground">
+                        {departmentLabel}
+                      </p>
+                    </div>
                   </div>
 
-                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="font-medium text-foreground">Empresa</dt>
-                      <dd className="text-muted-foreground">
-                        {profile.company_id
-                          ? companyMap.get(profile.company_id) ?? "Sin empresa"
-                          : "Global"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-medium text-foreground">
-                        Departamento
-                      </dt>
-                      <dd className="text-muted-foreground">
-                        {profile.department_id
-                          ? departmentMap.get(profile.department_id) ??
-                            "Sin departamento"
-                          : "Sin departamento"}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <div className="space-y-3">
-                  <Badge variant="secondary" className="w-fit">
-                    {USER_ROLE_LABELS[profile.role]}
-                  </Badge>
-                  <UserRoleForm
-                    userId={profile.id}
-                    fullName={profile.full_name}
-                    currentRole={profile.role}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4">
+                    <UserRoleForm
+                      userId={profile.id}
+                      fullName={profile.full_name}
+                      currentRole={profile.role}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

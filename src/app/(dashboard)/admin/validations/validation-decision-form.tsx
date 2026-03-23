@@ -70,7 +70,17 @@ export function ValidationDecisionForm({
   const isSubmitting = pendingAction !== null;
 
   return (
-    <div className="space-y-4 border-t pt-6">
+    <div className="space-y-5 border-t border-border/70 pt-6">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">
+          Decision de validacion
+        </p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Aprueba si la cuenta puede activarse. Si rechazas, deja un motivo claro
+          para que la persona sepa que debe corregir.
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="validation_notes">Motivo de rechazo</Label>
         <Textarea

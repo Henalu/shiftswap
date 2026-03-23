@@ -1,15 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  MessageSquare,
+  SearchX,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { CalendarDays, ArrowLeftRight, MessageSquare } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { startConversation } from "@/app/(dashboard)/chat/actions";
 import {
   EXCHANGE_STATUS_LABELS,
+  EXCHANGE_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
+  SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
-import { formatShortDate } from "@/lib/utils";
+import { formatShortDate, formatTimeRange } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
 import {
   cancelExchange,
   confirmExchange,
@@ -17,16 +27,7 @@ import {
   rejectSignedExchangeCancellation,
   requestSignedExchangeCancellation,
 } from "./actions";
-import { startConversation } from "@/app/(dashboard)/chat/actions";
 import type { ExchangeStatus, ShiftType } from "@/types";
-
-const EXCHANGE_STATUS_COLORS: Record<ExchangeStatus, string> = {
-  pending_confirmation: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-blue-100 text-blue-800",
-  signed: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
-};
 
 interface ExchangeRow {
   id: string;
@@ -48,15 +49,6 @@ interface ExchangeRow {
   };
   owner: { id: string; full_name: string; email: string };
   requester: { id: string; full_name: string; email: string };
-}
-
-function formatTime(time: string) {
-  if (time.includes(":")) {
-    const [hours, minutes] = time.split(":");
-    return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
-  }
-
-  return time;
 }
 
 export default async function ExchangesPage() {
@@ -91,148 +83,126 @@ export default async function ExchangesPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Intercambios</h1>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Acuerdos"
+        title="Intercambios"
+        description="Consulta que acuerdos estan pendientes, cuales requieren accion inmediata y cuales ya han quedado cerrados o firmados."
+      />
 
       {typedExchanges.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-muted-foreground">No tienes intercambios aun.</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cuando el propietario de un turno acepte tu solicitud, aparecera
-            aqui.
-          </p>
-        </div>
+        <EmptyState
+          icon={<SearchX className="size-5" />}
+          title="Todavia no tienes intercambios"
+          description="Cuando el propietario de un turno acepte tu solicitud, el intercambio aparecera aqui con su contexto y proximos pasos."
+          action={
+            <Link href="/shifts">
+              <Button variant="outline">Explorar turnos</Button>
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-8">
+        <>
           {pending.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Pendientes de confirmacion ({pending.length})
-              </h2>
-              <div className="space-y-3">
+            <section className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
+                  Pendientes de confirmacion
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Intercambios que todavia necesitan una respuesta para avanzar.
+                </p>
+              </div>
+
+              <div className="space-y-4">
                 {pending.map((exchange) => {
                   const isOwner = exchange.user_a_id === authUser.id;
                   const isRequester = exchange.user_b_id === authUser.id;
-                  const otherUser = isOwner
-                    ? exchange.requester
-                    : exchange.owner;
-                  const timeRange = `${formatTime(exchange.shift.start_time)} - ${formatTime(exchange.shift.end_time)}`;
+                  const otherUser = isOwner ? exchange.requester : exchange.owner;
+                  const timeRange = formatTimeRange(
+                    exchange.shift.start_time,
+                    exchange.shift.end_time
+                  );
 
                   return (
                     <Card key={exchange.id}>
-                      <CardHeader className="pb-2">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="space-y-1">
+                      <CardHeader className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <CalendarDays className="size-4" />
                               {formatShortDate(exchange.shift.date)} · {timeRange}
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="secondary">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className={SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]}>
                                 {SHIFT_TYPE_LABELS[exchange.shift.shift_type as ShiftType]}
                               </Badge>
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="text-foreground">
                                 {exchange.shift.department.name}
                               </Badge>
-                              <Badge className={EXCHANGE_STATUS_COLORS[exchange.status]}>
+                              <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
                             </div>
                           </div>
 
-                          {isRequester ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <form action={confirmExchange}>
-                                <input
-                                  type="hidden"
-                                  name="exchange_id"
-                                  value={exchange.id}
-                                />
-                                <Button type="submit" size="sm">
-                                  Confirmar
-                                </Button>
-                              </form>
-                              <form action={cancelExchange}>
-                                <input
-                                  type="hidden"
-                                  name="exchange_id"
-                                  value={exchange.id}
-                                />
-                                <Button type="submit" variant="outline" size="sm">
-                                  Cancelar
-                                </Button>
-                              </form>
-                              <form action={startConversation}>
-                                <input
-                                  type="hidden"
-                                  name="shift_id"
-                                  value={exchange.shift_id}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="other_user_id"
-                                  value={otherUser.id}
-                                />
-                                <Button type="submit" variant="secondary" size="sm">
-                                  <MessageSquare className="mr-1.5 size-3.5" />
-                                  Chat
-                                </Button>
-                              </form>
-                              <Link href={`/exchanges/${exchange.id}`}>
-                                <Button variant="ghost" size="sm">
-                                  Ver detalle
-                                </Button>
-                              </Link>
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <form action={startConversation}>
-                                <input
-                                  type="hidden"
-                                  name="shift_id"
-                                  value={exchange.shift_id}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="other_user_id"
-                                  value={otherUser.id}
-                                />
-                                <Button type="submit" variant="secondary" size="sm">
-                                  <MessageSquare className="mr-1.5 size-3.5" />
-                                  Chat
-                                </Button>
-                              </form>
-                              <Link href={`/exchanges/${exchange.id}`}>
-                                <Button variant="outline" size="sm">
-                                  Ver detalle
-                                </Button>
-                              </Link>
-                            </div>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isRequester && (
+                              <>
+                                <form action={confirmExchange}>
+                                  <input type="hidden" name="exchange_id" value={exchange.id} />
+                                  <Button type="submit" size="sm">
+                                    Confirmar
+                                  </Button>
+                                </form>
+                                <form action={cancelExchange}>
+                                  <input type="hidden" name="exchange_id" value={exchange.id} />
+                                  <Button type="submit" variant="outline" size="sm">
+                                    Cancelar
+                                  </Button>
+                                </form>
+                              </>
+                            )}
+
+                            <form action={startConversation}>
+                              <input type="hidden" name="shift_id" value={exchange.shift_id} />
+                              <input
+                                type="hidden"
+                                name="other_user_id"
+                                value={otherUser.id}
+                              />
+                              <Button type="submit" variant="secondary" size="sm">
+                                <MessageSquare className="size-4" />
+                                Chat
+                              </Button>
+                            </form>
+
+                            <Link href={`/exchanges/${exchange.id}`}>
+                              <Button variant="ghost" size="sm">
+                                Ver detalle
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="flex items-center gap-2 text-sm">
-                          <ArrowLeftRight className="size-4 text-muted-foreground" />
-                          <span>
-                            {isOwner ? (
-                              <>
-                                Esperando que{" "}
-                                <span className="font-medium">
-                                  {otherUser.full_name}
-                                </span>{" "}
-                                confirme el intercambio
-                              </>
-                            ) : (
-                              <>
-                                <span className="font-medium">
-                                  {otherUser.full_name}
-                                </span>{" "}
-                                ha aceptado tu solicitud. Confirma para cerrar el
-                                trato.
-                              </>
-                            )}
-                          </span>
+                        <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                          <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                            <ArrowLeftRight className="size-4 text-primary" />
+                            Estado actual
+                          </div>
+                          {isOwner ? (
+                            <>
+                              Esperando que <strong>{otherUser.full_name}</strong>{" "}
+                              confirme el intercambio para cerrar el acuerdo.
+                            </>
+                          ) : (
+                            <>
+                              <strong>{otherUser.full_name}</strong> ya ha aceptado
+                              tu solicitud. Confirma ahora para dejar el intercambio
+                              listo.
+                            </>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -243,29 +213,35 @@ export default async function ExchangesPage() {
           )}
 
           {others.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Historial
-              </h2>
-              <div className="space-y-3">
+            <section className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
+                  Historial y seguimiento
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Intercambios confirmados, firmados o cancelados con sus acciones
+                  disponibles.
+                </p>
+              </div>
+
+              <div className="space-y-4">
                 {others.map((exchange) => {
                   const isOwner = exchange.user_a_id === authUser.id;
-                  const otherUser = isOwner
-                    ? exchange.requester
-                    : exchange.owner;
-                  const timeRange = `${formatTime(exchange.shift.start_time)} - ${formatTime(exchange.shift.end_time)}`;
+                  const otherUser = isOwner ? exchange.requester : exchange.owner;
+                  const timeRange = formatTimeRange(
+                    exchange.shift.start_time,
+                    exchange.shift.end_time
+                  );
                   const hasPendingCancellationRequest =
                     exchange.status === "signed" &&
                     Boolean(exchange.cancellation_requested_by);
                   const isCancellationRequester =
                     exchange.cancellation_requested_by === authUser.id;
                   const canOpenChat =
-                    exchange.status === "confirmed" ||
-                    exchange.status === "signed";
+                    exchange.status === "confirmed" || exchange.status === "signed";
                   const canCancelDirectly = exchange.status === "confirmed";
                   const canRequestSignedCancellation =
-                    exchange.status === "signed" &&
-                    !hasPendingCancellationRequest;
+                    exchange.status === "signed" && !hasPendingCancellationRequest;
                   const canRespondToSignedCancellation =
                     exchange.status === "signed" &&
                     hasPendingCancellationRequest &&
@@ -273,27 +249,25 @@ export default async function ExchangesPage() {
 
                   return (
                     <Card key={exchange.id}>
-                      <CardHeader className="pb-2">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="space-y-1">
+                      <CardHeader className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <CalendarDays className="size-4" />
                               {formatShortDate(exchange.shift.date)} · {timeRange}
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="secondary">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className={SHIFT_TYPE_STYLES[exchange.shift.shift_type as ShiftType]}>
                                 {SHIFT_TYPE_LABELS[exchange.shift.shift_type as ShiftType]}
                               </Badge>
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="text-foreground">
                                 {exchange.shift.department.name}
                               </Badge>
-                              <Badge className={EXCHANGE_STATUS_COLORS[exchange.status]}>
+                              <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
                               {hasPendingCancellationRequest && (
-                                <Badge variant="outline">
-                                  Cancelacion pendiente
-                                </Badge>
+                                <Badge variant="outline">Cancelacion pendiente</Badge>
                               )}
                             </div>
                           </div>
@@ -301,18 +275,14 @@ export default async function ExchangesPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             {canOpenChat && (
                               <form action={startConversation}>
-                                <input
-                                  type="hidden"
-                                  name="shift_id"
-                                  value={exchange.shift_id}
-                                />
+                                <input type="hidden" name="shift_id" value={exchange.shift_id} />
                                 <input
                                   type="hidden"
                                   name="other_user_id"
                                   value={otherUser.id}
                                 />
                                 <Button type="submit" variant="secondary" size="sm">
-                                  <MessageSquare className="mr-1.5 size-3.5" />
+                                  <MessageSquare className="size-4" />
                                   Chat
                                 </Button>
                               </form>
@@ -320,11 +290,7 @@ export default async function ExchangesPage() {
 
                             {canCancelDirectly && (
                               <form action={cancelExchange}>
-                                <input
-                                  type="hidden"
-                                  name="exchange_id"
-                                  value={exchange.id}
-                                />
+                                <input type="hidden" name="exchange_id" value={exchange.id} />
                                 <Button type="submit" variant="outline" size="sm">
                                   Cancelar
                                 </Button>
@@ -333,51 +299,29 @@ export default async function ExchangesPage() {
 
                             {canRequestSignedCancellation && (
                               <form action={requestSignedExchangeCancellation}>
-                                <input
-                                  type="hidden"
-                                  name="exchange_id"
-                                  value={exchange.id}
-                                />
+                                <input type="hidden" name="exchange_id" value={exchange.id} />
                                 <Button type="submit" variant="outline" size="sm">
                                   Solicitar cancelacion
                                 </Button>
                               </form>
                             )}
 
-                            {exchange.status === "signed" &&
-                              isCancellationRequester && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled
-                                >
-                                  Solicitud enviada
-                                </Button>
-                              )}
+                            {exchange.status === "signed" && isCancellationRequester && (
+                              <Button type="button" variant="outline" size="sm" disabled>
+                                Solicitud enviada
+                              </Button>
+                            )}
 
                             {canRespondToSignedCancellation && (
                               <>
                                 <form action={confirmSignedExchangeCancellation}>
-                                  <input
-                                    type="hidden"
-                                    name="exchange_id"
-                                    value={exchange.id}
-                                  />
-                                  <Button
-                                    type="submit"
-                                    variant="outline"
-                                    size="sm"
-                                  >
+                                  <input type="hidden" name="exchange_id" value={exchange.id} />
+                                  <Button type="submit" variant="outline" size="sm">
                                     Confirmar cancelacion
                                   </Button>
                                 </form>
                                 <form action={rejectSignedExchangeCancellation}>
-                                  <input
-                                    type="hidden"
-                                    name="exchange_id"
-                                    value={exchange.id}
-                                  />
+                                  <input type="hidden" name="exchange_id" value={exchange.id} />
                                   <Button type="submit" variant="ghost" size="sm">
                                     Rechazar
                                   </Button>
@@ -394,7 +338,7 @@ export default async function ExchangesPage() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm leading-6 text-muted-foreground">
                           {exchange.status === "signed" &&
                           hasPendingCancellationRequest ? (
                             isCancellationRequester ? (
@@ -409,16 +353,12 @@ export default async function ExchangesPage() {
                               </>
                             )
                           ) : exchange.status === "signed" ? (
-                            <>Con {otherUser.full_name} · Intercambio firmado</>
+                            <>Con {otherUser.full_name} · Intercambio firmado.</>
                           ) : (
                             <>
                               Con {otherUser.full_name}
                               {exchange.confirmed_at && (
-                                <>
-                                  {" "}
-                                  · Confirmado el{" "}
-                                  {formatShortDate(exchange.confirmed_at)}
-                                </>
+                                <> · Confirmado el {formatShortDate(exchange.confirmed_at)}</>
                               )}
                             </>
                           )}
@@ -430,7 +370,7 @@ export default async function ExchangesPage() {
               </div>
             </section>
           )}
-        </div>
+        </>
       )}
     </div>
   );

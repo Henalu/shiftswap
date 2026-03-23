@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import type { UserRole } from "@/types";
 import { changeUserRole } from "./actions";
@@ -52,11 +53,19 @@ export function UserRoleForm({
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Rol asignado
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Ajusta el alcance administrativo sin salir de esta vista.
+        </p>
+      </div>
       <select
         value={role}
         onChange={(event) => setRole(event.target.value as UserRole)}
         disabled={isSubmitting}
-        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        className={FORM_CONTROL_CLASSNAME}
       >
         {ROLE_OPTIONS.map((roleOption) => (
           <option key={roleOption} value={roleOption}>
@@ -71,7 +80,7 @@ export function UserRoleForm({
         disabled={isSubmitting || role === currentRole}
         className="w-full"
       >
-        {isSubmitting ? "Guardando..." : "Guardar rol"}
+        {isSubmitting ? "Guardando..." : "Guardar cambios"}
       </Button>
     </div>
   );

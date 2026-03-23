@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/layout/header";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
-import type { Notification } from "@/types";
+import { createClient } from "@/lib/supabase/server";
 import {
   getAccountGateState,
   USER_PROFILE_PUBLIC_SELECT,
 } from "@/lib/user-profiles";
+import type { Notification } from "@/types";
 
 export default async function DashboardLayout({
   children,
@@ -64,11 +64,15 @@ export default async function DashboardLayout({
         initialUnreadCount={unreadCount}
         role={role}
       />
-      <div className="flex flex-1">
-        <aside className="hidden w-56 border-r bg-muted/30 md:block">
+      <div className="mx-auto flex w-full max-w-7xl flex-1">
+        <aside className="hidden w-72 shrink-0 border-r border-border/70 bg-sidebar/75 md:block">
           <SidebarNav role={role} />
         </aside>
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-auto">
+          <div className="flex min-h-full flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

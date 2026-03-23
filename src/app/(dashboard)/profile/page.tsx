@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/ui/page-header";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
@@ -55,8 +56,12 @@ export default async function ProfilePage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Mi perfil</h1>
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader
+        eyebrow="Cuenta"
+        title="Mi perfil"
+        description="Gestiona tu identidad dentro de ShiftSwap y revisa los datos con los que participas en turnos, conversaciones y aprobaciones."
+      />
 
       <ProfileForm
         profile={profile as ProfilePageProfile}

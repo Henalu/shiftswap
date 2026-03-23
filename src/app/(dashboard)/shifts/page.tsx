@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { Plus, SearchX } from "lucide-react";
 import { ShiftCard } from "@/components/shifts/shift-card";
 import { ShiftFilters } from "@/components/shifts/shift-filters";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { createClient } from "@/lib/supabase/server";
 import type { ShiftWithUser } from "@/types";
 
 interface PageProps {
@@ -28,13 +30,11 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  // Fetch departments for the filter dropdown
   const { data: departments } = await supabase
     .from("departments")
     .select("id, name")
     .order("name");
 
-  // Build filtered shifts query
   let query = supabase
     .from("shifts")
     .select(
@@ -63,49 +63,51 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
 
   const { data: shifts } = await query;
 
-  // Fetch active requests of the current user to show interest state
   const { data: myRequests } = await supabase
     .from("shift_requests")
     .select("id, shift_id")
     .eq("interested_user_id", authUser.id)
     .in("status", ["pending", "accepted"]);
 
-  const myRequestMap = new Map((myRequests ?? []).map((r) => [r.shift_id, r.id]));
-
-  const typedShifts = (shifts ?? []).map((s) => ({
-    ...s,
-    user: s.user,
-    department: s.department,
+  const myRequestMap = new Map((myRequests ?? []).map((request) => [request.shift_id, request.id]));
+  const typedShifts = (shifts ?? []).map((shift) => ({
+    ...shift,
+    user: shift.user,
+    department: shift.department,
   })) as ShiftWithUser[];
 
   const hasFilters = !!(department_id || shift_type || from || to);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Turnos disponibles
-        </h1>
-        <Link href="/shifts/new">
-          <Button>
-            <Plus className="mr-2 size-4" />
-            Publicar turno
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace interno"
+        title="Turnos disponibles"
+        description="Compara rapidamente los turnos abiertos, filtra por contexto y deja claro cuando quieres iniciar un intercambio."
+        action={
+          <Link href="/shifts/new">
+            <Button>
+              <Plus className="size-4" />
+              Publicar turno
+            </Button>
+          </Link>
+        }
+      />
 
       <ShiftFilters departments={departments ?? []} />
 
-      <p className="text-sm text-muted-foreground">
-        {typedShifts.length === 0
-          ? hasFilters
-            ? "Ningún turno coincide con los filtros aplicados."
-            : "No hay turnos disponibles en este momento."
-          : `${typedShifts.length} turno${typedShifts.length !== 1 ? "s" : ""} disponible${typedShifts.length !== 1 ? "s" : ""}${hasFilters ? " con los filtros aplicados" : ""}`}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {typedShifts.length === 0
+            ? hasFilters
+              ? "No hay turnos que coincidan con los filtros aplicados."
+              : "No hay turnos publicados en este momento."
+            : `${typedShifts.length} turno${typedShifts.length !== 1 ? "s" : ""} disponible${typedShifts.length !== 1 ? "s" : ""}${hasFilters ? " con tus filtros activos" : ""}.`}
+        </p>
+      </div>
 
-      {typedShifts.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {typedShifts.length > 0 ? (
+        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           {typedShifts.map((shift) => (
             <ShiftCard
               key={shift.id}
@@ -116,6 +118,27 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
             />
           ))}
         </div>
+      ) : (
+        <EmptyState
+          icon={<SearchX className="size-5" />}
+          title={hasFilters ? "Ajusta la busqueda" : "Todavia no hay turnos abiertos"}
+          description={
+            hasFilters
+              ? "Prueba con otro departamento, un rango de fechas distinto o elimina filtros para volver a ver mas opciones."
+              : "Cuando alguien publique un turno para intercambio aparecera aqui listo para comparar y solicitar."
+          }
+          action={
+            hasFilters ? (
+              <Button asChild variant="outline">
+                <Link href="/shifts">Ver todos los turnos</Link>
+              </Button>
+            ) : (
+              <Link href="/shifts/new">
+                <Button variant="outline">Publicar el primer turno</Button>
+              </Link>
+            )
+          }
+        />
       )}
     </div>
   );

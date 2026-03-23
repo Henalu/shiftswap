@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SHIFT_TYPE_LABELS } from "@/lib/constants";
+import { FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import { createShift } from "./actions";
 import type { ShiftType } from "@/types";
 
@@ -28,20 +29,24 @@ export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
     <form action={formAction}>
       <input type="hidden" name="user_id" value={userId} />
       <input type="hidden" name="department_id" value={departmentId} />
-      <Card>
+
+      <Card className="max-w-3xl">
         <CardHeader>
           <CardTitle>Detalles del turno</CardTitle>
           <CardDescription>
-            Rellena los datos del turno que quieres publicar para intercambio
+            Cuanto mas claro sea este formulario, mas facil sera que otra persona
+            compare tu turno y tome una decision rapido.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-6">
           {state?.error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {state.error}
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Fecha</Label>
               <Input
@@ -52,15 +57,16 @@ export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
                 min={new Date().toISOString().split("T")[0]}
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="shift_type">Tipo de turno</Label>
               <select
                 id="shift_type"
                 name="shift_type"
                 required
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none ring-ring/50 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                className={FORM_CONTROL_CLASSNAME}
               >
-                <option value="">Selecciona...</option>
+                <option value="">Selecciona un tipo</option>
                 {(Object.entries(SHIFT_TYPE_LABELS) as [ShiftType, string][]).map(
                   ([value, label]) => (
                     <option key={value} value={value}>
@@ -71,39 +77,38 @@ export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
               </select>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="start_time">Hora inicio</Label>
-              <Input
-                id="start_time"
-                name="start_time"
-                type="time"
-                required
-              />
+              <Label htmlFor="start_time">Hora de inicio</Label>
+              <Input id="start_time" name="start_time" type="time" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end_time">Hora fin</Label>
-              <Input
-                id="end_time"
-                name="end_time"
-                type="time"
-                required
-
-              />
+              <Label htmlFor="end_time">Hora de fin</Label>
+              <Input id="end_time" name="end_time" type="time" required />
             </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción (opcional)</Label>
+            <Label htmlFor="description">Notas opcionales</Label>
             <textarea
               id="description"
               name="description"
-              rows={3}
-              placeholder="Notas adicionales sobre el turno..."
-              className="flex min-h-[80px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base outline-none ring-ring/50 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              rows={4}
+              placeholder="Anade solo el contexto que ayude a valorar el intercambio."
+              className={FORM_CONTROL_CLASSNAME + " min-h-28 py-3"}
             />
+            <p className="text-sm text-muted-foreground">
+              Ejemplo: si necesitas cerrar con otro turno de manana, si hay una
+              restriccion concreta o si el horario requiere aclaracion.
+            </p>
           </div>
         </CardContent>
-        <CardFooter>
+
+        <CardFooter className="flex flex-wrap justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            El turno se publicara listo para recibir interes.
+          </p>
           <Button type="submit">Publicar turno</Button>
         </CardFooter>
       </Card>

@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ValidationDecisionForm } from "../validation-decision-form";
@@ -101,71 +109,93 @@ export default async function ValidationDetailPage({ params }: PageProps) {
   const detail = validation as ValidationDetail;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Solicitud de validación
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Revisa la evidencia enviada y decide si la cuenta puede activarse.
-          </p>
-        </div>
-
-        <Button asChild variant="outline">
-          <Link href="/admin/validations">Volver al listado</Link>
-        </Button>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <PageHeader
+        eyebrow="Administracion"
+        title="Solicitud de validacion"
+        description="Revisa los datos enviados, comprueba la evidencia adjunta y toma una decision clara para desbloquear o corregir el alta."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Badge className="border-amber-500/15 bg-amber-500/10 text-amber-700">
+              Pendiente
+            </Badge>
+            <Link href="/admin/validations">
+              <Button variant="outline">Volver al listado</Button>
+            </Link>
+          </div>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
-          <CardHeader>
-            <CardTitle>{detail.full_name}</CardTitle>
+          <CardHeader className="gap-3">
+            <div className="space-y-2">
+              <CardTitle>{detail.full_name}</CardTitle>
+              <CardDescription>
+                Comprueba que los datos personales y laborales coinciden con la
+                documentacion enviada antes de activar la cuenta.
+              </CardDescription>
+            </div>
           </CardHeader>
+
           <CardContent className="space-y-6">
-            <dl className="grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="font-medium text-foreground">Email</dt>
-                <dd className="text-muted-foreground">{detail.email}</dd>
+            <div className="grid gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Email
+                </p>
+                <p className="mt-2 break-words font-medium text-foreground">
+                  {detail.email}
+                </p>
               </div>
-              <div>
-                <dt className="font-medium text-foreground">Teléfono</dt>
-                <dd className="text-muted-foreground">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Telefono
+                </p>
+                <p className="mt-2 font-medium text-foreground">
                   {detail.phone ?? "No indicado"}
-                </dd>
+                </p>
               </div>
-              <div>
-                <dt className="font-medium text-foreground">Empresa</dt>
-                <dd className="text-muted-foreground">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Empresa
+                </p>
+                <p className="mt-2 font-medium text-foreground">
                   {detail.company_id
                     ? companyMap.get(detail.company_id) ?? "Sin empresa"
                     : "Sin empresa"}
-                </dd>
+                </p>
               </div>
-              <div>
-                <dt className="font-medium text-foreground">Departamento</dt>
-                <dd className="text-muted-foreground">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Departamento
+                </p>
+                <p className="mt-2 font-medium text-foreground">
                   {detail.department_id
                     ? departmentMap.get(detail.department_id) ?? "Sin departamento"
                     : "Sin departamento"}
-                </dd>
+                </p>
               </div>
-              <div>
-                <dt className="font-medium text-foreground">ID de empleado</dt>
-                <dd className="text-muted-foreground">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  ID de empleado
+                </p>
+                <p className="mt-2 font-medium text-foreground">
                   {detail.employee_id ?? "No indicado"}
-                </dd>
+                </p>
               </div>
-              <div>
-                <dt className="font-medium text-foreground">Registrado</dt>
-                <dd className="text-muted-foreground">
+              <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Registrado
+                </p>
+                <p className="mt-2 font-medium text-foreground">
                   {new Intl.DateTimeFormat("es-ES", {
                     dateStyle: "medium",
                     timeStyle: "short",
                   }).format(new Date(detail.created_at))}
-                </dd>
+                </p>
               </div>
-            </dl>
+            </div>
 
             <ValidationDecisionForm
               userId={detail.id}
@@ -175,23 +205,26 @@ export default async function ValidationDetailPage({ params }: PageProps) {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Carné de empresa</CardTitle>
+          <CardHeader className="gap-2">
+            <CardTitle>Carne de empresa</CardTitle>
+            <CardDescription>
+              Usa esta vista como referencia visual antes de aprobar o rechazar.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {signedIdCardUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={signedIdCardUrl}
-                alt={`Carné de ${detail.full_name}`}
-                className="w-full rounded-lg border object-cover"
+                alt={`Carne de ${detail.full_name}`}
+                className="w-full rounded-2xl border border-border/75 object-cover shadow-sm"
               />
             ) : (
-              <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">
-                No se pudo generar la vista previa del carné.
+              <div className="flex min-h-80 items-center justify-center rounded-2xl border border-dashed border-border/80 px-4 text-center text-sm text-muted-foreground">
+                No se pudo generar la vista previa del carne.
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs leading-5 text-muted-foreground">
               La URL firmada caduca en 10 minutos.
             </p>
           </CardContent>

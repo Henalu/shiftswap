@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import { registerEmployee } from "./actions";
 import type { Company, Department } from "@/types";
 
@@ -62,7 +63,7 @@ export default function RegisterForm({
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError("La imagen del carné no puede superar los 5 MB.");
+      setError("La imagen del carne no puede superar los 5 MB.");
       event.target.value = "";
       return;
     }
@@ -76,7 +77,7 @@ export default function RegisterForm({
     setError(null);
 
     if (!idCardFile) {
-      setError("La foto del carné es obligatoria.");
+      setError("La foto del carne es obligatoria.");
       return;
     }
 
@@ -92,7 +93,6 @@ export default function RegisterForm({
     formData.set("id_card", idCardFile);
 
     const result = await registerEmployee(formData);
-
     setLoading(false);
 
     if (result.error) {
@@ -105,30 +105,30 @@ export default function RegisterForm({
 
   if (registered) {
     return (
-      <Card>
+      <Card className="border-border/80">
         <CardHeader>
           <CardTitle>Solicitud enviada</CardTitle>
           <CardDescription>
             Tu cuenta se ha creado correctamente y ha quedado pendiente de
-            validación manual.
+            validacion manual.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
           <p>
-            Un administrador revisará tu carné y activará la cuenta cuando
-            confirme tus datos de empleado.
+            Un administrador revisara tu documentacion y activara la cuenta
+            cuando confirme tus datos de empleado.
           </p>
           <p>
-            Hasta entonces no podrás acceder al dashboard. Cuando la cuenta sea
-            aprobada ya podrás iniciar sesión con tu email y contraseña.
+            Hasta entonces no podras acceder al dashboard. En cuanto se apruebe,
+            podras iniciar sesion con tu email y contrasena.
           </p>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
           <Button asChild className="w-full">
-            <Link href="/login">Ir a iniciar sesión</Link>
+            <Link href="/login">Ir a iniciar sesion</Link>
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            ¿Necesitas crear otra cuenta?{" "}
+            Necesitas crear otra cuenta?{" "}
             <button
               type="button"
               className="font-medium text-primary underline-offset-4 hover:underline"
@@ -154,20 +154,25 @@ export default function RegisterForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Crear cuenta</CardTitle>
-        <CardDescription>
-          Introduce tus datos y la evidencia de empleado para solicitar acceso.
-        </CardDescription>
+    <Card className="border-border/80">
+      <CardHeader className="space-y-3">
+        <div className="space-y-2">
+          <CardTitle>Crear cuenta</CardTitle>
+          <CardDescription>
+            Introduce tus datos laborales y la evidencia necesaria para solicitar
+            acceso.
+          </CardDescription>
+        </div>
       </CardHeader>
+
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </p>
           )}
+
           <div className="space-y-2">
             <Label htmlFor="full_name">Nombre completo</Label>
             <Input
@@ -180,9 +185,10 @@ export default function RegisterForm({
               autoComplete="name"
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email corporativo</Label>
               <Input
                 id="email"
                 type="email"
@@ -194,7 +200,7 @@ export default function RegisterForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">Contrasena</Label>
               <Input
                 id="password"
                 type="password"
@@ -206,7 +212,8 @@ export default function RegisterForm({
               />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="company_id">Empresa</Label>
               <select
@@ -215,7 +222,7 @@ export default function RegisterForm({
                 onChange={(event) => handleCompanyChange(event.target.value)}
                 required
                 disabled={companies.length === 0}
-                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                className={FORM_CONTROL_CLASSNAME}
               >
                 {companies.length === 0 && (
                   <option value="">Sin empresas disponibles</option>
@@ -235,7 +242,7 @@ export default function RegisterForm({
                 onChange={(event) => setDepartmentId(event.target.value)}
                 required
                 disabled={availableDepartments.length === 0}
-                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none ring-ring/50 transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                className={FORM_CONTROL_CLASSNAME}
               >
                 {availableDepartments.length === 0 && (
                   <option value="">Sin departamentos disponibles</option>
@@ -248,6 +255,7 @@ export default function RegisterForm({
               </select>
             </div>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="employee_id">ID de empleado</Label>
             <Input
@@ -260,8 +268,9 @@ export default function RegisterForm({
               autoComplete="off"
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="id_card">Carné de empresa</Label>
+            <Label htmlFor="id_card">Carne de empresa</Label>
             <Input
               ref={fileInputRef}
               id="id_card"
@@ -270,17 +279,18 @@ export default function RegisterForm({
               required
               onChange={handleIdCardChange}
             />
-            <p className="text-xs text-muted-foreground">
-              Sube una foto del carné corporativo. Solo la revisará el equipo
-              administrador y se borrará al aprobar o rechazar tu cuenta.
+            <p className="text-sm leading-6 text-muted-foreground">
+              Sube una foto del carne corporativo. Solo la revisara el equipo
+              administrador y se borrara al aprobar o rechazar tu cuenta.
             </p>
             {idCardFile && (
-              <p className="text-xs text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 Archivo seleccionado: {idCardFile.name}
               </p>
             )}
           </div>
         </CardContent>
+
         <CardFooter className="flex flex-col gap-4">
           <Button
             type="submit"
@@ -291,15 +301,15 @@ export default function RegisterForm({
               availableDepartments.length === 0
             }
           >
-            {loading ? "Enviando solicitud..." : "Registrarse"}
+            {loading ? "Enviando solicitud..." : "Solicitar acceso"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            ¿Ya tienes cuenta?{" "}
+            Ya tienes cuenta?{" "}
             <Link
               href="/login"
               className="font-medium text-primary underline-offset-4 hover:underline"
             >
-              Inicia sesión
+              Inicia sesion
             </Link>
           </p>
         </CardFooter>

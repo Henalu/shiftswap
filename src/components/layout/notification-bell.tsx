@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getNotificationActionUrl } from "@/lib/notification-utils";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,9 +104,7 @@ export function NotificationBell({
         },
         (payload) => {
           const incomingNotification = payload.new as Notification;
-          setNotifications((prev) =>
-            mergeNotification(prev, incomingNotification)
-          );
+          setNotifications((prev) => mergeNotification(prev, incomingNotification));
           void refreshUnreadCount();
           void refreshNotifications();
         }
@@ -121,9 +119,7 @@ export function NotificationBell({
         },
         (payload) => {
           const incomingNotification = payload.new as Notification;
-          setNotifications((prev) =>
-            mergeNotification(prev, incomingNotification)
-          );
+          setNotifications((prev) => mergeNotification(prev, incomingNotification));
           void refreshUnreadCount();
           void refreshNotifications();
         }
@@ -213,26 +209,31 @@ export function NotificationBell({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="relative rounded-full p-1.5 outline-none ring-ring/50 transition-colors hover:bg-muted focus-visible:ring-2"
+        className="relative rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10"
         aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
       >
         <Bell className="size-5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground shadow-sm">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-[22rem] max-w-[calc(100vw-2rem)]"
+        className="w-[23rem] max-w-[calc(100vw-1.5rem)] rounded-2xl"
       >
         <DropdownMenuLabel className="flex items-center justify-between gap-3">
-          <span>Notificaciones</span>
+          <div>
+            <p className="font-semibold tracking-[-0.02em]">Notificaciones</p>
+            <p className="text-xs font-normal text-muted-foreground">
+              Mantente al dia con tus turnos e intercambios
+            </p>
+          </div>
           {unreadCount > 0 && (
             <button
               type="button"
-              className="text-xs font-medium text-primary hover:underline"
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-secondary"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -245,53 +246,59 @@ export function NotificationBell({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {notifications.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No tienes notificaciones.
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm font-medium text-foreground">
+              Todo al dia
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              No tienes notificaciones pendientes.
+            </p>
           </div>
         ) : (
           notifications.map((notification) => (
             <DropdownMenuItem
               key={notification.id}
-              className="flex cursor-pointer flex-col items-start gap-2 py-3"
+              className="flex cursor-pointer flex-col items-start gap-3 rounded-xl px-3 py-3"
               onSelect={() => {
                 void handleNotificationSelect(notification);
               }}
             >
-              <div className="flex w-full items-start justify-between gap-2">
-                <div className="min-w-0">
+              <div className="flex w-full items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
                   <div className="flex items-start gap-2">
                     {!notification.read && (
-                      <span className="mt-1 size-2 shrink-0 rounded-full bg-destructive" />
+                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
                     )}
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-1">
                       <p
-                        className={`truncate text-sm ${
-                          notification.read ? "" : "font-semibold"
-                        }`}
+                        className={cn(
+                          "truncate text-sm",
+                          notification.read ? "font-medium" : "font-semibold"
+                        )}
                       >
                         {notification.title}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
                         {notification.body}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-start gap-2">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="pt-0.5 text-xs text-muted-foreground">
                     {formatRelativeTime(getNotificationSortDate(notification))}
                   </span>
                   <button
                     type="button"
-                    aria-label="Descartar notificación"
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Descartar notificacion"
+                    className="flex size-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
                       void dismissNotification(notification);
                     }}
                   >
-                    <X className="size-3.5" />
+                    <X className="size-4" />
                   </button>
                 </div>
               </div>

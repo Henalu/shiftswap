@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { ShiftForm } from "./shift-form";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function NewShiftPage() {
   const supabase = await createClient();
@@ -27,20 +28,20 @@ export default async function NewShiftPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/shifts">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="size-4" />
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Publicar nuevo turno
-        </h1>
-      </div>
-      <ShiftForm
-        departmentId={profile.department_id}
-        userId={authUser.id}
+      <PageHeader
+        eyebrow="Publicacion"
+        title="Publicar nuevo turno"
+        description="Completa solo la informacion necesaria para que otros empleados puedan comparar tu turno y responder con rapidez."
+        action={
+          <Link href="/shifts">
+            <Button variant="ghost">
+              <ArrowLeft className="size-4" />
+              Volver a turnos
+            </Button>
+          </Link>
+        }
       />
+      <ShiftForm departmentId={profile.department_id} userId={authUser.id} />
     </div>
   );
 }

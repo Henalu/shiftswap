@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { ArrowLeft, MessageSquare, Users } from "lucide-react";
 import { InterestButton } from "@/components/shifts/interest-button";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,17 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  SHIFT_TYPE_LABELS,
-  SHIFT_STATUS_LABELS,
-  SHIFT_STATUS_COLORS,
-  REQUEST_STATUS_LABELS,
-} from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 import { startConversation } from "@/app/(dashboard)/chat/actions";
-import type { ShiftWithUser, ShiftRequestWithUser } from "@/types";
-import type { ShiftType } from "@/types";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import {
+  REQUEST_STATUS_LABELS,
+  REQUEST_STATUS_STYLES,
+  SHIFT_STATUS_LABELS,
+  SHIFT_STATUS_STYLES,
+  SHIFT_TYPE_LABELS,
+  SHIFT_TYPE_STYLES,
+} from "@/lib/constants";
+import { formatDate, formatTimeRange } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
+import type { ShiftRequestWithUser, ShiftType, ShiftWithUser } from "@/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -94,84 +96,82 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     .eq("shift_id", id)
     .order("created_at", { ascending: false });
 
-  const typedRequests = (requests ?? []).map((r) => ({
-    ...r,
-    user: r.user,
+  const typedRequests = (requests ?? []).map((request) => ({
+    ...request,
+    user: request.user,
   })) as ShiftRequestWithUser[];
 
-  const formatTimeDisplay = (time: string) => {
-    if (time && time.includes(":")) {
-      const parts = time.split(":");
-      return `${parts[0].padStart(2, "0")}:${parts[1]?.padStart(2, "0") || "00"}`;
-    }
-    return time;
-  };
-
-  const timeRange = `${formatTimeDisplay(shift.start_time)} - ${formatTimeDisplay(shift.end_time)}`;
+  const timeRange = formatTimeRange(shift.start_time, shift.end_time);
   const isOwner = authUser.id === shift.user_id;
   const showInterestButton = !isOwner && shift.status === "open";
-
-  // Active request of the current user (pending or accepted)
   const myActiveRequest = typedRequests.find(
-    (r) =>
-      r.user.id === authUser.id &&
-      (r.status === "pending" || r.status === "accepted")
+    (request) =>
+      request.user.id === authUser.id &&
+      (request.status === "pending" || request.status === "accepted")
   );
-
-  // Show "Enviar mensaje" if the current user has any request on this shift (any status)
-  const myRequest = typedRequests.find((r) => r.user.id === authUser.id);
+  const myRequest = typedRequests.find((request) => request.user.id === authUser.id);
   const showMessageButton = !isOwner && !!myRequest;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/shifts">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="size-4" />
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Detalle del turno
-        </h1>
-      </div>
+      <PageHeader
+        eyebrow="Detalle"
+        title="Detalle del turno"
+        description="Revisa la informacion clave, compara el horario y decide si quieres iniciar la conversacion o mostrar interes."
+        action={
+          <Link href="/shifts">
+            <Button variant="ghost">
+              <ArrowLeft className="size-4" />
+              Volver a turnos
+            </Button>
+          </Link>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <Card>
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge className={SHIFT_TYPE_STYLES[shift.shift_type as ShiftType]}>
                 {SHIFT_TYPE_LABELS[shift.shift_type as ShiftType]}
               </Badge>
-              <Badge
-                className={
-                  SHIFT_STATUS_COLORS[shift.status as keyof typeof SHIFT_STATUS_COLORS]
-                }
-              >
+              <Badge className={SHIFT_STATUS_STYLES[shift.status]}>
                 {SHIFT_STATUS_LABELS[shift.status]}
               </Badge>
+              <Badge variant="outline" className="text-foreground">
+                {shift.department.name}
+              </Badge>
             </div>
-            <CardTitle>{formatDate(shift.date)}</CardTitle>
-            <CardDescription>{timeRange}</CardDescription>
+            <div className="space-y-2">
+              <CardTitle className="text-[1.75rem]">{timeRange}</CardTitle>
+              <CardDescription>{formatDate(shift.date)}</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
+
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-border/70 bg-secondary/55 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Publicado por
               </p>
-              <p className="font-medium">{shift.user.full_name}</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="mt-2 text-base font-semibold text-foreground">
+                {shift.user.full_name}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {shift.user.email} · {shift.department.name}
               </p>
             </div>
-            {shift.description && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Descripción
-                </p>
-                <p className="text-sm">{shift.description}</p>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2">
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Contexto
+              </p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                {shift.description?.trim() ||
+                  "No hay notas adicionales. Si necesitas mas contexto, abre una conversacion desde aqui."}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
               {showInterestButton && (
                 <InterestButton
                   shiftId={shift.id}
@@ -182,14 +182,10 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               {showMessageButton && (
                 <form action={startConversation}>
                   <input type="hidden" name="shift_id" value={shift.id} />
-                  <input
-                    type="hidden"
-                    name="other_user_id"
-                    value={shift.user_id}
-                  />
+                  <input type="hidden" name="other_user_id" value={shift.user_id} />
                   <Button type="submit" variant="outline">
-                    <MessageSquare className="mr-2 size-4" />
-                    Enviar mensaje
+                    <MessageSquare className="size-4" />
+                    Abrir chat
                   </Button>
                 </form>
               )}
@@ -199,32 +195,39 @@ export default async function ShiftDetailPage({ params }: PageProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Interesados</CardTitle>
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Users className="size-4 text-primary" />
+              Interesados
+            </div>
             <CardDescription>
-              Personas que han mostrado interés en este turno
+              Personas que han mostrado interes en este turno.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {typedRequests.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nadie ha mostrado interés aún.
-              </p>
+              <div className="rounded-2xl border border-dashed border-border/80 bg-secondary/35 px-4 py-6 text-sm text-muted-foreground">
+                Aun no hay solicitudes. Cuando alguien se interese aparecera aqui.
+              </div>
             ) : (
               <ul className="space-y-3">
-                {typedRequests.map((req) => (
+                {typedRequests.map((request) => (
                   <li
-                    key={req.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    key={request.id}
+                    className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                   >
-                    <div>
-                      <p className="font-medium">{req.user.full_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {req.user.email}
-                      </p>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {request.user.full_name}
+                        </p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {request.user.email}
+                        </p>
+                      </div>
+                      <Badge className={REQUEST_STATUS_STYLES[request.status]}>
+                        {REQUEST_STATUS_LABELS[request.status]}
+                      </Badge>
                     </div>
-                    <Badge variant="outline">
-                      {REQUEST_STATUS_LABELS[req.status]}
-                    </Badge>
                   </li>
                 ))}
               </ul>

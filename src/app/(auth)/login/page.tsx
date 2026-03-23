@@ -23,8 +23,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
     setLoading(true);
 
@@ -37,9 +37,11 @@ export default function LoginPage() {
     setLoading(false);
 
     if (signInError) {
-      setError(signInError.message === "Invalid login credentials"
-        ? "Email o contraseña incorrectos."
-        : signInError.message);
+      setError(
+        signInError.message === "Invalid login credentials"
+          ? "Email o contrasena incorrectos."
+          : signInError.message
+      );
       return;
     }
 
@@ -48,53 +50,62 @@ export default function LoginPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Iniciar sesión</CardTitle>
-        <CardDescription>Introduce tus credenciales para acceder</CardDescription>
+    <Card className="border-border/80">
+      <CardHeader className="space-y-3">
+        <div className="space-y-2">
+          <CardTitle>Iniciar sesion</CardTitle>
+          <CardDescription>
+            Entra en tu espacio para revisar turnos, gestionar intercambios y
+            seguir las conversaciones abiertas.
+          </CardDescription>
+        </div>
       </CardHeader>
+
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </p>
           )}
+
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email corporativo</Label>
             <Input
               id="email"
               type="email"
               placeholder="tu@empresa.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               required
               autoComplete="email"
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password">Contrasena</Label>
             <Input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               required
               autoComplete="current-password"
             />
           </div>
         </CardContent>
+
         <CardFooter className="flex flex-col gap-4">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Entrando..." : "Entrar"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            ¿No tienes cuenta?{" "}
+            Aun no tienes cuenta?{" "}
             <Link
               href="/register"
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="font-semibold text-primary underline-offset-4 hover:underline"
             >
-              Regístrate
+              Solicita acceso
             </Link>
           </p>
         </CardFooter>

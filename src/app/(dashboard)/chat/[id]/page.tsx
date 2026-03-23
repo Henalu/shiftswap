@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { createClient } from "@/lib/supabase/server";
 import { ChatView } from "./chat-view";
 import type { Message } from "@/types";
 
@@ -20,8 +21,7 @@ export default async function ConversationPage({ params }: PageProps) {
 
   if (!authUser) redirect("/login");
 
-  // Fetch conversation and participants
-  const { data: conv } = await supabase
+  const { data: conversation } = await supabase
     .from("conversations")
     .select(
       `
@@ -36,10 +36,10 @@ export default async function ConversationPage({ params }: PageProps) {
     )
     .single();
 
-  if (!conv) notFound();
+  if (!conversation) notFound();
 
   type Participant = { id: string; full_name: string };
-  const typedConv = conv as unknown as {
+  const typedConversation = conversation as unknown as {
     id: string;
     shift_id: string;
     participant_a: Participant;
@@ -47,18 +47,16 @@ export default async function ConversationPage({ params }: PageProps) {
   };
 
   const otherUser =
-    typedConv.participant_a.id === authUser.id
-      ? typedConv.participant_b
-      : typedConv.participant_a;
+    typedConversation.participant_a.id === authUser.id
+      ? typedConversation.participant_b
+      : typedConversation.participant_a;
 
-  // Fetch messages in order
   const { data: messages } = await supabase
     .from("messages")
     .select("*")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 
-  // Mark incoming messages as read
   const now = new Date().toISOString();
 
   await supabase
@@ -77,17 +75,20 @@ export default async function ConversationPage({ params }: PageProps) {
     .contains("data", { conversation_id: id });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Link href="/chat">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="size-4" />
-          </Button>
-        </Link>
-        <h1 className="text-xl font-semibold tracking-tight">
-          {otherUser.full_name}
-        </h1>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Conversacion"
+        title={otherUser.full_name}
+        description="Negocia el intercambio con contexto y mantente dentro del flujo sin perder visibilidad del estado."
+        action={
+          <Link href="/chat">
+            <Button variant="ghost">
+              <ArrowLeft className="size-4" />
+              Volver al chat
+            </Button>
+          </Link>
+        }
+      />
 
       <ChatView
         conversationId={id}

@@ -16,8 +16,10 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
+  CalendarCheck,
   CalendarDays,
   LogOut,
+  MessageSquare,
   Repeat,
   ShieldCheck,
   User,
@@ -37,7 +39,6 @@ function getServerSnapshot() {
   return false;
 }
 
-// Loaded client-side only to avoid Radix hydration mismatches in dev.
 const NotificationBell = dynamic(
   () => import("./notification-bell").then((m) => ({ default: m.NotificationBell })),
   { ssr: false }
@@ -66,7 +67,8 @@ export function Header({
 
   const mobileNavItems = [
     { href: "/shifts", label: "Turnos", icon: CalendarDays },
-    { href: "/shifts/my", label: "Mis turnos", icon: CalendarDays },
+    { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
+    { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/exchanges", label: "Intercambios", icon: Repeat },
     ...(hasAdminPanelAccess(role)
       ? [{ href: "/admin/validations", label: "Admin", icon: ShieldCheck }]
@@ -91,20 +93,29 @@ export function Header({
     : "?";
 
   const avatar = (
-    <Avatar className="size-8">
+    <Avatar className="size-9 rounded-xl">
       <AvatarImage src={user?.avatar_url} alt={user?.full_name} />
-      <AvatarFallback>{initials}</AvatarFallback>
+      <AvatarFallback className="rounded-xl bg-secondary text-foreground">
+        {initials}
+      </AvatarFallback>
     </Avatar>
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background">
-      <div className="flex h-14 items-center gap-4 px-4 md:px-6">
-        <Link
-          href="/shifts"
-          className="flex items-center gap-2 font-semibold text-foreground"
-        >
-          ShiftSwap
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/88">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <Link href="/shifts" className="flex min-w-0 items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Repeat className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold tracking-[-0.02em] text-foreground">
+              ShiftSwap
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              Intercambio de turnos
+            </p>
+          </div>
         </Link>
 
         <div className="ml-auto flex items-center gap-2">
@@ -118,12 +129,17 @@ export function Header({
 
           {isUserMenuMounted ? (
             <DropdownMenu>
-              <DropdownMenuTrigger className="rounded-full outline-none ring-ring/50 focus-visible:ring-2 focus-visible:ring-offset-2">
+              <DropdownMenuTrigger
+                className="rounded-2xl border border-border/70 bg-background/90 p-1 shadow-sm outline-none transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10"
+                aria-label="Abrir menu de usuario"
+              >
                 {avatar}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <p className="font-medium">{user?.full_name ?? "Usuario"}</p>
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl">
+                <DropdownMenuLabel className="space-y-1">
+                  <p className="font-semibold tracking-[-0.02em]">
+                    {user?.full_name ?? "Usuario"}
+                  </p>
                   <p className="text-xs font-normal text-muted-foreground">
                     {user?.email}
                   </p>
@@ -131,7 +147,7 @@ export function Header({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push("/profile")}>
                   <User className="mr-2 size-4" />
-                  Perfil
+                  Mi perfil
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -140,16 +156,16 @@ export function Header({
                   className="cursor-pointer"
                 >
                   <LogOut className="mr-2 size-4" />
-                  Cerrar sesión
+                  Cerrar sesion
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <button
               type="button"
-              aria-label="Menú de usuario"
+              aria-label="Menu de usuario"
               disabled
-              className="rounded-full outline-none ring-ring/50"
+              className="rounded-2xl border border-border/70 bg-background/90 p-1 shadow-sm"
             >
               {avatar}
             </button>
@@ -157,29 +173,31 @@ export function Header({
         </div>
       </div>
 
-      <nav className="flex overflow-x-auto border-t px-2 md:hidden">
-        {mobileNavItems.map((item) => {
-          const isActive =
-            item.href === "/shifts"
-              ? pathname === "/shifts"
-              : pathname.startsWith(item.href);
+      <nav className="border-t border-border/70 md:hidden">
+        <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-3 py-2">
+          {mobileNavItems.map((item) => {
+            const isActive =
+              item.href === "/shifts"
+                ? pathname === "/shifts"
+                : pathname.startsWith(item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <item.icon className="size-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <item.icon className="size-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </header>
   );

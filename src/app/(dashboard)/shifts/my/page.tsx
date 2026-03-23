@@ -1,34 +1,31 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { CalendarDays, Plus, Users } from "lucide-react";
+import { CancelShiftButton } from "@/components/shifts/cancel-shift-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
   CardDescription,
+  CardHeader,
 } from "@/components/ui/card";
-import { Plus, CalendarDays, Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import {
-  SHIFT_TYPE_LABELS,
-  SHIFT_STATUS_LABELS,
-  SHIFT_STATUS_COLORS,
-  REQUEST_STATUS_LABELS,
   EXCHANGE_STATUS_LABELS,
+  EXCHANGE_STATUS_STYLES,
+  REQUEST_STATUS_LABELS,
+  REQUEST_STATUS_STYLES,
+  SHIFT_STATUS_LABELS,
+  SHIFT_STATUS_STYLES,
+  SHIFT_TYPE_LABELS,
+  SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
-import { formatShortDate } from "@/lib/utils";
+import { formatShortDate, formatTimeRange } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
 import { acceptRequest, rejectRequest } from "./actions";
-import { CancelShiftButton } from "@/components/shifts/cancel-shift-button";
-import type { ShiftType, RequestStatus, ExchangeStatus } from "@/types";
-
-const EXCHANGE_STATUS_COLORS: Record<ExchangeStatus, string> = {
-  pending_confirmation: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-blue-100 text-blue-800",
-  signed: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
-};
+import type { ExchangeStatus, RequestStatus, ShiftType } from "@/types";
 
 interface RequestWithUser {
   id: string;
@@ -110,7 +107,12 @@ export default async function MyShiftsPage() {
           `
           )
           .in("shift_id", shiftIds)
-          .in("status", ["pending_confirmation", "confirmed", "signed", "completed"])
+          .in("status", [
+            "pending_confirmation",
+            "confirmed",
+            "signed",
+            "completed",
+          ])
           .order("created_at", { ascending: false });
 
   const activeExchangeByShiftId = new Map<string, ActiveExchange>();
@@ -120,43 +122,38 @@ export default async function MyShiftsPage() {
     }
   }
 
-  const formatTime = (time: string) => {
-    if (time?.includes(":")) {
-      const [h, m] = time.split(":");
-      return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
-    }
-    return time;
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Mis turnos</h1>
-        <Link href="/shifts/new">
-          <Button>
-            <Plus className="mr-2 size-4" />
-            Publicar turno
-          </Button>
-        </Link>
-      </div>
-
-      {typedShifts.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-muted-foreground">
-            No has publicado ningún turno todavía.
-          </p>
-          <Link href="/shifts/new" className="mt-4 inline-block">
-            <Button variant="outline" size="sm">
-              <Plus className="mr-2 size-4" />
-              Publicar tu primer turno
+      <PageHeader
+        eyebrow="Gestion"
+        title="Mis turnos"
+        description="Supervisa tus publicaciones, revisa solicitudes pendientes y detecta rapido cuando un turno ya esta evolucionando hacia un intercambio."
+        action={
+          <Link href="/shifts/new">
+            <Button>
+              <Plus className="size-4" />
+              Publicar turno
             </Button>
           </Link>
-        </div>
+        }
+      />
+
+      {typedShifts.length === 0 ? (
+        <EmptyState
+          icon={<CalendarDays className="size-5" />}
+          title="Aun no has publicado ningun turno"
+          description="Cuando publiques tu primer turno podras gestionar solicitudes, negociar y seguir el estado del intercambio desde aqui."
+          action={
+            <Link href="/shifts/new">
+              <Button variant="outline">Publicar tu primer turno</Button>
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-6">
           {typedShifts.map((shift) => {
             const activeExchange = activeExchangeByShiftId.get(shift.id);
-            const timeRange = `${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}`;
+            const timeRange = formatTimeRange(shift.start_time, shift.end_time);
             const detailHref = activeExchange
               ? `/exchanges/${activeExchange.id}`
               : `/shifts/${shift.id}`;
@@ -173,7 +170,7 @@ export default async function MyShiftsPage() {
             );
             const hasPendingCancellationRequest =
               activeExchange?.status === "signed" &&
-              !!activeExchange.cancellation_requested_by;
+              Boolean(activeExchange.cancellation_requested_by);
             const isCancellationRequester =
               hasPendingCancellationRequest &&
               activeExchange?.cancellation_requested_by === authUser.id;
@@ -182,29 +179,33 @@ export default async function MyShiftsPage() {
               : SHIFT_STATUS_LABELS[
                   shift.status as keyof typeof SHIFT_STATUS_LABELS
                 ];
-            const statusColor = activeExchange
-              ? EXCHANGE_STATUS_COLORS[activeExchange.status]
-              : SHIFT_STATUS_COLORS[
-                  shift.status as keyof typeof SHIFT_STATUS_COLORS
+            const statusClassName = activeExchange
+              ? EXCHANGE_STATUS_STYLES[activeExchange.status]
+              : SHIFT_STATUS_STYLES[
+                  shift.status as keyof typeof SHIFT_STATUS_STYLES
                 ];
 
             return (
               <Card key={shift.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="space-y-1">
+                <CardHeader className="space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <CalendarDays className="size-4" />
                         {formatShortDate(shift.date)} · {timeRange}
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={SHIFT_TYPE_STYLES[shift.shift_type as ShiftType]}>
                           {SHIFT_TYPE_LABELS[shift.shift_type as ShiftType]}
                         </Badge>
-                        <Badge className={statusColor}>{statusLabel}</Badge>
+                        <Badge className={statusClassName}>{statusLabel}</Badge>
+                        <Badge variant="outline" className="text-foreground">
+                          {shift.department.name}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link href={detailHref}>
                         <Button variant="ghost" size="sm">
                           {detailLabel}
@@ -216,73 +217,67 @@ export default async function MyShiftsPage() {
                         )}
                     </div>
                   </div>
+
                   {shift.description && (
-                    <CardDescription className="mt-1">
-                      {shift.description}
-                    </CardDescription>
+                    <CardDescription>{shift.description}</CardDescription>
                   )}
                 </CardHeader>
 
                 <CardContent>
                   {activeExchange ? (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                          <Users className="size-4" />
-                          Intercambio asociado
-                        </div>
-                          <div className="rounded-lg border p-3">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="font-medium">
-                                  {activeExchange.requester.full_name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                  {activeExchange.requester.email}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Badge className={EXCHANGE_STATUS_COLORS[activeExchange.status]}>
-                                  {EXCHANGE_STATUS_LABELS[activeExchange.status]}
-                                </Badge>
-                                {hasPendingCancellationRequest && (
-                                  <Badge variant="outline">
-                                    Cancelacion pendiente
-                                  </Badge>
-                                )}
-                              </div>
+                    <div className="space-y-5">
+                      <div className="rounded-2xl border border-border/70 bg-secondary/45 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <Users className="size-4 text-primary" />
+                              Intercambio asociado
                             </div>
-                            <p className="mt-3 text-sm text-muted-foreground">
-                              {hasPendingCancellationRequest ? (
-                                isCancellationRequester ? (
-                                  <>
-                                    Ya has solicitado la cancelacion de este
-                                    intercambio firmado. Queda pendiente de
-                                    respuesta por la otra parte.
-                                  </>
-                                ) : (
-                                  <>
-                                    La otra parte ha solicitado cancelar este
-                                    intercambio firmado. Entra en el intercambio
-                                    para confirmarlo o rechazarlo.
-                                  </>
-                                )
-                              ) : (
-                                <>
-                                  Este caso ya se gestiona como intercambio. Usa
-                                  la vista de intercambio para consultar el
-                                  estado, el chat, el PDF y las acciones
-                                  disponibles.
-                                </>
-                              )}
+                            <p className="text-sm font-medium text-foreground">
+                              {activeExchange.requester.full_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {activeExchange.requester.email}
                             </p>
                           </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className={EXCHANGE_STATUS_STYLES[activeExchange.status]}>
+                              {EXCHANGE_STATUS_LABELS[activeExchange.status]}
+                            </Badge>
+                            {hasPendingCancellationRequest && (
+                              <Badge variant="outline">Cancelacion pendiente</Badge>
+                            )}
+                          </div>
                         </div>
+                        <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                          {hasPendingCancellationRequest ? (
+                            isCancellationRequester ? (
+                              <>
+                                Ya has solicitado la cancelacion de este intercambio
+                                firmado. Queda pendiente de respuesta por la otra
+                                parte.
+                              </>
+                            ) : (
+                              <>
+                                La otra parte ha solicitado cancelar este intercambio
+                                firmado. Entra en el intercambio para confirmarlo o
+                                rechazarlo.
+                              </>
+                            )
+                          ) : (
+                            <>
+                              Este caso ya se gestiona como intercambio. Usa la vista
+                              de detalle para consultar estado, chat, documento y
+                              acciones disponibles.
+                            </>
+                          )}
+                        </p>
+                      </div>
 
                       {shift.shift_requests.length > 1 && (
-                        <div>
-                          <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                            <Users className="size-4" />
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Users className="size-4 text-primary" />
                             Otras solicitudes
                           </div>
                           {pendingRequests.length === 0 && otherRequests.length === 0 ? (
@@ -290,41 +285,25 @@ export default async function MyShiftsPage() {
                               No hay otras solicitudes asociadas a este turno.
                             </p>
                           ) : (
-                            <ul className="space-y-2">
-                              {pendingRequests.map((request) => (
+                            <ul className="space-y-3">
+                              {[...pendingRequests, ...otherRequests].map((request) => (
                                 <li
                                   key={request.id}
-                                  className="flex items-center justify-between rounded-lg border p-3"
+                                  className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                                 >
-                                  <div>
-                                    <p className="font-medium">
-                                      {request.requester.full_name}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.requester.email}
-                                    </p>
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold text-foreground">
+                                        {request.requester.full_name}
+                                      </p>
+                                      <p className="truncate text-sm text-muted-foreground">
+                                        {request.requester.email}
+                                      </p>
+                                    </div>
+                                    <Badge className={REQUEST_STATUS_STYLES[request.status]}>
+                                      {REQUEST_STATUS_LABELS[request.status]}
+                                    </Badge>
                                   </div>
-                                  <Badge variant="outline">
-                                    {REQUEST_STATUS_LABELS[request.status]}
-                                  </Badge>
-                                </li>
-                              ))}
-                              {otherRequests.map((request) => (
-                                <li
-                                  key={request.id}
-                                  className="flex items-center justify-between rounded-lg border p-3"
-                                >
-                                  <div>
-                                    <p className="font-medium">
-                                      {request.requester.full_name}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.requester.email}
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline">
-                                    {REQUEST_STATUS_LABELS[request.status]}
-                                  </Badge>
                                 </li>
                               ))}
                             </ul>
@@ -333,62 +312,64 @@ export default async function MyShiftsPage() {
                       )}
                     </div>
                   ) : (
-                    <>
-                      <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                        <Users className="size-4" />
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Users className="size-4 text-primary" />
                         Interesados ({shift.shift_requests.length})
                       </div>
 
                       {shift.shift_requests.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          Nadie ha mostrado interés aún.
+                        <p className="rounded-2xl border border-dashed border-border/80 bg-secondary/35 px-4 py-6 text-sm text-muted-foreground">
+                          Todavia nadie ha mostrado interes por este turno.
                         </p>
                       ) : (
-                        <ul className="space-y-2">
+                        <ul className="space-y-3">
                           {pendingRequests.map((request) => (
                             <li
                               key={request.id}
-                              className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                              className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                             >
-                              <div>
-                                <p className="font-medium">
-                                  {request.requester.full_name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.requester.email}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <form action={acceptRequest}>
-                                  <input
-                                    type="hidden"
-                                    name="request_id"
-                                    value={request.id}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="shift_id"
-                                    value={shift.id}
-                                  />
-                                  <Button type="submit" size="sm" variant="default">
-                                    Aceptar
-                                  </Button>
-                                </form>
-                                <form action={rejectRequest}>
-                                  <input
-                                    type="hidden"
-                                    name="request_id"
-                                    value={request.id}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="shift_id"
-                                    value={shift.id}
-                                  />
-                                  <Button type="submit" size="sm" variant="outline">
-                                    Rechazar
-                                  </Button>
-                                </form>
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-foreground">
+                                    {request.requester.full_name}
+                                  </p>
+                                  <p className="truncate text-sm text-muted-foreground">
+                                    {request.requester.email}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <form action={acceptRequest}>
+                                    <input
+                                      type="hidden"
+                                      name="request_id"
+                                      value={request.id}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="shift_id"
+                                      value={shift.id}
+                                    />
+                                    <Button type="submit" size="sm">
+                                      Aceptar
+                                    </Button>
+                                  </form>
+                                  <form action={rejectRequest}>
+                                    <input
+                                      type="hidden"
+                                      name="request_id"
+                                      value={request.id}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="shift_id"
+                                      value={shift.id}
+                                    />
+                                    <Button type="submit" size="sm" variant="outline">
+                                      Rechazar
+                                    </Button>
+                                  </form>
+                                </div>
                               </div>
                             </li>
                           ))}
@@ -396,24 +377,26 @@ export default async function MyShiftsPage() {
                           {otherRequests.map((request) => (
                             <li
                               key={request.id}
-                              className="flex items-center justify-between rounded-lg border p-3"
+                              className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                             >
-                              <div>
-                                <p className="font-medium">
-                                  {request.requester.full_name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.requester.email}
-                                </p>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-foreground">
+                                    {request.requester.full_name}
+                                  </p>
+                                  <p className="truncate text-sm text-muted-foreground">
+                                    {request.requester.email}
+                                  </p>
+                                </div>
+                                <Badge className={REQUEST_STATUS_STYLES[request.status]}>
+                                  {REQUEST_STATUS_LABELS[request.status]}
+                                </Badge>
                               </div>
-                              <Badge variant="outline">
-                                {REQUEST_STATUS_LABELS[request.status]}
-                              </Badge>
                             </li>
                           ))}
                         </ul>
                       )}
-                    </>
+                    </div>
                   )}
                 </CardContent>
               </Card>
