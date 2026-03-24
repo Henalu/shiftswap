@@ -1,25 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
-import { Bell, X } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  CheckCircle2,
+  Clock3,
+  LucideIcon,
+  MessageSquareMore,
+  X,
+  XCircle,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getNotificationActionUrl } from "@/lib/notification-utils";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Notification } from "@/types";
+import type { Notification, NotificationType } from "@/types";
 
 interface NotificationBellProps {
   userId: string;
   initialNotifications: Notification[];
   initialUnreadCount: number;
+}
+
+interface NotificationAppearance {
+  label: string;
+  icon: LucideIcon;
+  iconClassName: string;
 }
 
 const NOTIFICATION_LIMIT = 12;
@@ -55,6 +68,64 @@ function mergeNotification(
   ]);
 }
 
+function getNotificationAppearance(type: NotificationType): NotificationAppearance {
+  switch (type) {
+    case "new_message":
+      return {
+        label: "Chat",
+        icon: MessageSquareMore,
+        iconClassName:
+          "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+      };
+    case "exchange_department_approved":
+    case "request_accepted":
+    case "exchange_confirmed":
+    case "exchange_signed":
+    case "account_approved":
+      return {
+        label: "Aprobado",
+        icon: CheckCircle2,
+        iconClassName:
+          "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+      };
+    case "request_rejected":
+    case "shift_cancelled":
+    case "exchange_cancelled":
+    case "exchange_department_rejected":
+    case "account_rejected":
+      return {
+        label: "Estado",
+        icon: XCircle,
+        iconClassName:
+          "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+      };
+    case "shift_request":
+    case "exchange_pending_approval":
+    case "exchange_cancellation_requested":
+    case "exchange_cancellation_rejected":
+      return {
+        label: "Pendiente",
+        icon: Clock3,
+        iconClassName:
+          "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+      };
+    case "exchange_document_added":
+      return {
+        label: "Documento",
+        icon: BellRing,
+        iconClassName:
+          "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+      };
+    default:
+      return {
+        label: "Aviso",
+        icon: BellRing,
+        iconClassName:
+          "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+      };
+  }
+}
+
 export function NotificationBell({
   userId,
   initialNotifications,
@@ -65,6 +136,8 @@ export function NotificationBell({
     normalizeNotifications(initialNotifications)
   );
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [desktopOpen, setDesktopOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -131,6 +204,18 @@ export function NotificationBell({
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    function closeOnDesktop(event: MediaQueryListEvent) {
+      if (event.matches) setMobileOpen(false);
+    }
+
+    mediaQuery.addEventListener("change", closeOnDesktop);
+    return () => mediaQuery.removeEventListener("change", closeOnDesktop);
+  }, [mobileOpen]);
+
   async function markNotificationAsRead(notificationId: string) {
     const supabase = createClient();
     const now = new Date().toISOString();
@@ -171,7 +256,16 @@ export function NotificationBell({
     }
   }
 
-  async function handleNotificationSelect(notification: Notification) {
+  async function handleNotificationSelect(
+    notification: Notification,
+    surface: "desktop" | "mobile"
+  ) {
+    if (surface === "desktop") {
+      setDesktopOpen(false);
+    } else {
+      setMobileOpen(false);
+    }
+
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
     }
@@ -206,106 +300,265 @@ export function NotificationBell({
     );
   }
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        className="relative rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10"
-        aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
-      >
-        <Bell className="size-5" />
-        {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground shadow-sm">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-[23rem] max-w-[calc(100vw-1.5rem)] rounded-2xl"
-      >
-        <DropdownMenuLabel className="flex items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold tracking-[-0.02em]">Notificaciones</p>
-            <p className="text-xs font-normal text-muted-foreground">
-              Mantente al dia con tus turnos e intercambios
-            </p>
-          </div>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-secondary"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void handleMarkAllAsRead();
-              }}
-            >
-              Marcar todas
-            </button>
+  function renderNotificationList(surface: "desktop" | "mobile") {
+    if (notifications.length === 0) {
+      return (
+        <div
+          className={cn(
+            "flex flex-col items-center justify-center text-center",
+            surface === "desktop" ? "px-5 py-10" : "px-4 py-14"
           )}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {notifications.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <p className="text-sm font-medium text-foreground">
-              Todo al dia
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              No tienes notificaciones pendientes.
-            </p>
+        >
+          <div className="flex size-14 items-center justify-center rounded-[1.4rem] border border-border/70 bg-card/90 text-muted-foreground">
+            <BellRing className="size-6" />
           </div>
-        ) : (
-          notifications.map((notification) => (
-            <DropdownMenuItem
+          <p className="mt-4 text-sm font-semibold tracking-[-0.02em] text-foreground">
+            Todo al dia
+          </p>
+          <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+            No tienes notificaciones pendientes ahora mismo.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("space-y-2", surface === "desktop" ? "p-2" : "space-y-3")}>
+        {notifications.map((notification) => {
+          const appearance = getNotificationAppearance(notification.type);
+          const timestamp = formatRelativeTime(getNotificationSortDate(notification));
+
+          return (
+            <div
               key={notification.id}
-              className="flex cursor-pointer flex-col items-start gap-3 rounded-xl px-3 py-3"
-              onSelect={() => {
-                void handleNotificationSelect(notification);
-              }}
+              className={cn(
+                "rounded-[1.6rem] border transition-[border-color,background-color,box-shadow] duration-200 ease-out",
+                surface === "desktop"
+                  ? notification.read
+                    ? "border-border/70 bg-card/92 hover:border-border hover:bg-card"
+                    : "border-primary/15 bg-primary/[0.05] shadow-[0_18px_32px_-30px_rgba(37,99,235,0.35)] hover:border-primary/20 hover:bg-primary/[0.07]"
+                  : notification.read
+                    ? "border-border/70 bg-card/96 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.2)]"
+                    : "border-primary/15 bg-primary/[0.05] shadow-[0_20px_36px_-30px_rgba(37,99,235,0.34)]"
+              )}
             >
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-start gap-2">
-                    {!notification.read && (
-                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
-                    )}
-                    <div className="min-w-0 space-y-1">
+              <div className="flex items-start gap-3 px-3.5 py-3.5">
+                <div
+                  className={cn(
+                    "mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-2xl border",
+                    appearance.iconClassName
+                  )}
+                >
+                  <appearance.icon className="size-5" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-2.5">
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 rounded-2xl text-left outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
+                      onClick={() => {
+                        void handleNotificationSelect(notification, surface);
+                      }}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary-foreground">
+                          {appearance.label}
+                        </span>
+                        {!notification.read && (
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                            Sin leer
+                          </span>
+                        )}
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {timestamp}
+                        </span>
+                      </div>
                       <p
                         className={cn(
-                          "truncate text-sm",
+                          "mt-3 text-sm leading-5 tracking-[-0.02em]",
                           notification.read ? "font-medium" : "font-semibold"
                         )}
                       >
                         {notification.title}
                       </p>
-                      <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                         {notification.body}
                       </p>
-                    </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Descartar notificacion"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-4 focus-visible:ring-primary/10"
+                      onClick={() => {
+                        void dismissNotification(notification);
+                      }}
+                    >
+                      <X className="size-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-start gap-2">
-                  <span className="pt-0.5 text-xs text-muted-foreground">
-                    {formatRelativeTime(getNotificationSortDate(notification))}
-                  </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <DialogPrimitive.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DialogPrimitive.Trigger asChild>
+          <button
+            type="button"
+            aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
+            className="relative flex size-10 items-center justify-center rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10 md:hidden"
+          >
+            <Bell className="size-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground shadow-sm">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+        </DialogPrimitive.Trigger>
+
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-slate-950/18 backdrop-blur-[3px] md:hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:transition-none" />
+          <DialogPrimitive.Content className="fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_94%,white)_0%,var(--background)_18rem)] text-foreground outline-none md:hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-3 data-[state=open]:slide-in-from-top-3 motion-reduce:transition-none">
+            <DialogPrimitive.Title className="sr-only">
+              Notificaciones
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description className="sr-only">
+              Panel de notificaciones con tus cambios, mensajes y estados recientes.
+            </DialogPrimitive.Description>
+
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_top,oklch(0.88_0.07_255_/_0.22),transparent_72%)]"
+            />
+
+            <div className="relative flex h-full flex-col">
+              <div className="flex items-center justify-between gap-3 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)]">
+                <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/90 px-3.5 py-2.5 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.3)]">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Bell className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold tracking-[-0.02em]">
+                      Notificaciones
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {unreadCount > 0
+                        ? `${unreadCount} pendientes por revisar`
+                        : "Todo tu inbox esta al dia"}
+                    </p>
+                  </div>
+                </div>
+
+                <DialogPrimitive.Close asChild>
                   <button
                     type="button"
-                    aria-label="Descartar notificacion"
-                    className="flex size-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void dismissNotification(notification);
-                    }}
+                    aria-label="Cerrar notificaciones"
+                    className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/90 outline-none transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10"
                   >
-                    <X className="size-4" />
+                    <X className="size-5" />
                   </button>
+                </DialogPrimitive.Close>
+              </div>
+
+              <div className="px-4 pb-4">
+                <div className="rounded-[1.75rem] border border-border/70 bg-card/90 px-4 py-4 shadow-[0_20px_38px_-30px_rgba(15,23,42,0.25)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold tracking-[-0.025em] text-foreground">
+                        Mantente al dia con tus turnos e intercambios
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Revisa mensajes, decisiones y cambios de estado sin perder el contexto.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">
+                      {notifications.length}
+                    </div>
+                  </div>
+
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl border border-primary/15 bg-primary/[0.06] px-4 py-2.5 text-sm font-semibold text-primary outline-none transition-colors hover:bg-primary/[0.1] focus-visible:ring-4 focus-visible:ring-primary/10"
+                      onClick={() => {
+                        void handleMarkAllAsRead();
+                      }}
+                    >
+                      Marcar todas como leidas
+                    </button>
+                  )}
                 </div>
               </div>
-            </DropdownMenuItem>
-          ))
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+
+              <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                {renderNotificationList("mobile")}
+              </div>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
+      <DropdownMenu open={desktopOpen} onOpenChange={setDesktopOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
+            className="relative hidden size-10 items-center justify-center rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10 md:flex"
+          >
+            <Bell className="size-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground shadow-sm">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent
+          align="end"
+          sideOffset={10}
+          className="hidden w-[24rem] rounded-[1.6rem] border-border/80 bg-popover/98 p-0 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.28)] md:block"
+        >
+          <div className="border-b border-border/70 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold tracking-[-0.02em] text-foreground">
+                  Notificaciones
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Mantente al dia con tus turnos e intercambios.
+                </p>
+              </div>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  className="rounded-xl px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-secondary"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void handleMarkAllAsRead();
+                  }}
+                >
+                  Marcar todas
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="max-h-[min(70vh,32rem)] overflow-y-auto p-2">
+            {renderNotificationList("desktop")}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
