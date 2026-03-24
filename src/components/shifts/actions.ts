@@ -97,6 +97,36 @@ export async function toggleInterest(
     return { success: true, interested: false, requestId: null };
   }
 
+  const [{ data: profile }, { data: shift }] = await Promise.all([
+    supabase
+      .from("user_profiles")
+      .select("department_id")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("shifts")
+      .select("id, user_id, department_id, status")
+      .eq("id", shiftId)
+      .maybeSingle(),
+  ]);
+
+  if (!profile?.department_id) {
+    return {
+      error:
+        "Tu perfil no tiene un departamento operativo valido. Revisa tu asignacion antes de continuar.",
+    };
+  }
+
+  if (!shift || shift.user_id === user.id || shift.status !== "open") {
+    return { error: "Este turno ya no esta disponible para solicitar." };
+  }
+
+  if (shift.department_id !== profile.department_id) {
+    return {
+      error: "Solo puedes mostrar interes en turnos de tu propio departamento.",
+    };
+  }
+
   const { data: withdrawn } = await supabase
     .from("shift_requests")
     .select("id")

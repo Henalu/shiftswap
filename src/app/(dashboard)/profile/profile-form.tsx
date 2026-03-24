@@ -41,6 +41,7 @@ interface ProfileFormProps {
     "full_name" | "email" | "phone" | "avatar_url" | "employee_id"
   >;
   companyName: string;
+  areaName: string;
   departmentName: string;
   userId: string;
 }
@@ -70,6 +71,7 @@ function ReadonlyField({ icon, label, value }: ReadonlyFieldProps) {
 export function ProfileForm({
   profile,
   companyName,
+  areaName,
   departmentName,
   userId,
 }: ProfileFormProps) {
@@ -285,15 +287,21 @@ export function ProfileForm({
           <CardTitle>Informacion laboral</CardTitle>
           <CardDescription>
             Estos datos vienen de la validacion inicial y sirven como contexto en
-            aprobaciones, turnos y negociaciones.
+            aprobaciones, turnos y negociaciones. Los cambios de departamento no se
+            aplican desde aqui: se solicitan y revisan por separado.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-4">
           <ReadonlyField
             icon={<Building2 className="size-4" />}
             label="Empresa"
             value={companyName}
+          />
+          <ReadonlyField
+            icon={<BriefcaseBusiness className="size-4" />}
+            label="Area o taller"
+            value={areaName}
           />
           <ReadonlyField
             icon={<IdCard className="size-4" />}

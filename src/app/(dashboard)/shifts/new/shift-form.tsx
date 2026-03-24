@@ -18,18 +18,15 @@ import { createShift } from "./actions";
 import type { ShiftType } from "@/types";
 
 interface ShiftFormProps {
-  departmentId: string;
-  userId: string;
+  areaName: string;
+  departmentName: string;
 }
 
-export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
+export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
   const [state, formAction] = useActionState(createShift, {});
 
   return (
     <form action={formAction}>
-      <input type="hidden" name="user_id" value={userId} />
-      <input type="hidden" name="department_id" value={departmentId} />
-
       <Card className="max-w-3xl">
         <CardHeader>
           <CardTitle>Detalles del turno</CardTitle>
@@ -37,6 +34,18 @@ export function ShiftForm({ departmentId, userId }: ShiftFormProps) {
             Cuanto mas claro sea este formulario, mas facil sera que otra persona
             compare tu turno y tome una decision rapido.
           </CardDescription>
+          <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
+            Este turno se publicara dentro de{" "}
+            <span className="font-semibold text-foreground">{departmentName}</span>
+            {areaName !== departmentName ? (
+              <>
+                {" "}
+                en el area{" "}
+                <span className="font-semibold text-foreground">{areaName}</span>
+              </>
+            ) : null}
+            .
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-6">

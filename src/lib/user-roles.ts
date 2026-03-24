@@ -18,6 +18,12 @@ interface UserScope {
   department_id: string | null;
 }
 
+interface DepartmentChangeRequestScope {
+  company_id: string | null;
+  current_department_id: string | null;
+  requested_department_id: string | null;
+}
+
 export interface ScopedRoleUser extends UserScope {
   role: UserRole;
 }
@@ -73,4 +79,35 @@ export function canAccessScopedDepartment(
   target: UserScope | null | undefined
 ): boolean {
   return canAccessScopedProfile(actor, target);
+}
+
+export function canReviewDepartmentChangeRequest(
+  actor: ScopedRoleUser | null | undefined,
+  target: DepartmentChangeRequestScope | null | undefined
+): boolean {
+  if (!actor || !target) {
+    return false;
+  }
+
+  if (actor.role === "super_admin") {
+    return true;
+  }
+
+  if (!actor.company_id || !target.company_id || actor.company_id !== target.company_id) {
+    return false;
+  }
+
+  if (actor.role === "hr_admin") {
+    return true;
+  }
+
+  if (!actor.department_id) {
+    return false;
+  }
+
+  return (
+    actor.role === "department_admin" &&
+    (actor.department_id === target.current_department_id ||
+      actor.department_id === target.requested_department_id)
+  );
 }

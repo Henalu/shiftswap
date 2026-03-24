@@ -1,4 +1,5 @@
 import type {
+  DepartmentChangeRequestStatus,
   ExchangeAgreementType,
   ExchangeStatus,
   RequestStatus,
@@ -119,6 +120,24 @@ export const SHIFT_DEBT_TRANSACTION_STATUS_STYLES = {
   settled:
     "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 } as const satisfies Record<ShiftDebtTransactionStatus, string>;
+
+export const DEPARTMENT_CHANGE_REQUEST_STATUS_LABELS = {
+  pending: "Pendiente",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  cancelled: "Cancelada",
+} as const satisfies Record<DepartmentChangeRequestStatus, string>;
+
+export const DEPARTMENT_CHANGE_REQUEST_STATUS_STYLES = {
+  pending:
+    "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  approved:
+    "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  rejected:
+    "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  cancelled:
+    "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+} as const satisfies Record<DepartmentChangeRequestStatus, string>;
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_SHIFTS_PER_DAY = 3;

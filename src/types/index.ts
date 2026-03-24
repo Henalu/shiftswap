@@ -21,6 +21,11 @@ export type ShiftDebtTransactionStatus =
   | 'voided'
   | 'settled';
 export type ShiftDebtMovementType = 'hours_bank_debt';
+export type DepartmentChangeRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'member' | 'department_admin' | 'hr_admin' | 'super_admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
@@ -70,6 +75,7 @@ export interface Department {
   company_id: string;
   name: string;
   parent_department_id?: string | null;
+  is_assignable?: boolean;
   created_at: string;
 }
 
@@ -159,6 +165,21 @@ export interface ShiftDebtTransaction {
   created_at: string;
 }
 
+export interface DepartmentChangeRequest {
+  id: string;
+  user_id: string;
+  company_id: string;
+  current_department_id: string;
+  requested_department_id: string;
+  request_reason?: string | null;
+  status: DepartmentChangeRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ExchangeEventType =
   | 'exchange_created'
   | 'agreement_confirmed'
@@ -237,6 +258,9 @@ export type NotificationType =
   | 'exchange_pending_approval'
   | 'exchange_department_approved'
   | 'exchange_department_rejected'
+  | 'department_change_requested'
+  | 'department_change_approved'
+  | 'department_change_rejected'
   | 'account_approved'
   | 'account_rejected';
 

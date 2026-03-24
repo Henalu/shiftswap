@@ -97,7 +97,7 @@ export async function acceptRequest(formData: FormData): Promise<void> {
 
   const { data: shift } = await supabase
     .from("shifts")
-    .select("user_id, status")
+    .select("user_id, status, department_id")
     .eq("id", shiftId)
     .single();
 
@@ -126,6 +126,16 @@ export async function acceptRequest(formData: FormData): Promise<void> {
     .single();
 
   if (!request) return;
+
+  const { data: requesterProfile } = await supabase
+    .from("user_profiles")
+    .select("department_id")
+    .eq("id", request.interested_user_id)
+    .maybeSingle();
+
+  if (!requesterProfile || requesterProfile.department_id !== shift.department_id) {
+    return;
+  }
 
   await supabase
     .from("shift_requests")

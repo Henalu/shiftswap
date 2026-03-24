@@ -8,8 +8,8 @@
 ## Estado actual
 - Fase: Fase 5 - Testing con usuarios / preparacion para piloto
 - Ultima actualizacion: 2026-03-24
-- Ultimo hito relevante: smartphone navigation refactor with mobile bottom nav + secondary account menu
-- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00020`
+- Ultimo hito relevante: department-scoped organizational model + hierarchical onboarding + department change requests
+- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00021`
 
 ## Resumen ejecutivo
 - ShiftSwap es una app web interna para intercambio de turnos entre empleados.
@@ -18,7 +18,12 @@
 - El expediente formal vive en la app: acuerdo, firmas, revision de departamento, resolucion y trazabilidad.
 - El PDF corporativo de Arcelor es una salida generada por el sistema, no el centro del proceso.
 - En smartphone, la navegacion principal ahora usa bottom nav para las 4 secciones de trabajo mas frecuentes y deja cuenta/admin en una capa secundaria.
-- `departments` ya soporta jerarquia via `parent_department_id`, con seed reproducible para la estructura inicial de Arcelor.
+- `departments` ya soporta jerarquia via `parent_department_id` y ahora distingue nodos operativos elegibles mediante `is_assignable`.
+- El registro ya no muestra departamentos en plano: obliga a elegir `empresa -> area/taller -> departamento operativo`.
+- El tablon de turnos deja de comportarse como marketplace abierto entre toda la empresa: los usuarios normales solo ven turnos de su departamento exacto.
+- El perfil ya muestra area y departamento actual, y permite solicitar cambio de departamento con revision administrativa.
+- Existe nueva cola admin en `/admin/department-changes` para aprobar o rechazar traslados entre departamentos operativos.
+- `next.config.ts` aumenta el `bodySizeLimit` de Server Actions a `8mb` para que el registro soporte la subida del carne corporativo sin romperse.
 - `npm run lint` y `npm run build` pasan con el estado actual del repo.
 
 ## Direccion de producto y diseno
@@ -123,6 +128,27 @@
 - El seed es idempotente y puede ejecutarse varias veces sin duplicar nodos.
 - La app actual ya puede asignar usuarios y turnos a nodos concretos; el filtrado sigue siendo por `department_id` exacto y no expande automaticamente a descendientes.
 
+### 2026-03-24 - Alcance real por departamento y cambio de departamento
+- Se anade `supabase/migrations/00021_department_scope_and_change_requests.sql`.
+- El modelo organizativo deja de depender solo de la jerarquia y pasa a marcar departamentos operativos con `departments.is_assignable`.
+- `Aceria LDG` queda tratada como nodo contenedor no elegible; sus hijos operativos (`Produccion`, `Maquinas`, `Mantenimiento mecanico`, `Mantenimiento electrico`) quedan como destinos validos.
+- El registro en `src/app/(auth)/register/*` ahora obliga a seleccionar:
+  - empresa
+  - area/taller
+  - departamento operativo final
+- El tablon en `src/app/(dashboard)/shifts/page.tsx` y `src/components/shifts/shift-filters.tsx` restringe la visibilidad al departamento exacto del usuario; el filtro de departamento solo queda disponible para alcance amplio (`hr_admin`, `super_admin`).
+- La publicacion de turnos ya no confia en campos ocultos del formulario: el `department_id` sale del perfil autenticado en server action.
+- Se endurecen validaciones y RLS para evitar cruces inconsistentes en:
+  - `shifts`
+  - `shift_requests`
+  - `conversations`
+  - `exchanges`
+- El perfil muestra `area/taller` y `departamento` por separado y anade solicitud de cambio con estado.
+- Se crea la entidad `department_change_requests` y un flujo admin minimo en `/admin/department-changes`.
+- La aprobacion/rechazo del cambio de departamento se resuelve de forma atomica desde SQL con `resolve_department_change_request(...)`.
+- `supabase/seeds/02_arcelor_organization.sql` ahora marca `Aceria LDG` con `is_assignable = FALSE` y los departamentos operativos correspondientes con `TRUE`.
+- `next.config.ts` sube `experimental.serverActions.bodySizeLimit` a `8mb` para soportar la carga del carne corporativo en el registro.
+
 ## Progreso por fase
 
 ### Fase 1 - Prototipo
@@ -153,10 +179,10 @@
   - pendiente: piloto con usuarios reales y refinamiento sobre feedback
 
 ## Problemas conocidos
-- El registro puede dejar usuario a medias si falla el `INSERT` en `user_profiles`; conviene endurecer el flujo para evitar estados parciales.
+- El registro hace rollback del usuario auth si falla la escritura del perfil o la subida del carne, pero conviene seguir vigilando errores operativos del bucket `id-cards`.
 - Todavia no hay suite automatizada de tests; `package.json` no expone `npm run test`.
 - En Windows + OneDrive puede aparecer de forma intermitente un `EPERM` durante `next build` por locks del filesystem en `.next`; no es un fallo estable del codigo si el build vuelve a pasar al reintentar.
-- Para produccion, la base de datos debe tener aplicadas al menos `00017`, `00018`, `00019` y `00020`.
+- Para produccion, la base de datos debe tener aplicadas al menos `00017`, `00018`, `00019`, `00020` y `00021`.
 
 ## Decisiones tecnicas importantes
 - Server Components por defecto; `"use client"` solo cuando es necesario.
@@ -173,9 +199,11 @@
 - `00018` modela workflow nativo, firmas embebidas, aprobacion y `exchange_events`.
 - `00019` modela acuerdos de compensacion y `shift_debt_transactions`.
 - `00020` anade jerarquia de departamentos con `parent_department_id`.
+- `00021` introduce `is_assignable`, visibilidad real por departamento, solicitudes de cambio de departamento y endurecimiento de RLS para alcance organizativo.
 - `src/components/layout/navigation-items.ts` centraliza navegacion primaria/secundaria y el calculo de active state entre desktop y movil.
 - En movil, la navegacion primaria es la bottom nav; el menu del avatar queda reservado para cuenta y administracion.
 - `src/app/(dashboard)/layout.tsx` anade padding inferior especifico en movil para convivir con la bottom nav sin tapar contenido.
+- `next.config.ts` configura `experimental.serverActions.bodySizeLimit = "8mb"` por la subida de documentos en registro.
 
 ## Sistema visual actual
 - Fuente principal: `Manrope`
@@ -204,7 +232,11 @@
 - `src/components/ui/page-header.tsx` - patron reutilizable para cabeceras de pagina
 - `src/components/ui/empty-state.tsx` - patron reutilizable para estados vacios
 - `supabase/migrations/00020_department_hierarchy.sql` - soporte jerarquico para departamentos
+- `supabase/migrations/00021_department_scope_and_change_requests.sql` - elegibilidad operativa, visibilidad por departamento y solicitudes de cambio
 - `supabase/seeds/02_arcelor_organization.sql` - estructura inicial de Arcelor para testing
+- `src/lib/departments.ts` - helpers de jerarquia y lectura de area/departamento operativo
+- `src/app/(dashboard)/profile/department-change-request-card.tsx` - solicitud de cambio desde perfil
+- `src/app/(dashboard)/admin/department-changes/page.tsx` - cola admin de cambios de departamento
 - `src/components/exchanges/exchange-workflow-progress.tsx` - resumen visual del workflow
 - `src/app/(dashboard)/exchanges/[id]/page.tsx` - expediente formal del cambio
 - `src/app/(dashboard)/exchanges/actions.ts` - confirmacion, firma, retirada y soporte del expediente
@@ -230,13 +262,13 @@
 - `00018_native_exchange_approval_workflow.sql` - workflow nativo, aprobacion departamental y `exchange_events`
 - `00019_exchange_compensation_terms_and_ledger.sql` - acuerdos de compensacion y ledger `shift_debt_transactions`
 - `00020_department_hierarchy.sql` - `parent_department_id`, jerarquia y unicidad entre hermanos
+- `00021_department_scope_and_change_requests.sql` - `is_assignable`, RLS de alcance real y `department_change_requests`
 
 ## Siguientes pasos recomendados
 - Ejecutar piloto con usuarios reales.
 - Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo.
 - Ejecutar `supabase/seeds/02_arcelor_organization.sql` en los entornos de prueba que necesiten estructura Arcelor.
 - Recoger friccion de bottom nav movil, comprension de estados y claridad del flujo de intercambio.
-- Endurecer el flujo de registro para evitar usuarios parciales.
 - Introducir una base minima de tests para acciones criticas.
 - Construir una vista dedicada de historial/saldo para `shift_debt_transactions` si la bolsa de horas se vuelve flujo habitual.
 

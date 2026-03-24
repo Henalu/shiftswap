@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { hasAdminPanelAccess, isSuperAdmin } from "@/lib/user-roles";
@@ -75,6 +76,12 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
       icon: ClipboardCheck,
     },
     {
+      href: "/admin/department-changes",
+      label: "Cambios de depto.",
+      description: "Revisa traslados entre departamentos operativos.",
+      icon: Workflow,
+    },
+    {
       href: "/admin/validations",
       label: "Validaciones",
       description: "Revisa altas y accesos antes de aprobarlos.",
@@ -115,6 +122,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname === "/admin" || pathname.startsWith("/admin/exchanges");
     case "/admin/validations":
       return pathname.startsWith("/admin/validations");
+    case "/admin/department-changes":
+      return pathname.startsWith("/admin/department-changes");
     case "/admin/users":
       return pathname.startsWith("/admin/users");
     default:

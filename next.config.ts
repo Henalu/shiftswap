@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    serverActions: {
+      // Registration sends the employee ID card through a Server Action.
+      // Allow enough room for the 5 MB file plus multipart overhead.
+      bodySizeLimit: "8mb",
+    },
+  },
 };
 
 export default nextConfig;

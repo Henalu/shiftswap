@@ -9,7 +9,7 @@ export default async function RegisterPage() {
     supabase.from("companies").select("id, name, slug, created_at").order("name"),
     supabase
       .from("departments")
-      .select("id, name, company_id, created_at")
+      .select("id, name, company_id, parent_department_id, is_assignable, created_at")
       .order("name"),
   ]);
 

@@ -18,10 +18,8 @@ export async function createShift(
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
   const description = (formData.get("description") as string) || null;
-  const userId = formData.get("user_id") as string;
-  const departmentId = formData.get("department_id") as string;
 
-  if (!date || !shiftType || !startTime || !endTime || !userId || !departmentId) {
+  if (!date || !shiftType || !startTime || !endTime) {
     return { error: "Todos los campos obligatorios deben estar rellenados." };
   }
 
@@ -35,13 +33,55 @@ export async function createShift(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || user.id !== userId) {
+  if (!user) {
     return { error: "No autorizado." };
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("department_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return { error: "No se pudo validar tu departamento actual." };
+  }
+
+  if (!profile?.department_id) {
+    return {
+      error:
+        "Tu perfil no tiene un departamento operativo asignado. Revisa tu perfil antes de publicar un turno.",
+    };
+  }
+
+  const [{ data: department, error: departmentError }, { data: childDepartments, error: childDepartmentsError }] =
+    await Promise.all([
+      supabase
+        .from("departments")
+        .select("id, is_assignable")
+        .eq("id", profile.department_id)
+        .maybeSingle(),
+      supabase
+        .from("departments")
+        .select("id")
+        .eq("parent_department_id", profile.department_id)
+        .limit(1),
+    ]);
+
+  if (departmentError || childDepartmentsError) {
+    return { error: "No se pudo validar tu departamento operativo." };
+  }
+
+  if (!department?.is_assignable || (childDepartments?.length ?? 0) > 0) {
+    return {
+      error:
+        "Tu cuenta sigue asociada a un area general. Necesitas un departamento operativo final para publicar turnos.",
+    };
+  }
+
   const { error } = await supabase.from("shifts").insert({
-    user_id: userId,
-    department_id: departmentId,
+    user_id: user.id,
+    department_id: profile.department_id,
     date,
     start_time: startTime,
     end_time: endTime,

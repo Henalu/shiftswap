@@ -6,8 +6,13 @@ import { ShiftFilters } from "@/components/shifts/shift-filters";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  getDepartmentScopeLabel,
+  isOperationalDepartment,
+} from "@/lib/departments";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { ShiftWithUser } from "@/types";
+import type { Department, ShiftWithUser, UserRole } from "@/types";
 
 interface PageProps {
   searchParams: Promise<{
@@ -22,6 +27,7 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
   const { department_id, shift_type, from, to } = await searchParams;
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
@@ -30,10 +36,50 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  const { data: departments } = await supabase
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role, company_id, department_id")
+    .eq("id", authUser.id)
+    .maybeSingle();
+
+  if (!profile?.department_id) {
+    redirect("/profile?setup=1");
+  }
+
+  const role = (profile.role ?? "member") as UserRole;
+  const canBrowseDepartments = role === "hr_admin" || role === "super_admin";
+  const { data: departments } = await adminClient
     .from("departments")
-    .select("id, name")
+    .select("id, name, company_id, parent_department_id, is_assignable, created_at")
     .order("name");
+
+  const typedDepartments = (departments ?? []) as Department[];
+  const filterableDepartments = typedDepartments
+    .filter((department) => {
+      if (!isOperationalDepartment(department, typedDepartments)) {
+        return false;
+      }
+
+      if (role === "super_admin") {
+        return true;
+      }
+
+      return department.company_id === profile.company_id;
+    })
+    .map((department) => ({
+      id: department.id,
+      name: department.name,
+    }));
+
+  const canApplyDepartmentFilter =
+    canBrowseDepartments &&
+    filterableDepartments.some((department) => department.id === department_id);
+  const effectiveDepartmentId = canApplyDepartmentFilter
+    ? department_id
+    : canBrowseDepartments
+      ? undefined
+      : profile.department_id;
+  const scopeLabel = getDepartmentScopeLabel(typedDepartments, profile.department_id);
 
   let query = supabase
     .from("shifts")
@@ -41,15 +87,15 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
       `
       *,
       user:user_profiles!user_id(id, email, full_name, avatar_url, department_id, company_id),
-      department:departments!department_id(id, name)
+      department:departments!department_id(id, name, parent_department_id)
     `
     )
     .eq("status", "open")
     .neq("user_id", authUser.id)
     .order("date", { ascending: true });
 
-  if (department_id) {
-    query = query.eq("department_id", department_id);
+  if (effectiveDepartmentId) {
+    query = query.eq("department_id", effectiveDepartmentId);
   }
   if (shift_type) {
     query = query.eq("shift_type", shift_type);
@@ -69,21 +115,26 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     .eq("interested_user_id", authUser.id)
     .in("status", ["pending", "accepted"]);
 
-  const myRequestMap = new Map((myRequests ?? []).map((request) => [request.shift_id, request.id]));
+  const myRequestMap = new Map(
+    (myRequests ?? []).map((request) => [request.shift_id, request.id])
+  );
   const typedShifts = (shifts ?? []).map((shift) => ({
     ...shift,
     user: shift.user,
     department: shift.department,
   })) as ShiftWithUser[];
-
-  const hasFilters = !!(department_id || shift_type || from || to);
+  const hasFilters = !!(effectiveDepartmentId || shift_type || from || to);
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Marketplace interno"
         title="Turnos disponibles"
-        description="Compara rapidamente los turnos abiertos, filtra por contexto y deja claro cuando quieres iniciar un intercambio."
+        description={
+          canBrowseDepartments
+            ? "Compara rapidamente los turnos abiertos, filtra por contexto y entra solo en los intercambios que correspondan a tu alcance."
+            : `Este tablon muestra solo los turnos abiertos de tu departamento${scopeLabel ? `: ${scopeLabel}.` : "."}`
+        }
         action={
           <Link href="/shifts/new">
             <Button>
@@ -94,14 +145,20 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
         }
       />
 
-      <ShiftFilters departments={departments ?? []} />
+      <ShiftFilters
+        departments={filterableDepartments}
+        showDepartmentFilter={canBrowseDepartments}
+        scopeLabel={scopeLabel}
+      />
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {typedShifts.length === 0
             ? hasFilters
               ? "No hay turnos que coincidan con los filtros aplicados."
-              : "No hay turnos publicados en este momento."
+              : canBrowseDepartments
+                ? "No hay turnos publicados en este momento."
+                : "No hay turnos publicados ahora mismo dentro de tu departamento."
             : `${typedShifts.length} turno${typedShifts.length !== 1 ? "s" : ""} disponible${typedShifts.length !== 1 ? "s" : ""}${hasFilters ? " con tus filtros activos" : ""}.`}
         </p>
       </div>
@@ -124,8 +181,12 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
           title={hasFilters ? "Ajusta la busqueda" : "Todavia no hay turnos abiertos"}
           description={
             hasFilters
-              ? "Prueba con otro departamento, un rango de fechas distinto o elimina filtros para volver a ver mas opciones."
-              : "Cuando alguien publique un turno para intercambio aparecera aqui listo para comparar y solicitar."
+              ? canBrowseDepartments
+                ? "Prueba con otro departamento operativo, un rango de fechas distinto o elimina filtros para volver a ver mas opciones."
+                : "Prueba con otro rango de fechas o elimina filtros para volver a ver los turnos de tu departamento."
+              : canBrowseDepartments
+                ? "Cuando alguien publique un turno para intercambio aparecera aqui listo para comparar y solicitar."
+                : "Cuando alguien publique un turno en tu departamento aparecera aqui listo para comparar y solicitar."
           }
           action={
             hasFilters ? (

@@ -69,6 +69,9 @@ export async function registerEmployee(
   const email = (formData.get("email") as string | null)?.trim().toLowerCase();
   const password = (formData.get("password") as string | null) ?? "";
   const companyId = (formData.get("company_id") as string | null)?.trim();
+  const areaDepartmentId = (
+    formData.get("area_department_id") as string | null
+  )?.trim();
   const departmentId = (formData.get("department_id") as string | null)?.trim();
   const employeeId = (formData.get("employee_id") as string | null)?.trim();
   const idCard = formData.get("id_card");
@@ -79,7 +82,8 @@ export async function registerEmployee(
     return { error: "La contraseña debe tener al menos 6 caracteres." };
   }
   if (!companyId) return { error: "Selecciona una empresa." };
-  if (!departmentId) return { error: "Selecciona un departamento." };
+  if (!areaDepartmentId) return { error: "Selecciona un area o taller." };
+  if (!departmentId) return { error: "Selecciona un departamento operativo." };
   if (!employeeId) return { error: "El ID de empleado es obligatorio." };
 
   if (!(idCard instanceof File) || idCard.size === 0) {
@@ -99,19 +103,60 @@ export async function registerEmployee(
 
   const supabase = createAdminClient();
 
-  const { data: department, error: departmentError } = await supabase
-    .from("departments")
-    .select("id, company_id")
-    .eq("id", departmentId)
-    .eq("company_id", companyId)
-    .maybeSingle();
+  const [
+    { data: selectedArea, error: selectedAreaError },
+    { data: department, error: departmentError },
+    { data: departmentChildren, error: departmentChildrenError },
+  ] = await Promise.all([
+    supabase
+      .from("departments")
+      .select("id, company_id, parent_department_id")
+      .eq("id", areaDepartmentId)
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    supabase
+      .from("departments")
+      .select("id, company_id, parent_department_id, is_assignable")
+      .eq("id", departmentId)
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    supabase
+      .from("departments")
+      .select("id")
+      .eq("parent_department_id", departmentId)
+      .limit(1),
+  ]);
 
-  if (departmentError) {
-    return { error: "No se pudo validar el departamento seleccionado." };
+  if (selectedAreaError || departmentError || departmentChildrenError) {
+    return { error: "No se pudo validar la ubicacion organizativa seleccionada." };
+  }
+
+  if (!selectedArea || selectedArea.parent_department_id) {
+    return { error: "Selecciona un area o taller valido." };
   }
 
   if (!department) {
-    return { error: "La empresa y el departamento seleccionados no coinciden." };
+    return { error: "Selecciona un departamento operativo valido." };
+  }
+
+  const isOperationalDepartment =
+    Boolean(department.is_assignable) && (departmentChildren?.length ?? 0) === 0;
+  const belongsToSelectedArea =
+    department.parent_department_id === areaDepartmentId ||
+    department.id === areaDepartmentId;
+
+  if (!isOperationalDepartment) {
+    return {
+      error:
+        "El nodo seleccionado no es un departamento operativo final. Elige uno de los departamentos de trabajo reales.",
+    };
+  }
+
+  if (!belongsToSelectedArea) {
+    return {
+      error:
+        "El departamento operativo debe pertenecer al area o taller que acabas de seleccionar.",
+    };
   }
 
   const { data: createdUserData, error: createUserError } =

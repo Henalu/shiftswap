@@ -16,9 +16,15 @@ interface Department {
 
 interface ShiftFiltersProps {
   departments: Department[];
+  showDepartmentFilter?: boolean;
+  scopeLabel?: string | null;
 }
 
-export function ShiftFilters({ departments }: ShiftFiltersProps) {
+export function ShiftFilters({
+  departments,
+  showDepartmentFilter = true,
+  scopeLabel = null,
+}: ShiftFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
@@ -32,11 +38,11 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
     for (const [key, value] of data.entries()) {
       if (value && typeof value === "string") params.set(key, value);
     }
-    router.push(`/shifts?${params.toString()}`);
+    router.push(params.toString() ? `/shifts?${params.toString()}` : "/shifts");
   }
 
   const hasFilters =
-    searchParams.has("department_id") ||
+    (showDepartmentFilter && searchParams.has("department_id")) ||
     searchParams.has("shift_type") ||
     searchParams.has("from") ||
     searchParams.has("to");
@@ -58,7 +64,11 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
             Filtra los turnos
           </div>
           <p className="text-sm text-muted-foreground">
-            Ajusta departamento, tipo o rango de fechas para comparar mas rapido.
+            {showDepartmentFilter
+              ? "Ajusta departamento operativo, tipo o rango de fechas para comparar mas rapido."
+              : scopeLabel
+                ? `Tu tablon ya esta limitado a ${scopeLabel}. Solo necesitas ajustar tipo o fechas si quieres afinar la busqueda.`
+                : "Tu tablon ya esta limitado a tu departamento. Ajusta solo tipo o fechas si quieres afinar la busqueda."}
           </p>
         </div>
         {hasFilters && (
@@ -68,29 +78,50 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <div className="space-y-2">
-          <label
-            htmlFor="filter-department"
-            className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-          >
-            Departamento
-          </label>
-          <select
-            id="filter-department"
-            name="department_id"
-            defaultValue={searchParams.get("department_id") ?? ""}
-            onChange={submit}
-            className={FORM_CONTROL_CLASSNAME}
-          >
-            <option value="">Todos</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-3 md:grid-cols-2",
+          showDepartmentFilter ? "xl:grid-cols-5" : "xl:grid-cols-4"
+        )}
+      >
+        {showDepartmentFilter ? (
+          <div className="space-y-2">
+            <label
+              htmlFor="filter-department"
+              className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+            >
+              Departamento
+            </label>
+            <select
+              id="filter-department"
+              name="department_id"
+              defaultValue={searchParams.get("department_id") ?? ""}
+              onChange={submit}
+              className={FORM_CONTROL_CLASSNAME}
+            >
+              <option value="">Todos</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="col-span-2 space-y-2 xl:col-span-1">
+            <label className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Ambito visible
+            </label>
+            <div
+              className={cn(
+                FORM_CONTROL_CLASSNAME,
+                "flex min-h-10 items-center bg-secondary/45 text-foreground"
+              )}
+            >
+              {scopeLabel ?? "Tu departamento"}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <label
@@ -149,7 +180,7 @@ export function ShiftFilters({ departments }: ShiftFiltersProps) {
           />
         </div>
 
-        <div className="flex items-end">
+        <div className="col-span-2 flex items-end xl:col-span-1">
           <Button type="submit" variant="outline" className="w-full">
             Aplicar filtros
           </Button>

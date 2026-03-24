@@ -37,6 +37,34 @@ export async function startConversation(formData: FormData): Promise<void> {
 
   if (existing2) redirect(`/chat/${existing2.id}`);
 
+  const { data: shift } = await supabase
+    .from("shifts")
+    .select("id, user_id")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (!shift) return;
+
+  const isShiftOwner = shift.user_id === user.id;
+  const expectedOtherUserId = isShiftOwner ? otherUserId : shift.user_id;
+  const requesterId = isShiftOwner ? otherUserId : user.id;
+
+  if (expectedOtherUserId !== otherUserId) {
+    return;
+  }
+
+  const { data: activeRequest } = await supabase
+    .from("shift_requests")
+    .select("id")
+    .eq("shift_id", shiftId)
+    .eq("interested_user_id", requesterId)
+    .in("status", ["pending", "accepted"])
+    .maybeSingle();
+
+  if (!activeRequest) {
+    return;
+  }
+
   // Create new conversation
   const { data: newConv } = await supabase
     .from("conversations")

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { ShiftForm } from "./shift-form";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function NewShiftPage() {
@@ -16,7 +17,8 @@ export default async function NewShiftPage() {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient();
+  const { data: profile } = await adminClient
     .from("user_profiles")
     .select("department_id")
     .eq("id", authUser.id)
@@ -25,6 +27,24 @@ export default async function NewShiftPage() {
   if (!profile?.department_id) {
     redirect("/profile?setup=1");
   }
+
+  const { data: department } = await adminClient
+    .from("departments")
+    .select("id, name, parent_department_id")
+    .eq("id", profile.department_id)
+    .maybeSingle();
+
+  if (!department) {
+    redirect("/profile?setup=1");
+  }
+
+  const { data: parentDepartment } = department.parent_department_id
+    ? await adminClient
+        .from("departments")
+        .select("name")
+        .eq("id", department.parent_department_id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="space-y-6">
@@ -41,7 +61,10 @@ export default async function NewShiftPage() {
           </Link>
         }
       />
-      <ShiftForm departmentId={profile.department_id} userId={authUser.id} />
+      <ShiftForm
+        areaName={parentDepartment?.name ?? department.name}
+        departmentName={department.name}
+      />
     </div>
   );
 }

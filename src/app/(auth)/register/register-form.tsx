@@ -13,6 +13,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  getOperationalDepartmentsForArea,
+  getTopLevelDepartmentsForCompany,
+} from "@/lib/departments";
 import { FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import { registerEmployee } from "./actions";
 import type { Company, Department } from "@/types";
@@ -26,15 +30,29 @@ export default function RegisterForm({
   companies,
   departments,
 }: RegisterFormProps) {
+  function getInitialAreaId(companyValue: string) {
+    return getTopLevelDepartmentsForCompany(departments, companyValue)[0]?.id ?? "";
+  }
+
+  function getInitialDepartmentId(companyValue: string, areaValue: string) {
+    return (
+      getOperationalDepartmentsForArea(departments, companyValue, areaValue)[0]?.id ??
+      ""
+    );
+  }
+
   const initialCompanyId = companies[0]?.id ?? "";
-  const initialDepartmentId =
-    departments.find((department) => department.company_id === initialCompanyId)
-      ?.id ?? "";
+  const initialAreaDepartmentId = getInitialAreaId(initialCompanyId);
+  const initialDepartmentId = getInitialDepartmentId(
+    initialCompanyId,
+    initialAreaDepartmentId
+  );
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyId, setCompanyId] = useState(initialCompanyId);
+  const [areaDepartmentId, setAreaDepartmentId] = useState(initialAreaDepartmentId);
   const [departmentId, setDepartmentId] = useState(initialDepartmentId);
   const [employeeId, setEmployeeId] = useState("");
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -44,18 +62,29 @@ export default function RegisterForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const availableDepartments = departments.filter(
-    (department) => department.company_id === companyId
+  const availableAreas = getTopLevelDepartmentsForCompany(departments, companyId);
+  const availableDepartments = getOperationalDepartmentsForArea(
+    departments,
+    companyId,
+    areaDepartmentId
   );
 
   function handleCompanyChange(companyValue: string) {
     setCompanyId(companyValue);
 
-    const nextDepartmentId =
-      departments.find((department) => department.company_id === companyValue)?.id ??
-      "";
+    const nextAreaDepartmentId = getInitialAreaId(companyValue);
+    const nextDepartmentId = getInitialDepartmentId(
+      companyValue,
+      nextAreaDepartmentId
+    );
 
+    setAreaDepartmentId(nextAreaDepartmentId);
     setDepartmentId(nextDepartmentId);
+  }
+
+  function handleAreaChange(nextAreaDepartmentId: string) {
+    setAreaDepartmentId(nextAreaDepartmentId);
+    setDepartmentId(getInitialDepartmentId(companyId, nextAreaDepartmentId));
   }
 
   function handleIdCardChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -88,6 +117,7 @@ export default function RegisterForm({
     formData.set("email", email.trim());
     formData.set("password", password);
     formData.set("company_id", companyId);
+    formData.set("area_department_id", areaDepartmentId);
     formData.set("department_id", departmentId);
     formData.set("employee_id", employeeId.trim());
     formData.set("id_card", idCardFile);
@@ -138,6 +168,9 @@ export default function RegisterForm({
                 setEmail("");
                 setPassword("");
                 setEmployeeId("");
+                setCompanyId(initialCompanyId);
+                setAreaDepartmentId(initialAreaDepartmentId);
+                setDepartmentId(initialDepartmentId);
                 setIdCardFile(null);
                 setError(null);
                 if (fileInputRef.current) {
@@ -155,15 +188,15 @@ export default function RegisterForm({
 
   return (
     <Card className="border-border/80">
-      <CardHeader className="space-y-3">
-        <div className="space-y-2">
-          <CardTitle>Crear cuenta</CardTitle>
-          <CardDescription>
-            Introduce tus datos laborales y la evidencia necesaria para solicitar
-            acceso.
-          </CardDescription>
-        </div>
-      </CardHeader>
+        <CardHeader className="space-y-3">
+          <div className="space-y-2">
+            <CardTitle>Crear cuenta</CardTitle>
+            <CardDescription>
+              Introduce tus datos laborales, elige primero tu area de trabajo y
+              despues tu departamento operativo para solicitar acceso.
+            </CardDescription>
+          </div>
+        </CardHeader>
 
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-5">
@@ -213,7 +246,7 @@ export default function RegisterForm({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="company_id">Empresa</Label>
               <select
@@ -235,7 +268,30 @@ export default function RegisterForm({
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="department_id">Departamento</Label>
+              <Label htmlFor="area_department_id">Area o taller</Label>
+              <select
+                id="area_department_id"
+                value={areaDepartmentId}
+                onChange={(event) => handleAreaChange(event.target.value)}
+                required
+                disabled={availableAreas.length === 0}
+                className={FORM_CONTROL_CLASSNAME}
+              >
+                {availableAreas.length === 0 && (
+                  <option value="">Sin areas disponibles</option>
+                )}
+                {availableAreas.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Selecciona primero tu taller o area general dentro de la empresa.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="department_id">Departamento operativo</Label>
               <select
                 id="department_id"
                 value={departmentId}
@@ -245,7 +301,7 @@ export default function RegisterForm({
                 className={FORM_CONTROL_CLASSNAME}
               >
                 {availableDepartments.length === 0 && (
-                  <option value="">Sin departamentos disponibles</option>
+                  <option value="">Sin departamentos operativos disponibles</option>
                 )}
                 {availableDepartments.map((department) => (
                   <option key={department.id} value={department.id}>
@@ -253,6 +309,10 @@ export default function RegisterForm({
                   </option>
                 ))}
               </select>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Solo puedes registrarte en un departamento operativo final, no en un
+                nivel padre.
+              </p>
             </div>
           </div>
 
@@ -298,6 +358,7 @@ export default function RegisterForm({
             disabled={
               loading ||
               companies.length === 0 ||
+              availableAreas.length === 0 ||
               availableDepartments.length === 0
             }
           >
