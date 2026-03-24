@@ -69,6 +69,7 @@ export interface Department {
   id: string;
   company_id: string;
   name: string;
+  parent_department_id?: string | null;
   created_at: string;
 }
 

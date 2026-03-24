@@ -5,103 +5,40 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  CalendarCheck,
-  CalendarDays,
-  ChevronRight,
-  ClipboardCheck,
-  LogOut,
-  LucideIcon,
-  Menu,
-  MessageSquare,
-  Repeat,
-  ShieldCheck,
-  User,
-  X,
-} from "lucide-react";
-import { hasAdminPanelAccess } from "@/lib/user-roles";
+import { ChevronRight, LogOut, X } from "lucide-react";
+import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import { cn } from "@/lib/utils";
 import type { UserProfile, UserRole } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import {
+  ACCOUNT_NAVIGATION_ITEMS,
+  getAdminNavigationItems,
+  isNavigationItemActive,
+  type NavigationItem,
+} from "@/components/layout/navigation-items";
 
 interface MobileNavProps {
   user: UserProfile | null;
   role: UserRole;
 }
 
-interface MobileNavItem {
-  href: string;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-}
-
 export function MobileNav({ user, role }: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const adminItems = getAdminNavigationItems(role);
 
   useEffect(() => {
     if (!isOpen) return;
+
     const mediaQuery = window.matchMedia("(min-width: 768px)");
     function closeOnDesktop(event: MediaQueryListEvent) {
       if (event.matches) setIsOpen(false);
     }
+
     mediaQuery.addEventListener("change", closeOnDesktop);
     return () => mediaQuery.removeEventListener("change", closeOnDesktop);
   }, [isOpen]);
-
-  const workItems: MobileNavItem[] = [
-    {
-      href: "/shifts",
-      label: "Turnos disponibles",
-      description: "Explora y filtra los turnos abiertos.",
-      icon: CalendarDays,
-    },
-    {
-      href: "/shifts/my",
-      label: "Mis turnos",
-      description: "Gestiona publicaciones y solicitudes recibidas.",
-      icon: CalendarCheck,
-    },
-    {
-      href: "/chat",
-      label: "Chat",
-      description: "Habla con otros compañeros sobre cada cambio.",
-      icon: MessageSquare,
-    },
-    {
-      href: "/exchanges",
-      label: "Intercambios",
-      description: "Revisa acuerdos, firmas y estado del expediente.",
-      icon: Repeat,
-    },
-  ];
-
-  const adminItems: MobileNavItem[] = hasAdminPanelAccess(role)
-    ? [
-        {
-          href: "/admin/exchanges",
-          label: "Aprobaciones",
-          description: "Resuelve expedientes pendientes del equipo.",
-          icon: ClipboardCheck,
-        },
-        {
-          href: "/admin/validations",
-          label: "Validaciones",
-          description: "Revisa altas y accesos antes de aprobarlos.",
-          icon: ShieldCheck,
-        },
-      ]
-    : [];
-  const accountItems: MobileNavItem[] = [
-    {
-      href: "/profile",
-      label: "Mi perfil",
-      description: "Consulta tus datos y preferencias básicas.",
-      icon: User,
-    },
-  ];
 
   async function handleLogout() {
     const supabase = createClient();
@@ -114,22 +51,16 @@ export function MobileNav({ user, role }: MobileNavProps) {
   const initials = user?.full_name
     ? user.full_name
         .split(" ")
-        .map((n) => n[0])
+        .map((name) => name[0])
         .join("")
         .toUpperCase()
         .slice(0, 2) || "?"
     : "?";
 
-  const isActive = (href: string) =>
-    href === "/shifts" ? pathname === "/shifts" : pathname.startsWith(href);
+  const renderItem = (item: NavigationItem) => {
+    const active = isNavigationItemActive(pathname, item.href);
+    const Icon = item.icon;
 
-  const renderItem = (item: {
-    href: string;
-    label: string;
-    description: string;
-    icon: LucideIcon;
-  }) => {
-    const active = isActive(item.href);
     return (
       <DialogPrimitive.Close asChild key={item.href}>
         <Link
@@ -150,7 +81,7 @@ export function MobileNav({ user, role }: MobileNavProps) {
                 : "border-border/70 bg-card text-muted-foreground group-hover:text-foreground"
             )}
           >
-            <item.icon className="size-5" />
+            <Icon className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -163,9 +94,11 @@ export function MobileNav({ user, role }: MobileNavProps) {
                 </span>
               )}
             </div>
-            <p className="truncate text-sm text-muted-foreground">
-              {item.description}
-            </p>
+            {item.description && (
+              <p className="truncate text-sm text-muted-foreground">
+                {item.description}
+              </p>
+            )}
           </div>
           <ChevronRight
             className={cn(
@@ -185,11 +118,19 @@ export function MobileNav({ user, role }: MobileNavProps) {
       <DialogPrimitive.Trigger asChild>
         <button
           type="button"
-          aria-label={isOpen ? "Cerrar menu" : "Abrir menu de navegacion"}
+          aria-label={isOpen ? "Cerrar cuenta" : "Abrir cuenta"}
           aria-expanded={isOpen}
-          className="flex size-10 items-center justify-center rounded-2xl border border-border/70 bg-background/90 shadow-sm outline-none transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10 md:hidden"
+          className="rounded-2xl border border-border/70 bg-background/90 p-1 shadow-sm outline-none transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10 md:hidden"
         >
-          <Menu className="size-5" />
+          <Avatar className="size-8 rounded-xl">
+            <AvatarImage
+              src={user?.avatar_url ?? undefined}
+              alt={user?.full_name ?? undefined}
+            />
+            <AvatarFallback className="rounded-xl bg-secondary text-foreground">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
         </button>
       </DialogPrimitive.Trigger>
 
@@ -197,10 +138,10 @@ export function MobileNav({ user, role }: MobileNavProps) {
         <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-slate-950/18 backdrop-blur-[3px] md:hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:transition-none" />
         <DialogPrimitive.Content className="fixed inset-0 z-[61] flex h-[100dvh] flex-col overflow-hidden bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_94%,white)_0%,var(--background)_18rem)] text-foreground outline-none md:hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-3 data-[state=open]:slide-in-from-top-3 motion-reduce:transition-none">
           <DialogPrimitive.Title className="sr-only">
-            Menu de navegacion
+            Cuenta y opciones secundarias
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Accede rapidamente a turnos, conversaciones, intercambios y perfil.
+            Accede a tu perfil, opciones de administracion y cierre de sesion.
           </DialogPrimitive.Description>
 
           <div
@@ -209,30 +150,20 @@ export function MobileNav({ user, role }: MobileNavProps) {
           />
 
           <div className="relative flex h-full flex-col">
-            <div className="flex items-center justify-between gap-3 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)]">
-              <DialogPrimitive.Close asChild>
-                <Link
-                  href="/shifts"
-                  className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/90 px-3.5 py-2.5 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.3)] transition-colors hover:bg-card"
-                >
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Repeat className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold tracking-[-0.02em]">
-                      ShiftSwap
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      Intercambio de turnos
-                    </p>
-                  </div>
-                </Link>
-              </DialogPrimitive.Close>
+            <div className="flex items-start justify-between gap-3 px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)]">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold tracking-[-0.02em] text-foreground">
+                  Cuenta
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Perfil, accesos secundarios y administracion.
+                </p>
+              </div>
 
               <DialogPrimitive.Close asChild>
                 <button
                   type="button"
-                  aria-label="Cerrar menu"
+                  aria-label="Cerrar cuenta"
                   className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/90 outline-none transition-colors hover:bg-secondary focus-visible:ring-4 focus-visible:ring-primary/10"
                 >
                   <X className="size-5" />
@@ -241,38 +172,37 @@ export function MobileNav({ user, role }: MobileNavProps) {
             </div>
 
             <div className="px-4 pb-4">
-              <div className="flex items-center gap-3 rounded-[1.75rem] border border-border/70 bg-card/90 px-4 py-4 shadow-[0_20px_38px_-30px_rgba(15,23,42,0.25)]">
-                <Avatar className="size-14 rounded-[1.35rem]">
-                  <AvatarImage
-                    src={user?.avatar_url ?? undefined}
-                    alt={user?.full_name ?? undefined}
-                  />
-                  <AvatarFallback className="rounded-[1.35rem] bg-secondary font-semibold text-foreground">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold tracking-[-0.025em]">
-                    {user?.full_name ?? "Usuario"}
-                  </p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {user?.email}
-                  </p>
+              <div className="rounded-[1.75rem] border border-border/70 bg-card/90 px-4 py-4 shadow-[0_20px_38px_-30px_rgba(15,23,42,0.25)]">
+                <div className="flex items-center gap-3">
+                  <Avatar className="size-14 rounded-[1.35rem]">
+                    <AvatarImage
+                      src={user?.avatar_url ?? undefined}
+                      alt={user?.full_name ?? undefined}
+                    />
+                    <AvatarFallback className="rounded-[1.35rem] bg-secondary font-semibold text-foreground">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold tracking-[-0.025em]">
+                      {user?.full_name ?? "Usuario"}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 inline-flex rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">
+                  {USER_ROLE_LABELS[role]}
                 </div>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
               <nav className="space-y-6">
-                <section className="space-y-2">
-                  <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Trabajo
-                  </p>
-                  <div className="space-y-1.5">{workItems.map(renderItem)}</div>
-                </section>
-
                 {adminItems.length > 0 && (
-                  <section className="space-y-2 border-t border-border/70 pt-6">
+                  <section className="space-y-2">
                     <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Administracion
                     </p>
@@ -280,11 +210,18 @@ export function MobileNav({ user, role }: MobileNavProps) {
                   </section>
                 )}
 
-                <section className="space-y-2 border-t border-border/70 pt-6">
+                <section
+                  className={cn(
+                    "space-y-2",
+                    adminItems.length > 0 ? "border-t border-border/70 pt-6" : ""
+                  )}
+                >
                   <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Cuenta
                   </p>
-                  <div className="space-y-1.5">{accountItems.map(renderItem)}</div>
+                  <div className="space-y-1.5">
+                    {ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}
+                  </div>
                 </section>
               </nav>
             </div>

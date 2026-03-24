@@ -6,7 +6,7 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 
 - Estado actual: base funcional cerrada y lista para despliegue
 - Fase actual: Fase 5, testing con usuarios y preparacion para piloto
-- Hito actual: workflow nativo de intercambio con aprobacion departamental, acuerdos de compensacion y PDF corporativo
+- Hito actual: workflow nativo de intercambio con aprobacion departamental, acuerdos de compensacion, PDF corporativo y navegacion movil smartphone-first
 
 ## Que incluye hoy
 
@@ -26,6 +26,9 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 - Base de ledger para deudas de bolsa de horas
 - PDF corporativo generado por el sistema
 - Centro de notificaciones con badge real, dedupe y navegacion contextual
+- Navegacion movil smartphone-first:
+  - bottom nav fija para `Turnos`, `Mis turnos`, `Chat` e `Intercambios`
+  - menu secundario desde avatar para perfil, administracion y cierre de sesion
 - Perfil consolidado con avatar upload
 - Panel admin para validaciones, roles y aprobaciones
 - Sistema visual actualizado para un producto interno moderno, claro y muy legible
@@ -47,6 +50,7 @@ La app no se comporta como una web de marketing. La direccion actual prioriza:
 - rapidez de escaneo
 - estados muy visibles
 - acciones obvias
+- navegacion movil natural y comoda para el pulgar
 - minima decoracion superflua
 
 Referencias mentales activas:
@@ -101,7 +105,7 @@ src/
     api/                 # route handlers (ej. PDF)
   components/
     exchanges/           # workflow progress y patrones del expediente
-    layout/              # header, sidebar, notification bell
+    layout/              # header, sidebar, mobile bottom nav, notification bell
     shifts/              # shift card, filters, actions
     ui/                  # design system base
   lib/
@@ -147,12 +151,38 @@ supabase/
 - `MEMORY.md`: estado vivo del proyecto y decisiones recientes
 - `docs/ROADMAP.md`: roadmap actualizado
 - `docs/API.md`: superficie tecnica real de rutas, paginas y server actions
+- `supabase/seeds/02_arcelor_organization.sql`: estructura jerarquica inicial de Arcelor para testing
+
+## Navegacion actual
+
+- Desktop mantiene `Header` + `SidebarNav` como patron principal.
+- En movil, la navegacion principal vive en una bottom nav fija para las cuatro secciones de trabajo mas frecuentes.
+- Perfil, opciones admin y cierre de sesion quedan fuera de la bottom nav y se resuelven desde el avatar en el header.
+- La fuente de verdad de rutas e iconos compartidos vive en `src/components/layout/navigation-items.ts`.
+
+## Datos de prueba organizativos
+
+- El esquema soporta jerarquia de departamentos mediante `parent_department_id` en `departments`.
+- La migracion `supabase/migrations/00020_department_hierarchy.sql` activa esa capacidad sin romper departamentos existentes y mantiene la coherencia empresa-padre-hijo.
+- Para cargar la estructura de Arcelor en un entorno de prueba:
+
+- aplica primero las migraciones con `npx supabase db push`
+- despues ejecuta el contenido de `supabase/seeds/02_arcelor_organization.sql` en el SQL Editor de Supabase o en tu flujo local de seeds
+- el seed es idempotente y, si ya existen nodos de Arcelor, los recoloca en la jerarquia prevista cuando corresponde
+
+- La jerarquia creada es:
+  - Arcelor
+  - Aceria LDG
+  - Carril
+  - Alambron
+  - Otros
+  - Produccion, Maquinas, Mantenimiento mecanico y Mantenimiento electrico como hijos de Aceria LDG
 
 ## Notas
 
 - El repo prioriza Server Components por defecto.
 - `params` y `searchParams` en Next.js 16 son `Promise<...>`.
-- Para produccion, Supabase debe tener aplicadas las migraciones hasta `00019`.
+- Para produccion y para el entorno de testing organizativo, Supabase debe tener aplicadas las migraciones hasta `00020`.
 - En Windows + OneDrive puede aparecer un `EPERM` intermitente en `next build` por locks en `.next`; limpiar la carpeta y reintentar suele resolverlo.
 
 ## Licencia

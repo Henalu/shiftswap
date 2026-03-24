@@ -153,7 +153,7 @@ export function Header({
             )}
           </div>
 
-          {/* Mobile only: fullscreen nav */}
+          {/* Mobile only: secondary account menu */}
           <MobileNav user={user} role={role} />
         </div>
       </div>

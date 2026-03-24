@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -69,11 +70,12 @@ export default async function DashboardLayout({
           <SidebarNav role={role} />
         </aside>
         <main className="min-w-0 flex-1 overflow-auto">
-          <div className="flex min-h-full flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex min-h-full flex-col gap-8 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 md:pb-6 lg:px-8">
             {children}
           </div>
         </main>
       </div>
+      <MobileBottomNav />
     </div>
   );
 }

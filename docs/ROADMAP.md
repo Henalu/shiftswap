@@ -45,6 +45,7 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
 - Mejor jerarquia visual
 - Mejor sistema de estados
 - Forms, empty states y cards mas legibles
+- Navegacion movil smartphone-first con bottom nav principal y menu secundario de cuenta
 
 ### Fase 4.6 - Compensacion y bolsa de horas
 - Seleccion de acuerdo en la firma del solicitante
@@ -56,7 +57,9 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
 
 ### Fase 5 - Testing con usuarios
 - Ejecutar piloto con empleados reales
+- Preparar entornos de prueba con la estructura organizativa de Arcelor para validar filtros, permisos y recorridos por departamento
 - Medir si la navegacion y el flujo de intercambio se entienden sin explicacion
+- Validar si la bottom nav movil reduce tiempo y friccion para entrar en `Turnos`, `Mis turnos`, `Chat` e `Intercambios`
 - Validar la claridad de estados:
   - turno disponible
   - solicitud pendiente
@@ -68,6 +71,7 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
   - bolsa de horas
   - intercambio de turno futuro
 - Recoger friccion en:
+  - bottom nav movil
   - filtros
   - chat
   - firma y compensacion
@@ -85,6 +89,7 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
 
 ### Bloque B - Mejora basada en feedback real
 - Ajustar jerarquia y copy segun observacion de usuarios
+- Ajustar densidad, etiquetas o visibilidad contextual de la bottom nav si el piloto detecta solapes o sobrecarga
 - Refinar el paso de firma/compensacion si aparecen dudas en piloto
 - Mejorar onboarding para usuarios nuevos
 - Refinar pantallas admin si el volumen de aprobaciones y validaciones crece
@@ -102,6 +107,7 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
 ## Criterios para considerar el piloto exitoso
 
 - Los usuarios entienden por donde empezar sin ayuda.
+- En movil, las secciones principales se alcanzan rapidamente con una sola accion desde la bottom nav.
 - El flujo publicar -> interes -> chat -> firma -> aprobacion se completa sin confusion grave.
 - Los estados del sistema se entienden de un vistazo.
 - La diferencia entre `bolsa de horas` e `intercambio de turno` se entiende sin explicacion externa.

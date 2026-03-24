@@ -2,18 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarCheck,
-  CalendarDays,
-  ClipboardCheck,
-  MessageSquare,
-  Repeat,
-  ShieldCheck,
-  User,
-} from "lucide-react";
-import { hasAdminPanelAccess } from "@/lib/user-roles";
 import type { UserRole } from "@/types";
 import { cn } from "@/lib/utils";
+import {
+  ACCOUNT_NAVIGATION_ITEMS,
+  getAdminNavigationItems,
+  isNavigationItemActive,
+  PRIMARY_NAVIGATION_ITEMS,
+} from "@/components/layout/navigation-items";
 
 interface SidebarNavProps {
   role: UserRole;
@@ -21,21 +17,7 @@ interface SidebarNavProps {
 
 export function SidebarNav({ role }: SidebarNavProps) {
   const pathname = usePathname();
-  const workspaceItems = [
-    { href: "/shifts", label: "Turnos disponibles", icon: CalendarDays },
-    { href: "/shifts/my", label: "Mis turnos", icon: CalendarCheck },
-    { href: "/chat", label: "Chat", icon: MessageSquare },
-    { href: "/exchanges", label: "Intercambios", icon: Repeat },
-  ];
-  const supportItems = [
-    ...(hasAdminPanelAccess(role)
-      ? [
-          { href: "/admin/exchanges", label: "Aprobaciones", icon: ClipboardCheck },
-          { href: "/admin/validations", label: "Validaciones", icon: ShieldCheck },
-        ]
-      : []),
-    { href: "/profile", label: "Perfil", icon: User },
-  ];
+  const adminItems = getAdminNavigationItems(role);
 
   const renderItem = ({
     href,
@@ -44,10 +26,9 @@ export function SidebarNav({ role }: SidebarNavProps) {
   }: {
     href: string;
     label: string;
-    icon: typeof CalendarDays;
+    icon: (typeof PRIMARY_NAVIGATION_ITEMS)[number]["icon"];
   }) => {
-    const isActive =
-      href === "/shifts" ? pathname === "/shifts" : pathname.startsWith(href);
+    const isActive = isNavigationItemActive(pathname, href);
 
     return (
       <Link
@@ -79,14 +60,23 @@ export function SidebarNav({ role }: SidebarNavProps) {
         <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Trabajo
         </p>
-        <div className="space-y-1">{workspaceItems.map(renderItem)}</div>
+        <div className="space-y-1">{PRIMARY_NAVIGATION_ITEMS.map(renderItem)}</div>
       </div>
+
+      {adminItems.length > 0 && (
+        <div className="space-y-2">
+          <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Administracion
+          </p>
+          <div className="space-y-1">{adminItems.map(renderItem)}</div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Cuenta
         </p>
-        <div className="space-y-1">{supportItems.map(renderItem)}</div>
+        <div className="space-y-1">{ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}</div>
       </div>
     </nav>
   );

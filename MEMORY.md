@@ -7,9 +7,9 @@
 
 ## Estado actual
 - Fase: Fase 5 - Testing con usuarios / preparacion para piloto
-- Ultima actualizacion: 2026-03-23
-- Ultimo hito relevante: native exchange approval workflow + compensation agreements + corporate PDF + internal product UI refresh
-- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00019`
+- Ultima actualizacion: 2026-03-24
+- Ultimo hito relevante: smartphone navigation refactor with mobile bottom nav + secondary account menu
+- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00020`
 
 ## Resumen ejecutivo
 - ShiftSwap es una app web interna para intercambio de turnos entre empleados.
@@ -17,6 +17,8 @@
 - El flujo de intercambio ya no depende de descargar, firmar y re-subir un documento para que la logica de negocio funcione.
 - El expediente formal vive en la app: acuerdo, firmas, revision de departamento, resolucion y trazabilidad.
 - El PDF corporativo de Arcelor es una salida generada por el sistema, no el centro del proceso.
+- En smartphone, la navegacion principal ahora usa bottom nav para las 4 secciones de trabajo mas frecuentes y deja cuenta/admin en una capa secundaria.
+- `departments` ya soporta jerarquia via `parent_department_id`, con seed reproducible para la estructura inicial de Arcelor.
 - `npm run lint` y `npm run build` pasan con el estado actual del repo.
 
 ## Direccion de producto y diseno
@@ -93,6 +95,34 @@
 - `src/lib/supabase/middleware.ts` se endurece para limpiar sesiones invalidas cuando Supabase devuelve errores de refresh token/JWT.
 - En Windows + OneDrive, si `next build` falla por `EPERM` en `.next`, limpiar la carpeta y relanzar el build resuelve el problema.
 
+### 2026-03-24 - Navegacion movil smartphone-first
+- La navegacion principal en movil deja de depender del menu hamburguesa para secciones frecuentes.
+- Se adopta bottom navigation fija para:
+  - `/shifts`
+  - `/shifts/my`
+  - `/chat`
+  - `/exchanges`
+- El avatar del header movil pasa a abrir una capa secundaria para:
+  - perfil
+  - accesos admin
+  - cierre de sesion
+- Desktop mantiene header + sidebar como patron principal.
+- La fuente de verdad de navegacion se centraliza en `src/components/layout/navigation-items.ts`.
+- El layout del dashboard reserva espacio inferior en movil para que la barra fija no tape contenido ni safe areas.
+
+### 2026-03-24 - Jerarquia organizativa de Arcelor en Supabase
+- `departments` deja de ser estrictamente plana y pasa a soportar jerarquia con `parent_department_id`.
+- Se anade `supabase/migrations/00020_department_hierarchy.sql` para soportar:
+  - departamentos raiz
+  - subdepartamentos
+  - consistencia de empresa entre padre e hijo
+  - unicidad por nombre entre hermanos
+- Se anade `supabase/seeds/02_arcelor_organization.sql` con estructura inicial de Arcelor:
+  - raiz: `Aceria LDG`, `Carril`, `Alambron`, `Otros`
+  - hijos bajo `Aceria LDG`: `Produccion`, `Maquinas`, `Mantenimiento mecanico`, `Mantenimiento electrico`
+- El seed es idempotente y puede ejecutarse varias veces sin duplicar nodos.
+- La app actual ya puede asignar usuarios y turnos a nodos concretos; el filtrado sigue siendo por `department_id` exacto y no expande automaticamente a descendientes.
+
 ## Progreso por fase
 
 ### Fase 1 - Prototipo
@@ -117,6 +147,7 @@
   - base funcional cerrada
   - admin y validacion manual disponibles
   - refresh UX/UI aplicado
+  - navegacion smartphone-first refinada con bottom nav principal + menu secundario de cuenta
   - workflow de 3 actores operativo
   - acuerdos de compensacion y base de ledger disponibles
   - pendiente: piloto con usuarios reales y refinamiento sobre feedback
@@ -125,7 +156,7 @@
 - El registro puede dejar usuario a medias si falla el `INSERT` en `user_profiles`; conviene endurecer el flujo para evitar estados parciales.
 - Todavia no hay suite automatizada de tests; `package.json` no expone `npm run test`.
 - En Windows + OneDrive puede aparecer de forma intermitente un `EPERM` durante `next build` por locks del filesystem en `.next`; no es un fallo estable del codigo si el build vuelve a pasar al reintentar.
-- Para produccion, la base de datos debe tener aplicadas al menos `00017`, `00018` y `00019`.
+- Para produccion, la base de datos debe tener aplicadas al menos `00017`, `00018`, `00019` y `00020`.
 
 ## Decisiones tecnicas importantes
 - Server Components por defecto; `"use client"` solo cuando es necesario.
@@ -141,6 +172,10 @@
 - `00014` es obligatoria para el centro de notificaciones.
 - `00018` modela workflow nativo, firmas embebidas, aprobacion y `exchange_events`.
 - `00019` modela acuerdos de compensacion y `shift_debt_transactions`.
+- `00020` anade jerarquia de departamentos con `parent_department_id`.
+- `src/components/layout/navigation-items.ts` centraliza navegacion primaria/secundaria y el calculo de active state entre desktop y movil.
+- En movil, la navegacion primaria es la bottom nav; el menu del avatar queda reservado para cuenta y administracion.
+- `src/app/(dashboard)/layout.tsx` anade padding inferior especifico en movil para convivir con la bottom nav sin tapar contenido.
 
 ## Sistema visual actual
 - Fuente principal: `Manrope`
@@ -160,11 +195,16 @@
 
 ## Archivos clave
 - `src/app/(dashboard)/layout.tsx` - layout protegido del dashboard
-- `src/components/layout/header.tsx` - header con mobile nav, avatar y NotificationBell
-- `src/components/layout/sidebar-nav.tsx` - navegacion lateral agrupada
+- `src/components/layout/header.tsx` - header compartido con logo, notificaciones y acceso secundario de cuenta en movil
+- `src/components/layout/sidebar-nav.tsx` - navegacion lateral agrupada en desktop
+- `src/components/layout/mobile-bottom-nav.tsx` - navegacion principal fija en smartphone
+- `src/components/layout/mobile-nav.tsx` - menu secundario de cuenta/admin para movil
+- `src/components/layout/navigation-items.ts` - fuente de verdad de secciones primarias/secundarias y active state
 - `src/components/layout/notification-bell.tsx` - centro de notificaciones con badge real
 - `src/components/ui/page-header.tsx` - patron reutilizable para cabeceras de pagina
 - `src/components/ui/empty-state.tsx` - patron reutilizable para estados vacios
+- `supabase/migrations/00020_department_hierarchy.sql` - soporte jerarquico para departamentos
+- `supabase/seeds/02_arcelor_organization.sql` - estructura inicial de Arcelor para testing
 - `src/components/exchanges/exchange-workflow-progress.tsx` - resumen visual del workflow
 - `src/app/(dashboard)/exchanges/[id]/page.tsx` - expediente formal del cambio
 - `src/app/(dashboard)/exchanges/actions.ts` - confirmacion, firma, retirada y soporte del expediente
@@ -189,11 +229,13 @@
 - `00017_allow_word_exchange_documents.sql` - soporte Word/PDF en `exchange-documents`
 - `00018_native_exchange_approval_workflow.sql` - workflow nativo, aprobacion departamental y `exchange_events`
 - `00019_exchange_compensation_terms_and_ledger.sql` - acuerdos de compensacion y ledger `shift_debt_transactions`
+- `00020_department_hierarchy.sql` - `parent_department_id`, jerarquia y unicidad entre hermanos
 
 ## Siguientes pasos recomendados
 - Ejecutar piloto con usuarios reales.
 - Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo.
-- Recoger friccion de navegacion, comprension de estados y claridad del flujo de intercambio.
+- Ejecutar `supabase/seeds/02_arcelor_organization.sql` en los entornos de prueba que necesiten estructura Arcelor.
+- Recoger friccion de bottom nav movil, comprension de estados y claridad del flujo de intercambio.
 - Endurecer el flujo de registro para evitar usuarios parciales.
 - Introducir una base minima de tests para acciones criticas.
 - Construir una vista dedicada de historial/saldo para `shift_debt_transactions` si la bolsa de horas se vuelve flujo habitual.
