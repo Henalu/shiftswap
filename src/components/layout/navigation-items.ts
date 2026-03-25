@@ -3,6 +3,7 @@
 import {
   CalendarCheck,
   CalendarDays,
+  BriefcaseBusiness,
   ClipboardCheck,
   MessageSquare,
   Repeat,
@@ -82,6 +83,12 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
       icon: Workflow,
     },
     {
+      href: "/admin/job-position-changes",
+      label: "Cambios de puesto",
+      description: "Revisa ajustes de puesto dentro de cada departamento.",
+      icon: BriefcaseBusiness,
+    },
+    {
       href: "/admin/validations",
       label: "Validaciones",
       description: "Revisa altas y accesos antes de aprobarlos.",
@@ -124,6 +131,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname.startsWith("/admin/validations");
     case "/admin/department-changes":
       return pathname.startsWith("/admin/department-changes");
+    case "/admin/job-position-changes":
+      return pathname.startsWith("/admin/job-position-changes");
     case "/admin/users":
       return pathname.startsWith("/admin/users");
     default:

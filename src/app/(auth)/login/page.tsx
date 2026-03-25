@@ -26,6 +26,18 @@ function isRefreshTokenError(message: string | undefined): boolean {
   );
 }
 
+async function clearLocalAuthSession() {
+  const supabase = createClient();
+
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // If the browser session is already broken or missing, we can continue.
+  }
+
+  return supabase;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -38,7 +50,8 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
+    // Clear any stale browser-side auth state before trying a fresh login.
+    const supabase = await clearLocalAuthSession();
     let { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,

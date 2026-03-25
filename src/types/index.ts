@@ -26,6 +26,7 @@ export type DepartmentChangeRequestStatus =
   | 'approved'
   | 'rejected'
   | 'cancelled';
+export type JobPositionChangeRequestStatus = DepartmentChangeRequestStatus;
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'member' | 'department_admin' | 'hr_admin' | 'super_admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
@@ -39,6 +40,7 @@ export interface UserProfile {
   email: string;
   full_name: string;
   department_id: string | null;
+  job_position_id?: string | null;
   company_id: string | null;
   role: UserRole;
   avatar_url?: string;
@@ -77,6 +79,17 @@ export interface Department {
   parent_department_id?: string | null;
   is_assignable?: boolean;
   created_at: string;
+}
+
+export interface JobPosition {
+  id: string;
+  company_id: string;
+  department_id: string;
+  name: string;
+  code?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================
@@ -180,6 +193,22 @@ export interface DepartmentChangeRequest {
   updated_at: string;
 }
 
+export interface JobPositionChangeRequest {
+  id: string;
+  user_id: string;
+  company_id: string;
+  current_department_id: string;
+  current_job_position_id?: string | null;
+  requested_job_position_id: string;
+  request_reason?: string | null;
+  status: JobPositionChangeRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ExchangeEventType =
   | 'exchange_created'
   | 'agreement_confirmed'
@@ -261,6 +290,9 @@ export type NotificationType =
   | 'department_change_requested'
   | 'department_change_approved'
   | 'department_change_rejected'
+  | 'job_position_change_requested'
+  | 'job_position_change_approved'
+  | 'job_position_change_rejected'
   | 'account_approved'
   | 'account_rejected';
 

@@ -43,6 +43,7 @@ interface ProfileFormProps {
   companyName: string;
   areaName: string;
   departmentName: string;
+  jobPositionName: string;
   userId: string;
 }
 
@@ -50,11 +51,18 @@ interface ReadonlyFieldProps {
   icon: ReactNode;
   label: string;
   value: string;
+  className?: string;
 }
 
-function ReadonlyField({ icon, label, value }: ReadonlyFieldProps) {
+function ReadonlyField({ icon, label, value, className }: ReadonlyFieldProps) {
   return (
-    <div className={cn(PANEL_CLASSNAME, "flex items-start gap-3 px-4 py-4")}>
+    <div
+      className={cn(
+        PANEL_CLASSNAME,
+        "flex h-full items-start gap-3 px-4 py-4",
+        className
+      )}
+    >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
         {icon}
       </div>
@@ -73,6 +81,7 @@ export function ProfileForm({
   companyName,
   areaName,
   departmentName,
+  jobPositionName,
   userId,
 }: ProfileFormProps) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
@@ -287,31 +296,41 @@ export function ProfileForm({
           <CardTitle>Informacion laboral</CardTitle>
           <CardDescription>
             Estos datos vienen de la validacion inicial y sirven como contexto en
-            aprobaciones, turnos y negociaciones. Los cambios de departamento no se
-            aplican desde aqui: se solicitan y revisan por separado.
+            aprobaciones, turnos y negociaciones. Los cambios de departamento y de
+            puesto se solicitan y revisan por separado.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="grid gap-4 sm:grid-cols-4">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <ReadonlyField
             icon={<Building2 className="size-4" />}
             label="Empresa"
             value={companyName}
+            className="xl:col-span-2"
           />
           <ReadonlyField
             icon={<BriefcaseBusiness className="size-4" />}
             label="Area o taller"
             value={areaName}
+            className="xl:col-span-2"
           />
           <ReadonlyField
             icon={<IdCard className="size-4" />}
             label="ID de empleado"
             value={profile.employee_id?.trim() || "No disponible"}
+            className="xl:col-span-2"
           />
           <ReadonlyField
             icon={<BriefcaseBusiness className="size-4" />}
             label="Departamento"
             value={departmentName}
+            className="xl:col-span-3"
+          />
+          <ReadonlyField
+            icon={<BriefcaseBusiness className="size-4" />}
+            label="Puesto de trabajo"
+            value={jobPositionName}
+            className="xl:col-span-3"
           />
         </CardContent>
       </Card>

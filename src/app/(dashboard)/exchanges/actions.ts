@@ -15,10 +15,10 @@ import {
   getMinimumCompensationDate,
   isCompensationDateValid,
   isExchangeAgreementType,
-  isShiftType,
   syncHoursBankDebtTransactionStatus,
   upsertHoursBankDebtTransaction,
 } from "@/lib/exchange-compensation";
+import { isShiftType } from "@/lib/shifts";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";

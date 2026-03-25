@@ -4,13 +4,20 @@ import {
   DepartmentChangeRequestCard,
   type ProfileDepartmentChangeRequestSummary,
 } from "./department-change-request-card";
+import {
+  JobPositionChangeRequestCard,
+  type ProfileJobPositionChangeRequestSummary,
+} from "./job-position-change-request-card";
 import { getDepartmentArea, getDepartmentById } from "@/lib/departments";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
 import type {
   Department,
   DepartmentChangeRequest,
+  JobPosition,
+  JobPositionChangeRequestStatus,
   UserProfile,
 } from "@/types";
 
@@ -24,7 +31,31 @@ type ProfilePageProfile = Pick<
   | "employee_id"
   | "company_id"
   | "department_id"
+  | "job_position_id"
 >;
+
+interface ProfileJobPositionChangeRequestRow {
+  id: string;
+  user_id: string;
+  company_id: string;
+  current_department_id: string;
+  current_job_position_id: string | null;
+  requested_job_position_id: string;
+  request_reason: string | null;
+  review_notes: string | null;
+  status: JobPositionChangeRequestStatus;
+  created_at: string;
+  reviewed_at: string | null;
+  updated_at: string;
+  current_job_position: {
+    id: string;
+    name: string;
+  } | null;
+  requested_job_position: {
+    id: string;
+    name: string;
+  } | null;
+}
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -40,7 +71,7 @@ export default async function ProfilePage() {
   const { data: profile, error: profileError } = await adminClient
     .from("user_profiles")
     .select(
-      "id, full_name, email, phone, avatar_url, employee_id, company_id, department_id"
+      "id, full_name, email, phone, avatar_url, employee_id, company_id, department_id, job_position_id"
     )
     .eq("id", authUser.id)
     .maybeSingle();
@@ -54,8 +85,13 @@ export default async function ProfilePage() {
     redirect("/shifts");
   }
 
-  const [{ data: company }, { data: companyDepartments }, { data: changeRequests }] =
-    await Promise.all([
+  const [
+    { data: company },
+    { data: companyDepartments },
+    { data: departmentChangeRequests },
+    { data: departmentJobPositions },
+    { data: jobPositionChangeRequests },
+  ] = await Promise.all([
       profile.company_id
         ? adminClient
             .from("companies")
@@ -80,15 +116,45 @@ export default async function ProfilePage() {
             .eq("user_id", profile.id)
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: null, error: null }),
+      profile.department_id
+        ? adminClient
+            .from("job_positions")
+            .select(
+              "id, company_id, department_id, name, code, active, created_at, updated_at"
+            )
+            .eq("department_id", profile.department_id)
+            .order("name", { ascending: true })
+        : Promise.resolve({ data: null, error: null }),
+      profile.id
+        ? adminClient
+            .from("job_position_change_requests")
+            .select(
+              `
+              id, user_id, company_id, current_department_id, current_job_position_id,
+              requested_job_position_id, request_reason, review_notes, status,
+              created_at, reviewed_at, updated_at,
+              current_job_position:job_positions!current_job_position_id(id, name),
+              requested_job_position:job_positions!requested_job_position_id(id, name)
+            `
+            )
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
   const typedDepartments = (companyDepartments ?? []) as Department[];
+  const typedDepartmentJobPositions = (departmentJobPositions ?? []) as JobPosition[];
   const currentDepartment =
     getDepartmentById(typedDepartments, profile.department_id) ?? null;
   const currentArea =
     getDepartmentArea(typedDepartments, profile.department_id) ?? currentDepartment;
-  const typedRequests = ((changeRequests ?? []) as DepartmentChangeRequest[]).map(
-    (request) => {
+  const currentJobPosition =
+    typedDepartmentJobPositions.find(
+      (jobPosition) => jobPosition.id === profile.job_position_id
+    ) ?? null;
+  const typedDepartmentRequests = (
+    (departmentChangeRequests ?? []) as DepartmentChangeRequest[]
+  ).map((request) => {
       const currentRequestDepartment =
         getDepartmentById(typedDepartments, request.current_department_id) ?? null;
       const requestedRequestDepartment =
@@ -108,8 +174,40 @@ export default async function ProfilePage() {
         requestedDepartmentName:
           requestedRequestDepartment?.name ?? "Sin departamento",
       } satisfies ProfileDepartmentChangeRequestSummary;
-    }
-  );
+    });
+  const typedJobPositionRequests = (
+    (jobPositionChangeRequests ?? []) as unknown[]
+  ).map((request) => {
+    const typedRequest = request as ProfileJobPositionChangeRequestRow & {
+      current_job_position:
+        | ProfileJobPositionChangeRequestRow["current_job_position"]
+        | ProfileJobPositionChangeRequestRow["current_job_position"][];
+      requested_job_position:
+        | ProfileJobPositionChangeRequestRow["requested_job_position"]
+        | ProfileJobPositionChangeRequestRow["requested_job_position"][];
+    };
+    const currentRequestDepartment =
+      getDepartmentById(typedDepartments, typedRequest.current_department_id) ?? null;
+    const currentRequestArea =
+      getDepartmentArea(typedDepartments, typedRequest.current_department_id) ??
+      currentRequestDepartment;
+    const currentRequestJobPosition = pickFirstRelation(
+      typedRequest.current_job_position
+    );
+    const requestedRequestJobPosition = pickFirstRelation(
+      typedRequest.requested_job_position
+    );
+
+    return {
+      ...typedRequest,
+      currentAreaName: currentRequestArea?.name ?? "Sin area",
+      currentDepartmentName: currentRequestDepartment?.name ?? "Sin departamento",
+      currentJobPositionName:
+        currentRequestJobPosition?.name ?? "Sin puesto asignado",
+      requestedJobPositionName:
+        requestedRequestJobPosition?.name ?? "Puesto no disponible",
+    } satisfies ProfileJobPositionChangeRequestSummary;
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -124,6 +222,7 @@ export default async function ProfilePage() {
         companyName={company?.name ?? "Sin empresa"}
         areaName={currentArea?.name ?? "Sin area"}
         departmentName={currentDepartment?.name ?? "Sin departamento"}
+        jobPositionName={currentJobPosition?.name ?? "Sin puesto asignado"}
         userId={authUser.id}
       />
 
@@ -134,7 +233,19 @@ export default async function ProfilePage() {
           currentAreaName={currentArea?.name ?? "Sin area"}
           currentDepartmentName={currentDepartment?.name ?? "Sin departamento"}
           departments={typedDepartments}
-          requests={typedRequests}
+          requests={typedDepartmentRequests}
+        />
+      ) : null}
+
+      {profile.company_id && profile.department_id ? (
+        <JobPositionChangeRequestCard
+          companyName={company?.name ?? "Sin empresa"}
+          currentAreaName={currentArea?.name ?? "Sin area"}
+          currentDepartmentName={currentDepartment?.name ?? "Sin departamento"}
+          currentJobPositionId={profile.job_position_id ?? null}
+          currentJobPositionName={currentJobPosition?.name ?? "Sin puesto asignado"}
+          jobPositions={typedDepartmentJobPositions}
+          requests={typedJobPositionRequests}
         />
       ) : null}
     </div>

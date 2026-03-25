@@ -7,9 +7,9 @@
 
 ## Estado actual
 - Fase: Fase 5 - Testing con usuarios / preparacion para piloto
-- Ultima actualizacion: 2026-03-24
-- Ultimo hito relevante: department-scoped organizational model + hierarchical onboarding + department change requests
-- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00021`
+- Ultima actualizacion: 2026-03-25
+- Ultimo hito relevante: job positions + official PDF mapping + profile/admin workflow for job position requests
+- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00024`
 
 ## Resumen ejecutivo
 - ShiftSwap es una app web interna para intercambio de turnos entre empleados.
@@ -23,6 +23,10 @@
 - El tablon de turnos deja de comportarse como marketplace abierto entre toda la empresa: los usuarios normales solo ven turnos de su departamento exacto.
 - El perfil ya muestra area y departamento actual, y permite solicitar cambio de departamento con revision administrativa.
 - Existe nueva cola admin en `/admin/department-changes` para aprobar o rechazar traslados entre departamentos operativos.
+- El perfil ya muestra tambien el puesto de trabajo actual y permite solicitar cambios de puesto con aprobacion administrativa dentro del mismo departamento operativo.
+- Existe nueva cola admin en `/admin/job-position-changes` para aprobar o rechazar solicitudes de cambio de puesto.
+- El PDF oficial obligatorio ya usa la jerarquia organizativa correcta: `DPTO. O TALLER` toma el padre del departamento operativo, `Categoria` toma el departamento operativo real y `Puesto de trabajo` toma el puesto asignado del perfil cuando exista.
+- Los turnos quedan normalizados por `shift_type`: el horario se deriva de forma fija tanto en UI como en backend y SQL.
 - `next.config.ts` aumenta el `bodySizeLimit` de Server Actions a `8mb` para que el registro soporte la subida del carne corporativo sin romperse.
 - `npm run lint` y `npm run build` pasan con el estado actual del repo.
 
@@ -149,6 +153,32 @@
 - `supabase/seeds/02_arcelor_organization.sql` ahora marca `Aceria LDG` con `is_assignable = FALSE` y los departamentos operativos correspondientes con `TRUE`.
 - `next.config.ts` sube `experimental.serverActions.bodySizeLimit` a `8mb` para soportar la carga del carne corporativo en el registro.
 
+### 2026-03-25 - Puestos de trabajo, PDF oficial y perfil laboral
+- Se anade `supabase/migrations/00023_job_positions_and_profile_scope.sql` para introducir:
+  - `job_positions`
+  - `user_profiles.job_position_id`
+  - validacion de que cada puesto pertenece a un departamento operativo
+  - limpieza automatica de `job_position_id` cuando el perfil deja de pertenecer a ese ambito
+- Se anade `supabase/migrations/00024_job_position_change_requests.sql` para soportar solicitudes de cambio de puesto con:
+  - registro del puesto actual y solicitado
+  - estado `pending/approved/rejected/cancelled`
+  - aprobacion SQL atomica via `resolve_job_position_change_request(...)`
+  - cancelacion automatica de solicitudes pendientes si cambia el departamento del perfil
+- El perfil ahora muestra empresa, area/taller, ID, departamento y puesto de trabajo con layout responsive mas respirado en desktop.
+- Se anade `src/app/(dashboard)/profile/job-position-change-request-card.tsx` para que el empleado solicite cambios de puesto sin editar directamente su perfil.
+- Se anade la cola admin `/admin/job-position-changes` con acciones para aprobar o rechazar solicitudes.
+- El PDF oficial obligatorio se separa en `src/app/api/exchanges/[id]/official-pdf/route.tsx` y usa:
+  - `DPTO. O TALLER` = padre del departamento operativo
+  - `Categoria` = departamento operativo real
+  - `Puesto de trabajo` = puesto asignado del perfil
+- La plantilla `src/lib/exchange-official-pdf-document.tsx` se ajusta sin rehacer layout para:
+  - dar mas aire a los campos de `SOLICITAN`
+  - limpiar la zona de firmas y evitar nombres duplicados
+  - renderizar la firma de diligencia/taller con nombre corto en una sola linea
+  - usar estilos de fuente compatibles con `@react-pdf/renderer`
+- Se anade `supabase/migrations/00022_normalize_shift_schedule.sql` y utilidades en `src/lib/shifts.ts` para fijar horarios segun `shift_type` (`morning`, `afternoon`, `night`) y evitar mezclas inconsistentes.
+- El login client-side se endurece para limpiar sesiones locales corruptas si Supabase devuelve errores de refresh token/JWT antes de reintentar el acceso.
+
 ## Progreso por fase
 
 ### Fase 1 - Prototipo
@@ -174,15 +204,16 @@
   - admin y validacion manual disponibles
   - refresh UX/UI aplicado
   - navegacion smartphone-first refinada con bottom nav principal + menu secundario de cuenta
-  - workflow de 3 actores operativo
-  - acuerdos de compensacion y base de ledger disponibles
-  - pendiente: piloto con usuarios reales y refinamiento sobre feedback
+- workflow de 3 actores operativo
+- acuerdos de compensacion y base de ledger disponibles
+- jerarquia organizativa y puestos de trabajo integrados en perfil, admin y PDF oficial
+- pendiente: piloto con usuarios reales y refinamiento sobre feedback
 
 ## Problemas conocidos
 - El registro hace rollback del usuario auth si falla la escritura del perfil o la subida del carne, pero conviene seguir vigilando errores operativos del bucket `id-cards`.
 - Todavia no hay suite automatizada de tests; `package.json` no expone `npm run test`.
 - En Windows + OneDrive puede aparecer de forma intermitente un `EPERM` durante `next build` por locks del filesystem en `.next`; no es un fallo estable del codigo si el build vuelve a pasar al reintentar.
-- Para produccion, la base de datos debe tener aplicadas al menos `00017`, `00018`, `00019`, `00020` y `00021`.
+- Para produccion, la base de datos debe tener aplicadas al menos `00017` hasta `00024`, incluyendo `00022`, `00023` y `00024` para horarios normalizados, puestos y solicitudes de cambio de puesto.
 
 ## Decisiones tecnicas importantes
 - Server Components por defecto; `"use client"` solo cuando es necesario.
@@ -200,6 +231,9 @@
 - `00019` modela acuerdos de compensacion y `shift_debt_transactions`.
 - `00020` anade jerarquia de departamentos con `parent_department_id`.
 - `00021` introduce `is_assignable`, visibilidad real por departamento, solicitudes de cambio de departamento y endurecimiento de RLS para alcance organizativo.
+- `00022` normaliza `start_time` y `end_time` a partir de `shift_type`.
+- `00023` introduce `job_positions` y `user_profiles.job_position_id`.
+- `00024` anade `job_position_change_requests` y la aprobacion SQL de cambios de puesto.
 - `src/components/layout/navigation-items.ts` centraliza navegacion primaria/secundaria y el calculo de active state entre desktop y movil.
 - En movil, la navegacion primaria es la bottom nav; el menu del avatar queda reservado para cuenta y administracion.
 - `src/app/(dashboard)/layout.tsx` anade padding inferior especifico en movil para convivir con la bottom nav sin tapar contenido.
@@ -233,10 +267,15 @@
 - `src/components/ui/empty-state.tsx` - patron reutilizable para estados vacios
 - `supabase/migrations/00020_department_hierarchy.sql` - soporte jerarquico para departamentos
 - `supabase/migrations/00021_department_scope_and_change_requests.sql` - elegibilidad operativa, visibilidad por departamento y solicitudes de cambio
+- `supabase/migrations/00022_normalize_shift_schedule.sql` - horarios fijos derivados de `shift_type`
+- `supabase/migrations/00023_job_positions_and_profile_scope.sql` - puestos de trabajo y relacion opcional con el perfil
+- `supabase/migrations/00024_job_position_change_requests.sql` - solicitudes y aprobacion de cambio de puesto
 - `supabase/seeds/02_arcelor_organization.sql` - estructura inicial de Arcelor para testing
 - `src/lib/departments.ts` - helpers de jerarquia y lectura de area/departamento operativo
 - `src/app/(dashboard)/profile/department-change-request-card.tsx` - solicitud de cambio desde perfil
+- `src/app/(dashboard)/profile/job-position-change-request-card.tsx` - solicitud de cambio de puesto desde perfil
 - `src/app/(dashboard)/admin/department-changes/page.tsx` - cola admin de cambios de departamento
+- `src/app/(dashboard)/admin/job-position-changes/page.tsx` - cola admin de cambios de puesto
 - `src/components/exchanges/exchange-workflow-progress.tsx` - resumen visual del workflow
 - `src/app/(dashboard)/exchanges/[id]/page.tsx` - expediente formal del cambio
 - `src/app/(dashboard)/exchanges/actions.ts` - confirmacion, firma, retirada y soporte del expediente
@@ -245,9 +284,12 @@
 - `src/app/(dashboard)/admin/exchanges/actions.ts` - aprobar/rechazar solicitud
 - `src/lib/exchange-workflow.ts` - helpers de estados, alcance y trazabilidad
 - `src/lib/exchange-compensation.ts` - reglas de compensacion y ledger de deuda
+- `src/lib/exchange-official-pdf-document.tsx` - plantilla del PDF oficial obligatorio
 - `src/lib/exchange-pdf-document.tsx` - plantilla PDF corporativa
+- `src/app/api/exchanges/[id]/official-pdf/route.tsx` - exportacion del PDF oficial obligatorio
 - `src/app/api/exchanges/[id]/pdf/route.tsx` - exportacion PDF
 - `src/lib/constants.ts` - labels y estilos centralizados de estados y acuerdos
+- `src/lib/shifts.ts` - horarios oficiales por `shift_type`
 - `src/lib/utils.ts` - utilidades visuales y helpers compartidos
 
 ## Migraciones importantes
@@ -263,10 +305,14 @@
 - `00019_exchange_compensation_terms_and_ledger.sql` - acuerdos de compensacion y ledger `shift_debt_transactions`
 - `00020_department_hierarchy.sql` - `parent_department_id`, jerarquia y unicidad entre hermanos
 - `00021_department_scope_and_change_requests.sql` - `is_assignable`, RLS de alcance real y `department_change_requests`
+- `00022_normalize_shift_schedule.sql` - trigger para imponer horarios oficiales por tipo de turno
+- `00023_job_positions_and_profile_scope.sql` - tabla `job_positions` y scope laboral del perfil
+- `00024_job_position_change_requests.sql` - solicitudes, RLS y aprobacion SQL de cambios de puesto
 
 ## Siguientes pasos recomendados
 - Ejecutar piloto con usuarios reales.
 - Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo.
+- Confirmar en produccion que estan aplicadas `00022`, `00023` y `00024` antes de usar el perfil laboral ampliado y el PDF oficial obligatorio.
 - Ejecutar `supabase/seeds/02_arcelor_organization.sql` en los entornos de prueba que necesiten estructura Arcelor.
 - Recoger friccion de bottom nav movil, comprension de estados y claridad del flujo de intercambio.
 - Introducir una base minima de tests para acciones criticas.

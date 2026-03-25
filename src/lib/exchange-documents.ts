@@ -70,3 +70,7 @@ export function getExchangeTemplateDownloadName(exchangeId: string): string {
 export function getExchangePdfDownloadName(exchangeId: string): string {
   return `solicitud-cambio-turno-${exchangeId.slice(0, 8)}.pdf`;
 }
+
+export function getExchangeOfficialPdfDownloadName(exchangeId: string): string {
+  return `solicitud-cambio-turno-oficial-${exchangeId.slice(0, 8)}.pdf`;
+}

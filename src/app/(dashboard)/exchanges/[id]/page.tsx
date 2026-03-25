@@ -702,7 +702,16 @@ export default async function ExchangeDetailPage({
                 <a href={`/api/exchanges/${typed.id}/pdf`} download>
                   <Button variant="outline">
                     <FileText className="size-4" />
-                    Descargar PDF corporativo
+                    Descargar PDF ShiftSwap
+                  </Button>
+                </a>
+              )}
+
+              {showExportButton && (
+                <a href={`/api/exchanges/${typed.id}/official-pdf`} download>
+                  <Button variant="outline">
+                    <FileText className="size-4" />
+                    Descargar PDF oficial
                   </Button>
                 </a>
               )}
@@ -836,8 +845,9 @@ export default async function ExchangeDetailPage({
               <CardContent className="space-y-3">
                 <p className="text-sm leading-6 text-muted-foreground">
                   Este expediente incluye un documento externo de apoyo. El
-                  PDF corporativo oficial de Cambio de Turno se genera aparte a
-                  partir de los datos del expediente dentro de ShiftSwap.
+                  PDF visual de ShiftSwap y el PDF oficial de Cambio de Turno se
+                  generan aparte a partir de los datos del expediente dentro de
+                  la app.
                 </p>
                 <a href={typed.document_url} target="_blank" rel="noreferrer">
                   <Button variant="outline">

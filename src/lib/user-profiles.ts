@@ -10,6 +10,7 @@ export interface AccountGateState {
   role: UserRole;
   company_id: string | null;
   department_id: string | null;
+  job_position_id?: string | null;
 }
 
 export async function getAccountGateState(
@@ -19,7 +20,9 @@ export async function getAccountGateState(
 
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("validation_status, validation_notes, role, company_id, department_id")
+    .select(
+      "validation_status, validation_notes, role, company_id, department_id, job_position_id"
+    )
     .eq("id", userId)
     .maybeSingle();
 

@@ -5,7 +5,10 @@ import { createNotification } from "@/lib/notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
-import { canReviewDepartmentChangeRequest } from "@/lib/user-roles";
+import {
+  canAccessScopedDepartment,
+  canReviewDepartmentChangeRequest,
+} from "@/lib/user-roles";
 import type { UserRole, ValidationStatus } from "@/types";
 
 export interface UpdateProfileResult {
@@ -18,12 +21,25 @@ export interface DepartmentChangeMutationResult {
   error?: string;
 }
 
+export interface JobPositionChangeMutationResult {
+  success?: true;
+  error?: string;
+}
+
 interface DepartmentRow {
   id: string;
   company_id: string;
   parent_department_id: string | null;
   is_assignable: boolean;
   name: string;
+}
+
+interface JobPositionRow {
+  id: string;
+  company_id: string;
+  department_id: string;
+  name: string;
+  active: boolean;
 }
 
 interface ApproverRow {
@@ -65,6 +81,39 @@ async function getDepartmentChangeApproverIds(
       )
       .map((approver) => approver.id)
   )];
+}
+
+async function getJobPositionChangeApproverIds(
+  companyId: string,
+  departmentId: string
+): Promise<string[]> {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
+    .from("user_profiles")
+    .select("id, role, company_id, department_id, validation_status")
+    .eq("validation_status", "approved")
+    .in("role", ["department_admin", "hr_admin", "super_admin"]);
+
+  if (error) {
+    console.error(
+      "[profile/actions] Failed to load job position change approvers",
+      error.message
+    );
+    return [];
+  }
+
+  return [
+    ...new Set(
+      ((data ?? []) as ApproverRow[])
+        .filter((approver) =>
+          canAccessScopedDepartment(approver, {
+            company_id: companyId,
+            department_id: departmentId,
+          })
+        )
+        .map((approver) => approver.id)
+    ),
+  ];
 }
 
 export async function updateProfile(
@@ -290,6 +339,147 @@ export async function requestDepartmentChange(
   revalidatePath("/profile");
   revalidatePath("/admin");
   revalidatePath("/admin/department-changes");
+
+  return { success: true };
+}
+
+export async function requestJobPositionChange(
+  formData: FormData
+): Promise<JobPositionChangeMutationResult> {
+  const requestedJobPositionId = (
+    formData.get("requested_job_position_id") as string | null
+  )?.trim();
+  const requestReason =
+    (formData.get("request_reason") as string | null)?.trim() || null;
+
+  if (!requestedJobPositionId) {
+    return { error: "Selecciona el puesto de trabajo que quieres solicitar." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "No autenticado." };
+  }
+
+  const accountState = await getAccountGateState(user.id);
+  if (!accountState?.company_id || !accountState.department_id) {
+    return {
+      error:
+        "Tu perfil no tiene una asignacion laboral valida. Revisa tus datos actuales antes de solicitar el cambio.",
+    };
+  }
+
+  if (requestedJobPositionId === accountState.job_position_id) {
+    return {
+      error:
+        "El nuevo puesto debe ser distinto del que tienes asignado actualmente.",
+    };
+  }
+
+  const adminClient = createAdminClient();
+  const [
+    { data: existingPending, error: pendingError },
+    { data: requestedJobPosition, error: requestedJobPositionError },
+  ] = await Promise.all([
+    adminClient
+      .from("job_position_change_requests")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .maybeSingle(),
+    adminClient
+      .from("job_positions")
+      .select("id, company_id, department_id, name, active")
+      .eq("id", requestedJobPositionId)
+      .maybeSingle(),
+  ]);
+
+  if (pendingError || requestedJobPositionError) {
+    return {
+      error:
+        "No se pudo validar la solicitud de cambio de puesto con la estructura laboral actual.",
+    };
+  }
+
+  if (existingPending) {
+    return {
+      error:
+        "Ya tienes una solicitud de cambio de puesto pendiente de revision.",
+    };
+  }
+
+  const typedRequestedJobPosition =
+    (requestedJobPosition as JobPositionRow | null) ?? null;
+
+  if (!typedRequestedJobPosition || !typedRequestedJobPosition.active) {
+    return {
+      error: "Selecciona un puesto de trabajo activo y valido para tu perfil.",
+    };
+  }
+
+  if (
+    typedRequestedJobPosition.company_id !== accountState.company_id ||
+    typedRequestedJobPosition.department_id !== accountState.department_id
+  ) {
+    return {
+      error:
+        "Solo puedes solicitar puestos de trabajo pertenecientes a tu departamento operativo actual.",
+    };
+  }
+
+  const { data: createdRequest, error: insertError } = await supabase
+    .from("job_position_change_requests")
+    .insert({
+      user_id: user.id,
+      company_id: accountState.company_id,
+      current_department_id: accountState.department_id,
+      current_job_position_id: accountState.job_position_id ?? null,
+      requested_job_position_id: requestedJobPositionId,
+      request_reason: requestReason,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    return {
+      error:
+        insertError.code === "23505"
+          ? "Ya tienes una solicitud pendiente para revisar."
+          : "No se pudo registrar la solicitud de cambio de puesto. " +
+            insertError.message,
+    };
+  }
+
+  const approverIds = await getJobPositionChangeApproverIds(
+    accountState.company_id,
+    accountState.department_id
+  );
+
+  for (const approverId of approverIds) {
+    if (approverId === user.id) {
+      continue;
+    }
+
+    await createNotification({
+      userId: approverId,
+      type: "job_position_change_requested",
+      title: "Cambio de puesto pendiente",
+      body: "Hay una nueva solicitud de cambio de puesto esperando revision.",
+      dedupeKey: `job_position_change_requested:${createdRequest.id}`,
+      data: {
+        job_position_change_request_id: createdRequest.id,
+        action_url: "/admin/job-position-changes",
+      },
+    });
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/admin");
+  revalidatePath("/admin/job-position-changes");
 
   return { success: true };
 }

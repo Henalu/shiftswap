@@ -2,11 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRightLeft,
+  BriefcaseBusiness,
   CheckCircle2,
   RefreshCw,
   XCircle,
 } from "lucide-react";
-import { DepartmentChangeDecisionForm } from "./department-change-decision-form";
+import { JobPositionChangeDecisionForm } from "./job-position-change-decision-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,22 +28,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import {
-  canReviewDepartmentChangeRequest,
+  canAccessScopedDepartment,
   hasAdminPanelAccess,
   USER_ROLE_LABELS,
 } from "@/lib/user-roles";
 import { formatShortDate } from "@/lib/utils";
-import type { DepartmentChangeRequestStatus, UserRole } from "@/types";
+import type { JobPositionChangeRequestStatus, UserRole } from "@/types";
 
-interface DepartmentChangeRow {
+interface JobPositionChangeRow {
   id: string;
   user_id: string;
   company_id: string;
   current_department_id: string;
-  requested_department_id: string;
+  current_job_position_id: string | null;
+  requested_job_position_id: string;
   request_reason: string | null;
   review_notes: string | null;
-  status: DepartmentChangeRequestStatus;
+  status: JobPositionChangeRequestStatus;
   created_at: string;
   reviewed_at: string | null;
   user: {
@@ -58,13 +60,17 @@ interface DepartmentChangeRow {
     id: string;
     name: string;
   };
-  requested_department: {
+  current_job_position: {
+    id: string;
+    name: string;
+  } | null;
+  requested_job_position: {
     id: string;
     name: string;
   };
 }
 
-export default async function AdminDepartmentChangesPage() {
+export default async function AdminJobPositionChangesPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -88,33 +94,37 @@ export default async function AdminDepartmentChangesPage() {
 
   const adminClient = createAdminClient();
   const { data: requests, error } = await adminClient
-    .from("department_change_requests")
+    .from("job_position_change_requests")
     .select(
       `
-      id, user_id, company_id, current_department_id, requested_department_id,
-      request_reason, review_notes, status, created_at, reviewed_at,
+      id, user_id, company_id, current_department_id, current_job_position_id,
+      requested_job_position_id, request_reason, review_notes, status, created_at, reviewed_at,
       user:user_profiles!user_id(id, full_name, email),
       company:companies!company_id(id, name),
       current_department:departments!current_department_id(id, name),
-      requested_department:departments!requested_department_id(id, name)
+      current_job_position:job_positions!current_job_position_id(id, name),
+      requested_job_position:job_positions!requested_job_position_id(id, name)
     `
     )
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error("No se pudieron cargar las solicitudes de cambio de departamento.");
+    throw new Error("No se pudieron cargar las solicitudes de cambio de puesto.");
   }
 
   const normalizedRequests = ((requests ?? []) as unknown[]).map((request) => {
-    const typed = request as DepartmentChangeRow & {
-      user: DepartmentChangeRow["user"] | DepartmentChangeRow["user"][];
-      company: DepartmentChangeRow["company"] | DepartmentChangeRow["company"][];
+    const typed = request as JobPositionChangeRow & {
+      user: JobPositionChangeRow["user"] | JobPositionChangeRow["user"][];
+      company: JobPositionChangeRow["company"] | JobPositionChangeRow["company"][];
       current_department:
-        | DepartmentChangeRow["current_department"]
-        | DepartmentChangeRow["current_department"][];
-      requested_department:
-        | DepartmentChangeRow["requested_department"]
-        | DepartmentChangeRow["requested_department"][];
+        | JobPositionChangeRow["current_department"]
+        | JobPositionChangeRow["current_department"][];
+      current_job_position:
+        | JobPositionChangeRow["current_job_position"]
+        | JobPositionChangeRow["current_job_position"][];
+      requested_job_position:
+        | JobPositionChangeRow["requested_job_position"]
+        | JobPositionChangeRow["requested_job_position"][];
     };
 
     return {
@@ -122,28 +132,28 @@ export default async function AdminDepartmentChangesPage() {
       user: pickFirstRelation(typed.user),
       company: pickFirstRelation(typed.company),
       current_department: pickFirstRelation(typed.current_department),
-      requested_department: pickFirstRelation(typed.requested_department),
+      current_job_position: pickFirstRelation(typed.current_job_position),
+      requested_job_position: pickFirstRelation(typed.requested_job_position),
     };
   });
 
   const scopedRequests = normalizedRequests.filter(
     (
       request
-    ): request is DepartmentChangeRow & {
-      user: NonNullable<DepartmentChangeRow["user"]>;
-      company: NonNullable<DepartmentChangeRow["company"]>;
-      current_department: NonNullable<DepartmentChangeRow["current_department"]>;
-      requested_department: NonNullable<DepartmentChangeRow["requested_department"]>;
+    ): request is JobPositionChangeRow & {
+      user: NonNullable<JobPositionChangeRow["user"]>;
+      company: NonNullable<JobPositionChangeRow["company"]>;
+      current_department: NonNullable<JobPositionChangeRow["current_department"]>;
+      requested_job_position: NonNullable<JobPositionChangeRow["requested_job_position"]>;
     } =>
       Boolean(request.user) &&
       Boolean(request.company) &&
       Boolean(request.current_department) &&
-      Boolean(request.requested_department) &&
+      Boolean(request.requested_job_position) &&
       request.user_id !== actor.id &&
-      canReviewDepartmentChangeRequest(actor, {
+      canAccessScopedDepartment(actor, {
         company_id: request.company_id,
-        current_department_id: request.current_department_id,
-        requested_department_id: request.requested_department_id,
+        department_id: request.current_department_id,
       })
   );
 
@@ -156,16 +166,13 @@ export default async function AdminDepartmentChangesPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Administracion"
-        title="Cambios de departamento"
-        description="Revisa y resuelve aqui las solicitudes de traslado entre departamentos operativos dentro de tu alcance."
+        title="Cambios de puesto"
+        description="Revisa aqui las solicitudes de cambio de puesto dentro del departamento operativo que te corresponde administrar."
         action={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{USER_ROLE_LABELS[actor.role]}</Badge>
-            <Link href="/admin/job-position-changes">
-              <Button variant="outline">Cambios de puesto</Button>
-            </Link>
-            <Link href="/admin/exchanges">
-              <Button variant="outline">Aprobaciones de cambios</Button>
+            <Link href="/admin/department-changes">
+              <Button variant="outline">Cambios de departamento</Button>
             </Link>
           </div>
         }
@@ -177,8 +184,8 @@ export default async function AdminDepartmentChangesPage() {
             Pendientes de revision
           </h2>
           <p className="text-sm text-muted-foreground">
-            Cada solicitud mantiene el departamento actual del empleado hasta que un
-            administrador la aprueba.
+            Cada solicitud mantiene el puesto actual del empleado hasta que una
+            persona administradora aprueba el cambio.
           </p>
         </div>
 
@@ -186,7 +193,7 @@ export default async function AdminDepartmentChangesPage() {
           <EmptyState
             icon={<RefreshCw className="size-5" />}
             title="No hay solicitudes pendientes"
-            description="Cuando un empleado solicite un cambio de departamento aparecera aqui lista para revision."
+            description="Cuando un empleado solicite un cambio de puesto aparecera aqui lista para revision."
           />
         ) : (
           <div className="space-y-4">
@@ -228,7 +235,12 @@ export default async function AdminDepartmentChangesPage() {
                       Movimiento solicitado
                     </div>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      {request.current_department.name} → {request.requested_department.name}
+                      {request.current_department.name}
+                    </p>
+                    <p className="mt-2 flex items-center gap-2 text-sm leading-6 text-muted-foreground">
+                      <BriefcaseBusiness className="size-4 text-primary" />
+                      {request.current_job_position?.name ?? "Sin puesto asignado"} →{" "}
+                      {request.requested_job_position.name}
                     </p>
                   </div>
 
@@ -241,10 +253,10 @@ export default async function AdminDepartmentChangesPage() {
                     </div>
                   ) : null}
 
-                  <DepartmentChangeDecisionForm
+                  <JobPositionChangeDecisionForm
                     requestId={request.id}
                     employeeName={request.user.full_name}
-                    requestedDepartmentName={request.requested_department.name}
+                    requestedJobPositionName={request.requested_job_position.name}
                   />
                 </CardContent>
               </Card>
@@ -260,7 +272,7 @@ export default async function AdminDepartmentChangesPage() {
               Resueltas recientemente
             </h2>
             <p className="text-sm text-muted-foreground">
-              Ultimas decisiones tomadas dentro de tu alcance administrativo.
+              Ultimas decisiones tomadas sobre cambios de puesto dentro de tu alcance.
             </p>
           </div>
 
@@ -288,7 +300,11 @@ export default async function AdminDepartmentChangesPage() {
                         {request.user.full_name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {request.current_department.name} → {request.requested_department.name}
+                        {request.current_department.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {request.current_job_position?.name ?? "Sin puesto asignado"} →{" "}
+                        {request.requested_job_position.name}
                       </p>
                     </div>
 

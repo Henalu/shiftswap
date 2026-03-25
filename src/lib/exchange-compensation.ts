@@ -35,10 +35,6 @@ export function isExchangeAgreementType(
   return value === "hours_bank" || value === "shift_exchange";
 }
 
-export function isShiftType(value: string | null | undefined): value is ShiftType {
-  return value === "morning" || value === "afternoon" || value === "night";
-}
-
 export function getMadridDateInputValue(baseDate: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: MADRID_TIMEZONE,

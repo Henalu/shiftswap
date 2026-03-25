@@ -164,6 +164,19 @@ supabase/
 ### Build / PDF — patrones clave
 - En Route Handlers que devuelven PDF, convertir el resultado de `renderToBuffer(...)` a `Uint8Array` antes de crear `new Response(...)` para satisfacer el tipado Web API de Next.js en producción.
 
+### Organizacion / Perfil / PDF oficial - patrones clave
+- **Jerarquia organizativa activa:** empresa -> departamento/taller padre -> departamento operativo -> puesto de trabajo.
+- **Departamento operativo:** `user_profiles.department_id` siempre representa el departamento operativo final del empleado.
+- **Puestos de trabajo:** `job_positions` cuelga del departamento operativo y `user_profiles.job_position_id` queda como relacion opcional del perfil.
+- **Cambios de puesto:** el perfil muestra el puesto actual y el usuario solo puede solicitar cambios dentro de su propio departamento operativo; la aprobacion se resuelve desde `/admin/job-position-changes`.
+- **PDF oficial obligatorio:** la ruta activa es `/api/exchanges/[id]/official-pdf`; `DPTO. O TALLER` usa el padre del departamento operativo, `Categoria` usa el departamento operativo real y `Puesto de trabajo` usa el puesto asignado del perfil cuando exista.
+- **Firmas PDF:** mantener estilos compatibles con las fuentes base de `@react-pdf/renderer`; para Helvetica usar combinaciones soportadas como `fontStyle: "italic"` y evitar variantes no resueltas en produccion.
+
+### Turnos - horarios normalizados
+- **Fuente de verdad del horario:** `shift_type` determina automaticamente `start_time` y `end_time`.
+- **Horarios fijos activos:** morning `06:00-14:00`, afternoon `14:00-22:00`, night `22:00-06:00`.
+- **Creacion de turnos:** el formulario muestra horas readonly derivadas del tipo y el backend valida que no se inserten mezclas inconsistentes.
+
 ## Convenciones de Código
 
 ### Nombrado
