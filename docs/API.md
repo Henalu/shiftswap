@@ -14,7 +14,10 @@
 ### Auth
 - `/login`
 - `/register`
+- `/forgot-password`
+- `/reset-password`
 - `/pending-validation`
+- `/billing`
 
 ### Dashboard
 - `/shifts`
@@ -39,6 +42,32 @@
 - Ruta: `/api/exchanges/[id]/pdf`
 - Uso: genera el PDF corporativo del cambio de turno en servidor
 - Archivo: `src/app/api/exchanges/[id]/pdf/route.tsx`
+
+### PDF oficial obligatorio
+- Metodo: `GET`
+- Ruta: `/api/exchanges/[id]/official-pdf`
+- Uso: genera el PDF oficial obligatorio del cambio de turno
+- Archivo: `src/app/api/exchanges/[id]/official-pdf/route.tsx`
+
+### Billing checkout
+- Metodo: `POST`
+- Ruta: `/api/billing/checkout`
+- Uso: crea la sesion Stripe Checkout del plan individual
+
+### Billing portal
+- Metodo: `POST`
+- Ruta: `/api/billing/portal`
+- Uso: abre el customer portal de Stripe para la cuenta autenticada
+
+### Billing webhook
+- Metodo: `POST`
+- Ruta: `/api/billing/webhooks/stripe`
+- Uso: sincroniza eventos de Stripe con el dominio local de billing
+
+### Health check
+- Metodo: `GET`
+- Ruta: `/api/health`
+- Uso: comprobar conectividad basica y readiness del entorno
 
 ## Server Actions principales
 
@@ -75,6 +104,12 @@
 - `src/app/(dashboard)/profile/actions.ts`
   - `updateProfile`
 
+### Auth
+- `src/app/(auth)/login/actions.ts`
+  - `loginWithPassword`
+- `src/app/(auth)/forgot-password/actions.ts`
+  - `sendPasswordResetEmail`
+
 ### Admin
 - `src/app/(dashboard)/admin/validations/actions.ts`
   - `approveUser`
@@ -87,6 +122,10 @@
 ### Tablas publicadas y usadas por cliente
 - `messages`
 - `notifications`
+- `billing_accounts`
+- `billing_subscriptions`
+- `billing_invoices`
+- `billing_webhook_events`
 
 ### Dependencias de migracion
 - `00010_enable_realtime_for_messages.sql`
@@ -156,3 +195,4 @@
 - La logica de negocio del workflow ya no depende de descargar/subir documentos manualmente.
 - El PDF es una salida generada por el sistema; el soporte documental externo es opcional.
 - Para produccion, Supabase debe tener aplicadas las migraciones hasta `00019`.
+- Para produccion, Supabase debe tener aplicadas las migraciones hasta `00025`.

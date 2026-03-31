@@ -124,7 +124,13 @@ supabase/
 │   ├── 00016_roles_and_permissions.sql           # Roles, alcance admin y helpers
 │   ├── 00017_allow_word_exchange_documents.sql   # Soporte Word/PDF en exchange-documents
 │   ├── 00018_native_exchange_approval_workflow.sql # Workflow nativo, aprobacion y exchange_events
-│   └── 00019_exchange_compensation_terms_and_ledger.sql # Compensacion y shift_debt_transactions
+│   ├── 00019_exchange_compensation_terms_and_ledger.sql # Compensacion y shift_debt_transactions
+│   ├── 00020_department_hierarchy.sql          # Jerarquia empresa -> area/taller -> departamento
+│   ├── 00021_department_scope_and_change_requests.sql # Alcance real por departamento y cambios
+│   ├── 00022_normalize_shift_schedule.sql      # Horarios oficiales por shift_type
+│   ├── 00023_job_positions_and_profile_scope.sql # Puestos de trabajo por departamento operativo
+│   ├── 00024_job_position_change_requests.sql  # Solicitudes de cambio de puesto
+│   └── 00025_pilot_readiness_and_billing_foundation.sql # Rate limiting + billing foundation
 └── seeds/
     └── 01_demo_data.sql            # 1 empresa + 3 departamentos (UUIDs fijos)
 ```
@@ -176,6 +182,18 @@ supabase/
 - **Fuente de verdad del horario:** `shift_type` determina automaticamente `start_time` y `end_time`.
 - **Horarios fijos activos:** morning `06:00-14:00`, afternoon `14:00-22:00`, night `22:00-06:00`.
 - **Creacion de turnos:** el formulario muestra horas readonly derivadas del tipo y el backend valida que no se inserten mezclas inconsistentes.
+
+### Pilot readiness / billing / seguridad - patrones clave
+- **Reset de contrasena activo:** las rutas vigentes son `/forgot-password` y `/reset-password`.
+- **Auth endurecida:** login y registro pasan por rate limiting server-side persistido en SQL; no volver a depender solo del cliente para frenar abuso.
+- **CAPTCHA configurable:** el registro puede exigir Cloudflare Turnstile cuando existen `NEXT_PUBLIC_TURNSTILE_SITE_KEY` y `TURNSTILE_SECRET_KEY`.
+- **Billing abstracto:** el modelo base soporta `owner_type = "user" | "company"`; no crear modelos paralelos separados para suscripciones por usuario y por empresa.
+- **Fuente de verdad del acceso comercial:** `src/lib/billing.ts` resuelve el estado efectivo (`inactive`, `trialing`, `active`, `past_due`, `blocked`) y debe seguir siendo el punto central.
+- **Feature flags de billing:** usar `BILLING_ENABLED`, `BILLING_MODE` y `BILLING_ENFORCEMENT` para activar o endurecer cobro sin rehacer el flujo.
+- **Gate de acceso:** middleware y dashboard layout ya consultan billing; con enforcement duro, usuarios bloqueados deben caer en `/billing`.
+- **Stripe v1:** existen `/api/billing/checkout`, `/api/billing/portal` y `/api/billing/webhooks/stripe`; la primera monetizacion prevista sigue siendo por usuario.
+- **Rutas publicas operativas:** `/api/health` y el webhook de Stripe deben seguir accesibles fuera del gate del dashboard.
+- **Emails transaccionales base:** Resend se usa de forma optativa para aprobacion y rechazo de cuenta; faltan aun los correos del ciclo comercial completo.
 
 ## Convenciones de Código
 
@@ -307,6 +325,7 @@ supabase/
 - [ ] Prueba con grupo piloto
 - [x] Primera pasada de refresh UX/UI aplicada en navegacion, jerarquia visual, forms, cards, empty states y sistema de estados
 - [x] Acuerdos de compensación (`hours_bank` / `shift_exchange`) y base de ledger `shift_debt_transactions`
+- [x] Base de pilot readiness y billing foundation implementada (reset de contrasena, rate limiting, CAPTCHA configurable, `/billing`, Stripe base y `health` endpoint)
 - [ ] Ajustes finales basados en observacion de usuarios reales
 
 ## Agentes Disponibles — Cuándo Activar Cada Uno
@@ -388,6 +407,21 @@ Pégalo en el SQL Editor de Supabase para poder registrar usuarios.
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+```
+
+## Variables de Entorno Operativas / Billing
+```
+NEXT_PUBLIC_APP_URL=
+BILLING_ENABLED=false
+BILLING_MODE=user
+BILLING_ENFORCEMENT=off
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_USER_MONTHLY_PRICE_ID=
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
 ```
 
 ## Employee Validation â€” patrones clave

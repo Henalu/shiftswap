@@ -40,6 +40,7 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 - Backend/BaaS: Supabase (PostgreSQL, Auth, Realtime, Storage)
 - PDF: `@react-pdf/renderer`
 - Deploy: Vercel + Supabase Cloud
+- Billing readiness: Stripe + gate comercial preparado para `user` y `company`
 
 ## Direccion UX/UI
 
@@ -84,6 +85,17 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_APP_URL=
+BILLING_ENABLED=
+BILLING_MODE=
+BILLING_ENFORCEMENT=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_USER_MONTHLY_PRICE_ID=
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
 ```
 
 ## Comandos utiles
@@ -151,6 +163,8 @@ supabase/
 - `MEMORY.md`: estado vivo del proyecto y decisiones recientes
 - `docs/ROADMAP.md`: roadmap actualizado
 - `docs/API.md`: superficie tecnica real de rutas, paginas y server actions
+- `docs/OPERATIONS.md`: checklist de staging/produccion, health checks y rollback
+- `docs/SMOKE_CHECKLIST.md`: smoke manual minimo para piloto y billing
 - `supabase/seeds/02_arcelor_organization.sql`: estructura jerarquica inicial de Arcelor para testing
 
 ## Navegacion actual
@@ -182,7 +196,7 @@ supabase/
 
 - El repo prioriza Server Components por defecto.
 - `params` y `searchParams` en Next.js 16 son `Promise<...>`.
-- Para produccion y para el entorno de testing organizativo, Supabase debe tener aplicadas las migraciones hasta `00020`.
+- Para produccion y para el entorno de testing organizativo, Supabase debe tener aplicadas las migraciones hasta `00025`.
 - En Windows + OneDrive puede aparecer un `EPERM` intermitente en `next build` por locks en `.next`; limpiar la carpeta y reintentar suele resolverlo.
 
 ## Licencia

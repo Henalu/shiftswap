@@ -1,0 +1,219 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CreditCard,
+  ShieldCheck,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { getBillingMode, isBillingEnabled } from "@/lib/app-config";
+import { resolveBillingGateState } from "@/lib/billing";
+import { createClient } from "@/lib/supabase/server";
+import { getAccountGateState } from "@/lib/user-profiles";
+import { stripeReady } from "@/lib/stripe";
+
+const BILLING_STATE_LABELS = {
+  inactive: "Sin suscripcion activa",
+  trialing: "En trial",
+  active: "Activa",
+  past_due: "Pago pendiente",
+  blocked: "Bloqueada",
+} as const;
+
+export default async function BillingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const accountState = await getAccountGateState(user.id);
+
+  if (
+    accountState?.validation_status === "pending" ||
+    accountState?.validation_status === "rejected"
+  ) {
+    redirect("/pending-validation");
+  }
+
+  const billingState = await resolveBillingGateState(user.id, accountState);
+  const billingEnabled = isBillingEnabled();
+  const mode = getBillingMode();
+  const stripeConfigured = stripeReady();
+
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-10">
+      <Card className="w-full border-border/80">
+        <CardHeader className="space-y-4">
+          <div className="inline-flex size-12 items-center justify-center rounded-2xl border border-border/70 bg-secondary/45">
+            <CreditCard className="size-5 text-foreground" />
+          </div>
+          <div className="space-y-2">
+            <CardTitle>Suscripcion y acceso</CardTitle>
+            <CardDescription>
+              Controla el estado comercial de tu cuenta y regulariza el acceso si
+              fuera necesario.
+            </CardDescription>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-4 text-sm text-muted-foreground">
+            <p className="font-semibold text-foreground">
+              Estado actual: {BILLING_STATE_LABELS[billingState.state]}
+            </p>
+            <p className="mt-2">
+              {billingState.reason ??
+                "Tu acceso esta listo para el piloto actual y quedara controlado desde aqui cuando actives billing."}
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border/70 bg-background/80 p-4 text-sm">
+              <p className="font-semibold text-foreground">Modo de cobro</p>
+              <p className="mt-2 text-muted-foreground">
+                {mode === "user"
+                  ? "Suscripcion individual por usuario"
+                  : "Suscripcion centralizada por empresa"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/70 bg-background/80 p-4 text-sm">
+              <p className="font-semibold text-foreground">Motor de pago</p>
+              <p className="mt-2 text-muted-foreground">
+                {stripeConfigured
+                  ? "Stripe listo para checkout y portal"
+                  : "Stripe aun no esta configurado en este entorno"}
+              </p>
+            </div>
+          </div>
+
+          {billingEnabled ? (
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-background/80 p-4">
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-foreground">Detalle comercial</p>
+                <p className="text-muted-foreground">
+                  Plan: {billingState.planName ?? "Plan individual base"}
+                </p>
+                <p className="text-muted-foreground">
+                  Estado de suscripcion:{" "}
+                  {billingState.subscriptionStatus ?? "Sin suscripcion creada"}
+                </p>
+                <p className="text-muted-foreground">
+                  Fin de periodo:{" "}
+                  {billingState.currentPeriodEnd
+                    ? new Date(billingState.currentPeriodEnd).toLocaleDateString("es-ES")
+                    : "No disponible"}
+                </p>
+              </div>
+
+              {!stripeConfigured ? (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+                  Este entorno no tiene las claves de Stripe listas todavia. La
+                  pagina ya esta preparada, pero falta configurar el proveedor.
+                </div>
+              ) : null}
+
+              {billingState.state === "active" || billingState.state === "trialing" || billingState.state === "past_due" ? (
+                <form action="/api/billing/portal" method="post">
+                  <Button type="submit" className="w-full" disabled={!stripeConfigured}>
+                    Gestionar suscripcion
+                  </Button>
+                </form>
+              ) : (
+                <form action="/api/billing/checkout" method="post">
+                  <Button type="submit" className="w-full" disabled={!stripeConfigured}>
+                    Activar suscripcion
+                  </Button>
+                </form>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-800">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">
+                    Billing desactivado durante el piloto
+                  </p>
+                  <p>
+                    El gate comercial esta preparado, pero el acceso sigue
+                    abierto para facilitar las pruebas reales antes del cobro.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {billingState.state === "blocked" ? (
+            <div className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-4 text-sm text-destructive">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">
+                    Tu acceso operativo esta bloqueado
+                  </p>
+                  <p>
+                    Necesitas activar o regularizar la suscripcion antes de
+                    volver al dashboard.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-4 text-sm">
+            <Link
+              href="/legal/terms"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Terminos
+            </Link>
+            <Link
+              href="/legal/privacy"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Privacidad
+            </Link>
+            <Link
+              href="/legal/billing"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Facturacion
+            </Link>
+            <Link
+              href="/legal/data-processing"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Documentos y RGPD
+            </Link>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+          <Button asChild variant="outline">
+            <Link href="/shifts">
+              <ArrowLeft className="size-4" />
+              Volver al dashboard
+            </Link>
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            El modelo de acceso comercial esta preparado para usuario y empresa.
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}

@@ -4,7 +4,7 @@
 // Status enums
 // ============================================
 
-export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'expired';
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
 export type ExchangeStatus =
   | 'pending_confirmation'
@@ -30,6 +30,23 @@ export type JobPositionChangeRequestStatus = DepartmentChangeRequestStatus;
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'member' | 'department_admin' | 'hr_admin' | 'super_admin';
 export type ShiftType = 'morning' | 'afternoon' | 'night';
+export type BillingOwnerType = 'user' | 'company';
+export type BillingAccessState =
+  | 'inactive'
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'blocked';
+export type BillingEnforcementMode = 'off' | 'soft' | 'hard';
+export type BillingSubscriptionStatus =
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid';
+export type BillingInterval = 'month' | 'year' | 'custom';
 
 // ============================================
 // UserProfile
@@ -90,6 +107,84 @@ export interface JobPosition {
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface BillingPlan {
+  id: string;
+  code: string;
+  owner_type: BillingOwnerType;
+  name: string;
+  description?: string | null;
+  billing_interval: BillingInterval;
+  currency: string;
+  amount_cents: number;
+  active: boolean;
+  stripe_price_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingAccount {
+  id: string;
+  owner_type: BillingOwnerType;
+  owner_user_id?: string | null;
+  owner_company_id?: string | null;
+  provider: string;
+  provider_customer_id?: string | null;
+  billing_email?: string | null;
+  current_billing_state: BillingAccessState;
+  trial_ends_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingSubscription {
+  id: string;
+  billing_account_id: string;
+  billing_plan_id?: string | null;
+  provider: string;
+  provider_subscription_id: string;
+  provider_price_id?: string | null;
+  status: BillingSubscriptionStatus;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at?: string | null;
+  trial_start?: string | null;
+  trial_end?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingInvoice {
+  id: string;
+  billing_account_id: string;
+  billing_subscription_id?: string | null;
+  provider: string;
+  provider_invoice_id: string;
+  status: string;
+  currency: string;
+  amount_due_cents: number;
+  amount_paid_cents: number;
+  hosted_invoice_url?: string | null;
+  invoice_pdf_url?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  paid_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingWebhookEvent {
+  id: string;
+  provider: string;
+  provider_event_id: string;
+  event_type: string;
+  payload?: Record<string, unknown> | null;
+  processed: boolean;
+  processed_at?: string | null;
+  created_at: string;
 }
 
 // ============================================

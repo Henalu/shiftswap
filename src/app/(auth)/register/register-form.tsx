@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { TurnstileField } from "@/components/auth/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,8 @@ export default function RegisterForm({
   const [departmentId, setDepartmentId] = useState(initialDepartmentId);
   const [employeeId, setEmployeeId] = useState("");
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -104,6 +107,7 @@ export default function RegisterForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setCaptchaError(null);
 
     if (!idCardFile) {
       setError("La foto del carne es obligatoria.");
@@ -121,12 +125,17 @@ export default function RegisterForm({
     formData.set("department_id", departmentId);
     formData.set("employee_id", employeeId.trim());
     formData.set("id_card", idCardFile);
+    formData.set("captcha_token", captchaToken);
 
     const result = await registerEmployee(formData);
     setLoading(false);
 
     if (result.error) {
-      setError(result.error);
+      if (result.error.toLowerCase().includes("anti-bot")) {
+        setCaptchaError(result.error);
+      } else {
+        setError(result.error);
+      }
       return;
     }
 
@@ -172,6 +181,8 @@ export default function RegisterForm({
                 setAreaDepartmentId(initialAreaDepartmentId);
                 setDepartmentId(initialDepartmentId);
                 setIdCardFile(null);
+                setCaptchaToken("");
+                setCaptchaError(null);
                 setError(null);
                 if (fileInputRef.current) {
                   fileInputRef.current.value = "";
@@ -224,6 +235,7 @@ export default function RegisterForm({
               <Label htmlFor="email">Email corporativo</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="tu@empresa.com"
                 value={email}
@@ -236,6 +248,7 @@ export default function RegisterForm({
               <Label htmlFor="password">Contrasena</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -320,6 +333,7 @@ export default function RegisterForm({
             <Label htmlFor="employee_id">ID de empleado</Label>
             <Input
               id="employee_id"
+              name="employee_id"
               type="text"
               placeholder="Tu identificador interno"
               value={employeeId}
@@ -349,6 +363,16 @@ export default function RegisterForm({
               </p>
             )}
           </div>
+
+          <TurnstileField
+            error={captchaError}
+            onTokenChange={(token) => {
+              setCaptchaToken(token);
+              if (token) {
+                setCaptchaError(null);
+              }
+            }}
+          />
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">

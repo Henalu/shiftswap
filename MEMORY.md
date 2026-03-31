@@ -7,9 +7,9 @@
 
 ## Estado actual
 - Fase: Fase 5 - Testing con usuarios / preparacion para piloto
-- Ultima actualizacion: 2026-03-25
-- Ultimo hito relevante: job positions + official PDF mapping + profile/admin workflow for job position requests
-- Estado general: funcionalmente estable, lista para despliegue en produccion si la base de datos tiene aplicadas las migraciones hasta `00024`
+- Ultima actualizacion: 2026-03-26
+- Ultimo hito relevante: pilot readiness + billing foundation + auth hardening
+- Estado general: funcionalmente estable, lista para piloto y staging si la base de datos tiene aplicadas las migraciones hasta `00025`; el dominio de billing ya existe pero todavia no esta activado comercialmente en produccion
 
 ## Resumen ejecutivo
 - ShiftSwap es una app web interna para intercambio de turnos entre empleados.
@@ -27,8 +27,16 @@
 - Existe nueva cola admin en `/admin/job-position-changes` para aprobar o rechazar solicitudes de cambio de puesto.
 - El PDF oficial obligatorio ya usa la jerarquia organizativa correcta: `DPTO. O TALLER` toma el padre del departamento operativo, `Categoria` toma el departamento operativo real y `Puesto de trabajo` toma el puesto asignado del perfil cuando exista.
 - Los turnos quedan normalizados por `shift_type`: el horario se deriva de forma fija tanto en UI como en backend y SQL.
+- Ya existe recuperacion real de contrasena con `/forgot-password` y `/reset-password`.
+- Login y registro ya pasan por endurecimiento server-side con rate limiting persistido en base de datos.
+- El registro ya puede exigir CAPTCHA de Cloudflare Turnstile cuando las variables de entorno estan configuradas.
+- Existe ya una base de billing compatible con dos pagadores posibles (`user` y `company`) sin duplicar modelos.
+- El acceso comercial se resuelve con un helper centralizado y flags operativas (`BILLING_ENABLED`, `BILLING_MODE`, `BILLING_ENFORCEMENT`).
+- Ya existe pagina `/billing`, endpoints base de Stripe (`checkout`, `portal`, `webhook`) y sincronizacion inicial del estado de suscripcion.
+- Se han anadido un `health` endpoint, documentacion operativa minima y checklist manual de smoke para staging/produccion.
+- Ya existen paginas legales base y helpers de email transaccional via Resend para aprobacion y rechazo de cuenta.
 - `next.config.ts` aumenta el `bodySizeLimit` de Server Actions a `8mb` para que el registro soporte la subida del carne corporativo sin romperse.
-- `npm run lint` y `npm run build` pasan con el estado actual del repo.
+- `npm run build` pasa con el estado actual del repo; `lint` sigue siendo recomendable antes de cerrar el siguiente corte.
 
 ## Direccion de producto y diseno
 - No es una web de marketing ni editorial.
@@ -179,6 +187,42 @@
 - Se anade `supabase/migrations/00022_normalize_shift_schedule.sql` y utilidades en `src/lib/shifts.ts` para fijar horarios segun `shift_type` (`morning`, `afternoon`, `night`) y evitar mezclas inconsistentes.
 - El login client-side se endurece para limpiar sesiones locales corruptas si Supabase devuelve errores de refresh token/JWT antes de reintentar el acceso.
 
+### 2026-03-26 - Pilot readiness, seguridad operativa y billing foundation
+- Se anade `supabase/migrations/00025_pilot_readiness_and_billing_foundation.sql` con:
+  - `request_rate_limits`
+  - `billing_plans`
+  - `billing_accounts`
+  - `billing_subscriptions`
+  - `billing_invoices`
+  - `billing_webhook_events`
+- Se formaliza el roadmap comercial con una arquitectura de billing abstracta compatible con dos dueños posibles:
+  - `user`
+  - `company`
+- La monetizacion inicial prevista sigue siendo por usuario, pero sin bloquear la futura extension a suscripcion por empresa.
+- Se anaden helpers en `src/lib/app-config.ts` para centralizar flags y configuracion de:
+  - billing
+  - Stripe
+  - Turnstile
+  - Resend
+- Se anaden `src/lib/rate-limit.ts` y `src/lib/turnstile.ts` para endurecer login y registro sin depender del cliente.
+- Login deja de depender solo del cliente y pasa a usar server action con rate limiting persistido en base de datos.
+- El flujo de recuperacion de contrasena queda operativo con:
+  - `src/app/(auth)/forgot-password/*`
+  - `src/app/(auth)/reset-password/*`
+- Se anade `src/lib/billing.ts` como helper central para resolver acceso comercial y sincronizar cuentas de billing del usuario.
+- Se anade integracion base con Stripe en:
+  - `src/app/api/billing/checkout/route.ts`
+  - `src/app/api/billing/portal/route.ts`
+  - `src/app/api/billing/webhooks/stripe/route.ts`
+- Se anade pagina `/billing` para mostrar estado de acceso, plan y acciones de activacion/gestion.
+- Middleware y layout del dashboard ya consultan el estado de billing y pueden redirigir a `/billing` cuando `BILLING_ENFORCEMENT` lo exija.
+- Se anade `src/app/api/health/route.ts` para comprobacion minima de disponibilidad.
+- Se anaden emails transaccionales base via Resend para aprobacion y rechazo de cuenta desde admin.
+- Se anaden paginas legales base en `/legal/*` y documentacion operativa minima:
+  - `docs/OPERATIONS.md`
+  - `docs/SMOKE_CHECKLIST.md`
+- `npm run build` pasa con todo el corte actual.
+
 ## Progreso por fase
 
 ### Fase 1 - Prototipo
@@ -209,11 +253,34 @@
 - jerarquia organizativa y puestos de trabajo integrados en perfil, admin y PDF oficial
 - pendiente: piloto con usuarios reales y refinamiento sobre feedback
 
+### Fase 5.1 - Pilot readiness y billing foundation
+- Implementada la base tecnica
+- Ya disponible:
+  - reset de contrasena
+  - rate limiting en login y registro
+  - CAPTCHA configurable en registro
+  - health endpoint
+  - runbook operativo y smoke checklist
+  - dominio de billing abstracto (`user` / `company`)
+  - gate comercial centralizado
+  - pagina `/billing`
+  - handlers base de Stripe
+  - emails transaccionales iniciales de validacion
+- Pendiente para cerrar la salida comercial real:
+  - staging separado y checklist operativo ejecutado en entorno real
+  - monitorizacion y alertas externas
+  - politica formal de retencion de documentos
+  - suite automatizada E2E/smoke
+  - activacion real de Stripe con claves productivas
+
 ## Problemas conocidos
 - El registro hace rollback del usuario auth si falla la escritura del perfil o la subida del carne, pero conviene seguir vigilando errores operativos del bucket `id-cards`.
-- Todavia no hay suite automatizada de tests; `package.json` no expone `npm run test`.
+- Todavia no hay suite automatizada E2E/smoke; `package.json` no expone `npm run test`.
 - En Windows + OneDrive puede aparecer de forma intermitente un `EPERM` durante `next build` por locks del filesystem en `.next`; no es un fallo estable del codigo si el build vuelve a pasar al reintentar.
-- Para produccion, la base de datos debe tener aplicadas al menos `00017` hasta `00024`, incluyendo `00022`, `00023` y `00024` para horarios normalizados, puestos y solicitudes de cambio de puesto.
+- Para produccion, la base de datos debe tener aplicadas al menos `00017` hasta `00025`, incluyendo `00022`, `00023`, `00024` y `00025` para horarios normalizados, puestos, solicitudes de cambio de puesto y billing foundation.
+- El dominio de billing ya existe, pero todavia no estan construidos el backoffice real de onboarding de empresas, la importacion CSV de estructura ni la precedencia `company > user`.
+- Las paginas legales actuales son base funcional y todavia requieren revision legal real antes de cobro a terceros.
+- Solo estan implementados emails transaccionales de validacion de cuenta; faltan los de billing, invitaciones y ciclo de vida comercial.
 
 ## Decisiones tecnicas importantes
 - Server Components por defecto; `"use client"` solo cuando es necesario.
@@ -234,6 +301,16 @@
 - `00022` normaliza `start_time` y `end_time` a partir de `shift_type`.
 - `00023` introduce `job_positions` y `user_profiles.job_position_id`.
 - `00024` anade `job_position_change_requests` y la aprobacion SQL de cambios de puesto.
+- `00025` introduce rate limiting persistido, foundation de billing, planes, cuentas, suscripciones, facturas y eventos webhook.
+- Las flags de billing son:
+  - `BILLING_ENABLED`
+  - `BILLING_MODE`
+  - `BILLING_ENFORCEMENT`
+- El acceso comercial se resuelve desde `src/lib/billing.ts`; no dispersar reglas de suscripcion por pantallas sueltas.
+- `BILLING_MODE` puede ser `user` o `company`, aunque la UX actualmente solo cubre el flujo individual.
+- Cuando `BILLING_ENFORCEMENT = hard`, usuarios sin acceso comercial deben salir del dashboard y caer en `/billing`.
+- `/api/billing/webhooks/stripe` y `/api/health` deben mantenerse accesibles fuera del gate normal de dashboard/auth.
+- Turnstile y Resend son integraciones opcionales por entorno; si faltan claves, la app debe degradar sin romper el acceso en desarrollo.
 - `src/components/layout/navigation-items.ts` centraliza navegacion primaria/secundaria y el calculo de active state entre desktop y movil.
 - En movil, la navegacion primaria es la bottom nav; el menu del avatar queda reservado para cuenta y administracion.
 - `src/app/(dashboard)/layout.tsx` anade padding inferior especifico en movil para convivir con la bottom nav sin tapar contenido.
@@ -270,6 +347,7 @@
 - `supabase/migrations/00022_normalize_shift_schedule.sql` - horarios fijos derivados de `shift_type`
 - `supabase/migrations/00023_job_positions_and_profile_scope.sql` - puestos de trabajo y relacion opcional con el perfil
 - `supabase/migrations/00024_job_position_change_requests.sql` - solicitudes y aprobacion de cambio de puesto
+- `supabase/migrations/00025_pilot_readiness_and_billing_foundation.sql` - rate limiting, billing foundation y eventos webhook
 - `supabase/seeds/02_arcelor_organization.sql` - estructura inicial de Arcelor para testing
 - `src/lib/departments.ts` - helpers de jerarquia y lectura de area/departamento operativo
 - `src/app/(dashboard)/profile/department-change-request-card.tsx` - solicitud de cambio desde perfil
@@ -290,6 +368,21 @@
 - `src/app/api/exchanges/[id]/pdf/route.tsx` - exportacion PDF
 - `src/lib/constants.ts` - labels y estilos centralizados de estados y acuerdos
 - `src/lib/shifts.ts` - horarios oficiales por `shift_type`
+- `src/lib/app-config.ts` - flags operativas y variables de entorno centralizadas
+- `src/lib/billing.ts` - resolucion de acceso comercial y sincronizacion de cuentas
+- `src/lib/rate-limit.ts` - rate limiting server-side persistido en SQL
+- `src/lib/stripe.ts` - integracion base con Stripe sin acoplar la app al SDK
+- `src/lib/turnstile.ts` - verificacion anti-bot de Cloudflare Turnstile
+- `src/lib/transactional-email.ts` - emails transaccionales base via Resend
+- `src/app/billing/page.tsx` - estado de suscripcion y acciones comerciales del usuario
+- `src/app/api/billing/checkout/route.ts` - creacion de checkout Stripe
+- `src/app/api/billing/portal/route.ts` - acceso al customer portal
+- `src/app/api/billing/webhooks/stripe/route.ts` - sincronizacion de eventos de Stripe
+- `src/app/api/health/route.ts` - health check minimo
+- `src/app/(auth)/forgot-password/page.tsx` - solicitud de reset de contrasena
+- `src/app/(auth)/reset-password/page.tsx` - establecimiento de nueva contrasena
+- `src/components/auth/turnstile-field.tsx` - widget CAPTCHA reutilizable
+- `src/components/legal/legal-document.tsx` - layout base de documentos legales
 - `src/lib/utils.ts` - utilidades visuales y helpers compartidos
 
 ## Migraciones importantes
@@ -308,15 +401,56 @@
 - `00022_normalize_shift_schedule.sql` - trigger para imponer horarios oficiales por tipo de turno
 - `00023_job_positions_and_profile_scope.sql` - tabla `job_positions` y scope laboral del perfil
 - `00024_job_position_change_requests.sql` - solicitudes, RLS y aprobacion SQL de cambios de puesto
+- `00025_pilot_readiness_and_billing_foundation.sql` - rate limiting, billing abstraction y soporte inicial de Stripe
 
 ## Siguientes pasos recomendados
-- Ejecutar piloto con usuarios reales.
-- Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo.
-- Confirmar en produccion que estan aplicadas `00022`, `00023` y `00024` antes de usar el perfil laboral ampliado y el PDF oficial obligatorio.
-- Ejecutar `supabase/seeds/02_arcelor_organization.sql` en los entornos de prueba que necesiten estructura Arcelor.
-- Recoger friccion de bottom nav movil, comprension de estados y claridad del flujo de intercambio.
-- Introducir una base minima de tests para acciones criticas.
-- Construir una vista dedicada de historial/saldo para `shift_debt_transactions` si la bolsa de horas se vuelve flujo habitual.
+- Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo, incluyendo `00025`.
+- Preparar staging real separado de produccion y ejecutar el smoke checklist completo.
+- Activar observabilidad minima externa: errores, uptime y alertas.
+- Definir y documentar politica de retencion de carnets y documentos de validacion.
+- Ejecutar piloto con usuarios reales y recoger friccion de bottom nav movil, estados y claridad del flujo de intercambio.
+- Introducir una base automatizada de tests smoke/E2E para:
+  - registro
+  - login
+  - reset de contrasena
+  - validacion admin
+  - intercambio
+  - PDF
+  - billing
+- Activar billing individual real con Stripe cuando existan claves y pricing definitivos.
+- Construir backoffice de onboarding asistido para:
+  - alta de empresa
+  - carga de departamentos
+  - carga de puestos
+  - importacion CSV
+- Extender despues el modelo a suscripcion por empresa reutilizando `billing_accounts`.
+
+## Roadmap priorizado persistido
+1. Cerrar pilot readiness de verdad:
+   - staging separado
+   - monitorizacion y alertas
+   - retencion documental
+   - smoke/E2E basicos
+2. Activar billing real v1 por usuario:
+   - Stripe en entorno real
+   - checkout
+   - portal
+   - webhook
+   - bloqueo comercial progresivo (`off` -> `soft` -> `hard`)
+3. Construir onboarding asistido de empresa:
+   - alta de company
+   - gestion de jerarquia organizativa
+   - carga de puestos
+   - importacion CSV
+   - invitaciones controladas
+4. Completar salida comercial:
+   - legales revisados
+   - emails transaccionales restantes
+   - criterios operativos de cobro
+5. Extender a suscripcion por empresa sin rehacer billing:
+   - `owner_type = company`
+   - precedencia `company > user`
+   - tooling admin comercial
 
 ## Ideas futuras
 - PWA o app movil

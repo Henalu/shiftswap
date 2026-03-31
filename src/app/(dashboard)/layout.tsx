@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { AlertTriangle } from "lucide-react";
+import { resolveBillingGateState } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
 import {
   getAccountGateState,
@@ -28,7 +30,7 @@ export default async function DashboardLayout({
       getAccountGateState(authUser.id),
       supabase
         .from("user_profiles")
-        .select(USER_PROFILE_PUBLIC_SELECT)
+        .select(`${USER_PROFILE_PUBLIC_SELECT}, company:companies!company_id(name)`)
         .eq("id", authUser.id)
         .single(),
       supabase
@@ -47,20 +49,33 @@ export default async function DashboardLayout({
     ]);
 
   if (
-    accountState?.validation_status === "pending" ||
-    accountState?.validation_status === "rejected"
+    accountState?.role !== "super_admin" &&
+    (accountState?.validation_status === "pending" ||
+      accountState?.validation_status === "rejected")
   ) {
     redirect("/pending-validation");
+  }
+
+  const billingState = await resolveBillingGateState(authUser.id, accountState);
+
+  if (billingState.accessBlocked) {
+    redirect("/billing");
   }
 
   const typedNotifications = (notifications ?? []) as Notification[];
   const unreadCount = unreadResult.count ?? 0;
   const role = accountState?.role ?? "member";
+  const companyRelation = (profile as Record<string, unknown> | null)?.company;
+  const companyName =
+    (Array.isArray(companyRelation) ? companyRelation[0]?.name : (companyRelation as { name?: string } | null)?.name) as
+      | string
+      | undefined;
 
   return (
     <div className="flex min-h-screen flex-col">
       <Header
         user={profile}
+        companyName={companyName}
         initialNotifications={typedNotifications}
         initialUnreadCount={unreadCount}
         role={role}
@@ -71,6 +86,28 @@ export default async function DashboardLayout({
         </aside>
         <main className="min-w-0 flex-1 overflow-auto">
           <div className="flex min-h-full flex-col gap-8 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 md:pb-6 lg:px-8">
+            {billingState.enabled && billingState.state === "past_due" ? (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-foreground">
+                      Tu suscripcion necesita regularizacion
+                    </p>
+                    <p className="text-amber-800/90">
+                      El acceso sigue abierto de forma temporal, pero debes revisar el pago cuanto antes desde{" "}
+                      <a
+                        href="/billing"
+                        className="font-medium underline underline-offset-4"
+                      >
+                        Suscripcion
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {children}
           </div>
         </main>

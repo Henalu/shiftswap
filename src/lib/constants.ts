@@ -31,6 +31,7 @@ export const SHIFT_STATUS_LABELS = {
   confirmed: "Confirmado",
   completed: "Completado",
   cancelled: "Cancelado",
+  expired: "Caducado",
 } as const satisfies Record<ShiftStatus, string>;
 
 export const REQUEST_STATUS_LABELS = {
@@ -61,6 +62,8 @@ export const SHIFT_STATUS_STYLES = {
     "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   cancelled:
     "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  expired:
+    "border-slate-400/15 bg-slate-400/10 text-slate-500 dark:text-slate-400",
 } as const satisfies Record<ShiftStatus, string>;
 
 export const REQUEST_STATUS_STYLES = {

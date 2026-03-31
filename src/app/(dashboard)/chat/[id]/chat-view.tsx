@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,7 @@ export function ChatView({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasInitialScrollRef = useRef(false);
@@ -98,6 +99,9 @@ export function ChatView({
   );
   const previousLastMessageIdRef = useRef<string | null>(
     initialMessages[initialMessages.length - 1]?.id ?? null
+  );
+  const knownMessageIdsRef = useRef<Set<string>>(
+    new Set(initialMessages.map((m) => m.id))
   );
 
   useEffect(() => {
@@ -132,6 +136,7 @@ export function ChatView({
   useEffect(() => {
     latestCreatedAtRef.current =
       messages[messages.length - 1]?.created_at ?? null;
+    knownMessageIdsRef.current = new Set(messages.map((m) => m.id));
   }, [messages]);
 
   useEffect(() => {
@@ -158,12 +163,17 @@ export function ChatView({
 
       const latestCreatedAt = latestCreatedAtRef.current;
       if (latestCreatedAt) {
-        query = query.gte("created_at", latestCreatedAt);
+        query = query.gt("created_at", latestCreatedAt);
       }
 
       const { data, error } = await query;
 
       if (cancelled || error || !data || data.length === 0) return;
+
+      const hasNew = data.some(
+        (m) => !knownMessageIdsRef.current.has((m as Message).id)
+      );
+      if (!hasNew) return;
 
       setMessages((prev) =>
         data.reduce(
@@ -174,7 +184,7 @@ export function ChatView({
       );
     }
 
-    const intervalId = window.setInterval(syncLatestMessages, 3000);
+    const intervalId = window.setInterval(syncLatestMessages, 5000);
 
     return () => {
       cancelled = true;
@@ -182,31 +192,40 @@ export function ChatView({
     };
   }, [conversationId]);
 
+  const scrollToBottomIfNeeded = useCallback(
+    (lastMessage: Message) => {
+      const isInitialLoad = !hasInitialScrollRef.current;
+      const hasNewLastMessage =
+        lastMessage.id !== previousLastMessageIdRef.current;
+      const shouldScroll =
+        isInitialLoad ||
+        (hasNewLastMessage &&
+          (isNearBottomRef.current || lastMessage.sender_id === currentUserId));
+
+      if (shouldScroll) {
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({
+            behavior: isInitialLoad ? "auto" : "smooth",
+            block: "end",
+          });
+          isNearBottomRef.current = true;
+        });
+      }
+
+      if (isInitialLoad) {
+        hasInitialScrollRef.current = true;
+      }
+
+      previousLastMessageIdRef.current = lastMessage.id;
+    },
+    [currentUserId]
+  );
+
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
-
-    const isInitialLoad = !hasInitialScrollRef.current;
-    const hasNewLastMessage = lastMessage.id !== previousLastMessageIdRef.current;
-    const shouldScroll =
-      isInitialLoad ||
-      (hasNewLastMessage &&
-        (isNearBottomRef.current || lastMessage.sender_id === currentUserId));
-
-    if (shouldScroll) {
-      bottomRef.current?.scrollIntoView({
-        behavior: isInitialLoad ? "auto" : "smooth",
-        block: "end",
-      });
-      isNearBottomRef.current = true;
-    }
-
-    if (isInitialLoad) {
-      hasInitialScrollRef.current = true;
-    }
-
-    previousLastMessageIdRef.current = lastMessage.id;
-  }, [currentUserId, messages]);
+    scrollToBottomIfNeeded(lastMessage);
+  }, [messages, scrollToBottomIfNeeded]);
 
   function handleMessagesScroll() {
     const container = messagesContainerRef.current;
@@ -247,6 +266,7 @@ export function ChatView({
       .eq("id", conversationId);
 
     setSending(false);
+    inputRef.current?.focus();
   }
 
   return (
@@ -314,12 +334,14 @@ export function ChatView({
         <form onSubmit={handleSend} className="flex items-end gap-3">
           <div className="flex-1">
             <Input
+              ref={inputRef}
               value={content}
               onChange={(event) => setContent(event.target.value)}
               placeholder="Escribe un mensaje claro y breve..."
               disabled={sending}
               className="h-12"
               autoComplete="off"
+              autoFocus
             />
           </div>
           <Button

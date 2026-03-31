@@ -50,7 +50,7 @@ export function MobileBottomNav() {
                   <Icon className="size-4.5 shrink-0" />
                 </div>
                 <span className="max-w-full truncate text-[11px] font-semibold leading-none tracking-[-0.01em]">
-                  {item.mobileLabel ?? item.label}
+                  {item.label}
                 </span>
               </Link>
             );

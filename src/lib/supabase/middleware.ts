@@ -3,6 +3,8 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { resolveBillingGateState } from '@/lib/billing';
+import type { AccountGateState } from '@/lib/user-profiles';
 import { hasAdminPanelAccess } from '@/lib/user-roles';
 import type { UserRole, ValidationStatus } from '@/types';
 
@@ -49,9 +51,15 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isAuthPage =
-    pathname.startsWith('/login') || pathname.startsWith('/register');
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password');
+  const isBillingPage = pathname.startsWith('/billing');
   const isPendingValidationPage = pathname.startsWith('/pending-validation');
   const isAuthApiRoute = pathname.startsWith('/api/auth');
+  const isHealthRoute = pathname.startsWith('/api/health');
+  const isBillingWebhookRoute = pathname.startsWith('/api/billing/webhooks');
 
   if (authError) {
     const shouldClearSession =
@@ -63,7 +71,7 @@ export async function updateSession(request: NextRequest) {
       clearSupabaseAuthCookies(request, supabaseResponse);
     }
 
-    if (!isAuthPage && !isAuthApiRoute) {
+    if (!isAuthPage && !isAuthApiRoute && !isHealthRoute && !isBillingWebhookRoute) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       return NextResponse.redirect(url);
@@ -72,7 +80,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (!user && !isAuthPage && !isAuthApiRoute) {
+  if (!user && !isAuthPage && !isAuthApiRoute && !isHealthRoute && !isBillingWebhookRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
@@ -84,20 +92,18 @@ export async function updateSession(request: NextRequest) {
 
   const { data: rawAccountState } = await supabase
     .from('user_profiles')
-    .select('validation_status, role')
+    .select(
+      'validation_status, validation_notes, role, company_id, department_id, job_position_id'
+    )
     .eq('id', user.id)
     .maybeSingle();
 
-  const accountState = rawAccountState as
-    | {
-        validation_status: ValidationStatus;
-        role: UserRole;
-      }
-    | null;
+  const accountState = (rawAccountState as AccountGateState | null) ?? null;
   const validationStatus = accountState?.validation_status ?? null;
   const role = accountState?.role ?? 'member';
   const isBlockedByValidation =
-    validationStatus === 'pending' || validationStatus === 'rejected';
+    role !== 'super_admin' &&
+    (validationStatus === 'pending' || validationStatus === 'rejected');
 
   if (isAuthPage) {
     const url = request.nextUrl.clone();
@@ -120,6 +126,14 @@ export async function updateSession(request: NextRequest) {
   if (pathname.startsWith('/admin') && !hasAdminPanelAccess(role)) {
     const url = request.nextUrl.clone();
     url.pathname = '/shifts';
+    return NextResponse.redirect(url);
+  }
+
+  const billingState = await resolveBillingGateState(user.id, accountState);
+
+  if (billingState.accessBlocked && !isBillingPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/billing';
     return NextResponse.redirect(url);
   }
 

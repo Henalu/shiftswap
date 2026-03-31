@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import { isSuperAdmin, USER_ROLE_LABELS } from "@/lib/user-roles";
 import type { UserRole } from "@/types";
+import { UserFilters } from "./user-filters";
 import { UserRoleForm } from "./user-role-form";
 
 interface UserRow {
@@ -32,7 +33,18 @@ interface NamedEntity {
   name: string;
 }
 
-export default async function AdminUsersPage() {
+interface PageProps {
+  searchParams: Promise<{
+    company_id?: string;
+    department_id?: string;
+    role?: string;
+    q?: string;
+  }>;
+}
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
+  const { company_id, department_id, role: filterRole, q } = await searchParams;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,13 +59,25 @@ export default async function AdminUsersPage() {
     redirect("/admin/validations");
   }
 
+  let usersQuery = supabase
+    .from("user_profiles")
+    .select("id, full_name, email, role, company_id, department_id")
+    .eq("validation_status", "approved")
+    .order("full_name");
+
+  if (company_id) {
+    usersQuery = usersQuery.eq("company_id", company_id);
+  }
+  if (department_id) {
+    usersQuery = usersQuery.eq("department_id", department_id);
+  }
+  if (filterRole) {
+    usersQuery = usersQuery.eq("role", filterRole);
+  }
+
   const [{ data: users, error }, { data: companies }, { data: departments }] =
     await Promise.all([
-      supabase
-        .from("user_profiles")
-        .select("id, full_name, email, role, company_id, department_id")
-        .eq("validation_status", "approved")
-        .order("full_name"),
+      usersQuery,
       supabase.from("companies").select("id, name").order("name"),
       supabase.from("departments").select("id, name").order("name"),
     ]);
@@ -72,7 +96,11 @@ export default async function AdminUsersPage() {
     ])
   );
 
-  const approvedUsers = (users ?? []) as UserRow[];
+  const searchTerm = q?.toLowerCase().trim();
+  const approvedUsers = ((users ?? []) as UserRow[]).filter(
+    (u) => !searchTerm || u.full_name.toLowerCase().includes(searchTerm) || u.email.toLowerCase().includes(searchTerm)
+  );
+  const hasFilters = !!(company_id || department_id || filterRole || q);
 
   return (
     <div className="space-y-6">
@@ -93,10 +121,17 @@ export default async function AdminUsersPage() {
         }
       />
 
+      <UserFilters
+        companies={(companies ?? []) as NamedEntity[]}
+        departments={(departments ?? []) as NamedEntity[]}
+      />
+
       <p className="text-sm text-muted-foreground">
         {approvedUsers.length === 0
-          ? "No hay usuarios aprobados para gestionar todavia."
-          : `${approvedUsers.length} usuario${approvedUsers.length !== 1 ? "s" : ""} aprobado${approvedUsers.length !== 1 ? "s" : ""} listo${approvedUsers.length !== 1 ? "s" : ""} para ajuste de rol.`}
+          ? hasFilters
+            ? "No hay usuarios que coincidan con los filtros aplicados."
+            : "No hay usuarios aprobados para gestionar todavia."
+          : `${approvedUsers.length} usuario${approvedUsers.length !== 1 ? "s" : ""}${hasFilters ? " con los filtros activos" : ""}.`}
       </p>
 
       {approvedUsers.length === 0 ? (

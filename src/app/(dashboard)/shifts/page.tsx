@@ -81,6 +81,8 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
       : profile.department_id;
   const scopeLabel = getDepartmentScopeLabel(typedDepartments, profile.department_id);
 
+  const today = new Date().toISOString().slice(0, 10);
+
   let query = supabase
     .from("shifts")
     .select(
@@ -91,6 +93,7 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     `
     )
     .eq("status", "open")
+    .gte("date", today)
     .neq("user_id", authUser.id)
     .order("date", { ascending: true });
 

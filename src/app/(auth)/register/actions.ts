@@ -1,6 +1,13 @@
 "use server";
 
+import { headers } from "next/headers";
+import {
+  AUTH_RATE_LIMITS,
+  consumeRateLimit,
+  getRequestIp,
+} from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 const ID_CARD_BUCKET = "id-cards";
 const MAX_ID_CARD_SIZE = 5 * 1024 * 1024;
@@ -74,6 +81,7 @@ export async function registerEmployee(
   )?.trim();
   const departmentId = (formData.get("department_id") as string | null)?.trim();
   const employeeId = (formData.get("employee_id") as string | null)?.trim();
+  const captchaToken = (formData.get("captcha_token") as string | null)?.trim();
   const idCard = formData.get("id_card");
 
   if (!fullName) return { error: "El nombre completo es obligatorio." };
@@ -85,6 +93,26 @@ export async function registerEmployee(
   if (!areaDepartmentId) return { error: "Selecciona un area o taller." };
   if (!departmentId) return { error: "Selecciona un departamento operativo." };
   if (!employeeId) return { error: "El ID de empleado es obligatorio." };
+
+  const requestHeaders = await headers();
+  const requestIp = getRequestIp(requestHeaders);
+  const rateLimit = await consumeRateLimit({
+    scope: "auth_register_ip",
+    identifier: requestIp,
+    maxHits: AUTH_RATE_LIMITS.registerByIp.maxHits,
+    windowSeconds: AUTH_RATE_LIMITS.registerByIp.windowSeconds,
+  });
+
+  if (!rateLimit.allowed) {
+    const retryAfterMinutes = Math.max(
+      1,
+      Math.ceil(rateLimit.retryAfterSeconds / 60)
+    );
+
+    return {
+      error: `Has alcanzado el limite de altas desde esta red. Espera ${retryAfterMinutes} min antes de volver a intentarlo.`,
+    };
+  }
 
   if (!(idCard instanceof File) || idCard.size === 0) {
     return { error: "La foto del carné es obligatoria." };
@@ -98,6 +126,15 @@ export async function registerEmployee(
   if (!idCardMimeType) {
     return {
       error: "El carné debe estar en formato JPG, PNG, WEBP, HEIC o HEIF.",
+    };
+  }
+
+  const captchaResult = await verifyTurnstileToken(captchaToken, requestIp);
+  if (!captchaResult.success) {
+    return {
+      error:
+        captchaResult.error ??
+        "La verificacion anti-bot no ha sido valida. Vuelve a intentarlo.",
     };
   }
 

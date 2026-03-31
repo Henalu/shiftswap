@@ -37,6 +37,7 @@ const NotificationBell = dynamic(
 
 interface HeaderProps {
   user: UserProfile | null;
+  companyName?: string;
   initialNotifications: Notification[];
   initialUnreadCount: number;
   role: UserRole;
@@ -44,6 +45,7 @@ interface HeaderProps {
 
 export function Header({
   user,
+  companyName,
   initialNotifications,
   initialUnreadCount,
   role,
@@ -92,7 +94,7 @@ export function Header({
               ShiftSwap
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              Intercambio de turnos
+              {companyName ?? "Intercambio de turnos"}
             </p>
           </div>
         </Link>

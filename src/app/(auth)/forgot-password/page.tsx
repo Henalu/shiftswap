@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
 import Link from "next/link";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,21 +14,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { loginWithPassword, type LoginActionState } from "./actions";
+import {
+  sendPasswordResetEmail,
+  type ForgotPasswordState,
+} from "./actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Entrando..." : "Entrar"}
+      {pending ? "Enviando..." : "Enviar enlace de recuperacion"}
     </Button>
   );
 }
 
-export default function LoginPage() {
-  const [state, formAction] = useActionState<LoginActionState, FormData>(
-    loginWithPassword,
+export default function ForgotPasswordPage() {
+  const [state, formAction] = useActionState<ForgotPasswordState, FormData>(
+    sendPasswordResetEmail,
     {}
   );
 
@@ -36,10 +39,10 @@ export default function LoginPage() {
     <Card className="border-border/80">
       <CardHeader className="space-y-3">
         <div className="space-y-2">
-          <CardTitle>Iniciar sesion</CardTitle>
+          <CardTitle>Recuperar contrasena</CardTitle>
           <CardDescription>
-            Entra en tu espacio para revisar turnos, gestionar intercambios y
-            seguir las conversaciones abiertas.
+            Te enviaremos un enlace seguro para que puedas definir una nueva
+            contrasena.
           </CardDescription>
         </div>
       </CardHeader>
@@ -50,6 +53,13 @@ export default function LoginPage() {
             <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {state.error}
             </p>
+          ) : null}
+
+          {state.success ? (
+            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
+              Si el email existe, acabamos de enviar el enlace de recuperacion.
+              Revisa tu bandeja de entrada.
+            </div>
           ) : null}
 
           <div className="space-y-2">
@@ -63,34 +73,17 @@ export default function LoginPage() {
               autoComplete="email"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Contrasena</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-            />
-          </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
           <SubmitButton />
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            He olvidado mi contrasena
-          </Link>
           <p className="text-center text-sm text-muted-foreground">
-            Aun no tienes cuenta?{" "}
+            Ya recuerdas tu contrasena?{" "}
             <Link
-              href="/register"
-              className="font-semibold text-primary underline-offset-4 hover:underline"
+              href="/login"
+              className="font-medium text-primary underline-offset-4 hover:underline"
             >
-              Solicita acceso
+              Volver a iniciar sesion
             </Link>
           </p>
         </CardFooter>

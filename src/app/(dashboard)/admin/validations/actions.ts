@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createNotification } from "@/lib/notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  sendAccountApprovedEmail,
+  sendAccountRejectedEmail,
+} from "@/lib/transactional-email";
 import { getAccountGateState } from "@/lib/user-profiles";
 import {
   canAccessScopedProfile,
@@ -20,6 +24,7 @@ export interface ValidationMutationResult {
 
 interface ValidationTarget {
   id: string;
+  email: string;
   full_name: string;
   company_id: string | null;
   department_id: string | null;
@@ -54,7 +59,7 @@ async function getValidationTarget(
   const { data, error } = await supabase
     .from("user_profiles")
     .select(
-      "id, full_name, company_id, department_id, id_card_url, validation_status"
+      "id, email, full_name, company_id, department_id, id_card_url, validation_status"
     )
     .eq("id", userId)
     .maybeSingle();
@@ -146,6 +151,18 @@ export async function approveUser(
     },
   });
 
+  try {
+    await sendAccountApprovedEmail({
+      to: target.email,
+      fullName: target.full_name,
+    });
+  } catch (error) {
+    console.error("[admin/validations] Failed to send approval email", {
+      targetUserId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   revalidateValidationViews(targetUserId);
   return { success: true };
 }
@@ -217,6 +234,19 @@ export async function rejectUser(
       action_url: "/pending-validation",
     },
   });
+
+  try {
+    await sendAccountRejectedEmail({
+      to: target.email,
+      fullName: target.full_name,
+      notes: validationNotes,
+    });
+  } catch (error) {
+    console.error("[admin/validations] Failed to send rejection email", {
+      targetUserId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   revalidateValidationViews(targetUserId);
   return { success: true };

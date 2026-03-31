@@ -5,6 +5,7 @@ import {
   CalendarDays,
   BriefcaseBusiness,
   ClipboardCheck,
+  CreditCard,
   MessageSquare,
   Repeat,
   ShieldCheck,
@@ -19,7 +20,6 @@ import type { UserRole } from "@/types";
 export interface NavigationItem {
   href: string;
   label: string;
-  mobileLabel?: string;
   description?: string;
   icon: LucideIcon;
 }
@@ -27,29 +27,25 @@ export interface NavigationItem {
 export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
   {
     href: "/shifts",
-    label: "Turnos disponibles",
-    mobileLabel: "Tablon",
+    label: "Tablon",
     description: "Explora y filtra los turnos abiertos.",
     icon: CalendarDays,
   },
   {
     href: "/shifts/my",
     label: "Mis turnos",
-    mobileLabel: "Mis turnos",
     description: "Gestiona publicaciones y solicitudes recibidas.",
     icon: CalendarCheck,
   },
   {
     href: "/chat",
     label: "Chat",
-    mobileLabel: "Chat",
     description: "Habla con otros companeros sobre cada cambio.",
     icon: MessageSquare,
   },
   {
     href: "/exchanges",
-    label: "Intercambios",
-    mobileLabel: "Cambios",
+    label: "Cambios",
     description: "Revisa acuerdos, firmas y estado del expediente.",
     icon: Repeat,
   },
@@ -61,6 +57,12 @@ export const ACCOUNT_NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Mi perfil",
     description: "Consulta tus datos y preferencias basicas.",
     icon: User,
+  },
+  {
+    href: "/billing",
+    label: "Suscripcion",
+    description: "Consulta el estado de acceso y gestiona tu plan.",
+    icon: CreditCard,
   },
 ];
 
@@ -125,6 +127,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname === "/exchanges" || pathname.startsWith("/exchanges/");
     case "/profile":
       return pathname === "/profile" || pathname.startsWith("/profile/");
+    case "/billing":
+      return pathname === "/billing" || pathname.startsWith("/billing/");
     case "/admin/exchanges":
       return pathname === "/admin" || pathname.startsWith("/admin/exchanges");
     case "/admin/validations":

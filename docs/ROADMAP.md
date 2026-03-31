@@ -78,6 +78,16 @@ El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat,
   - aprobacion departamental
   - panel admin
 
+### Fase 5.1 - Pilot readiness y billing foundation
+- Reset de contrasena
+- Rate limiting basico en auth
+- CAPTCHA configurable en registro
+- Health endpoint
+- Runbook operativo y smoke checklist
+- Dominio de billing abstracto compatible con `user` y `company`
+- Gate comercial centralizado preparado en middleware y layout
+- Billing page y handlers base de Stripe listos para activacion
+
 ## Siguientes bloques recomendados
 
 ### Bloque A - Endurecimiento funcional
