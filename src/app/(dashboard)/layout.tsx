@@ -30,7 +30,7 @@ export default async function DashboardLayout({
       getAccountGateState(authUser.id),
       supabase
         .from("user_profiles")
-        .select(`${USER_PROFILE_PUBLIC_SELECT}, company:companies!company_id(name)`)
+        .select(USER_PROFILE_PUBLIC_SELECT)
         .eq("id", authUser.id)
         .single(),
       supabase
@@ -65,11 +65,16 @@ export default async function DashboardLayout({
   const typedNotifications = (notifications ?? []) as Notification[];
   const unreadCount = unreadResult.count ?? 0;
   const role = accountState?.role ?? "member";
-  const companyRelation = (profile as Record<string, unknown> | null)?.company;
-  const companyName =
-    (Array.isArray(companyRelation) ? companyRelation[0]?.name : (companyRelation as { name?: string } | null)?.name) as
-      | string
-      | undefined;
+
+  let companyName: string | undefined;
+  if (accountState?.company_id) {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("name")
+      .eq("id", accountState.company_id)
+      .maybeSingle();
+    companyName = (company as { name?: string } | null)?.name ?? undefined;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

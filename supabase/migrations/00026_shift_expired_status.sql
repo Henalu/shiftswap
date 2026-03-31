@@ -34,5 +34,8 @@ $$;
 REVOKE ALL ON FUNCTION public.expire_stale_shifts() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.expire_stale_shifts() TO authenticated;
 
--- 3. Expire any already-past shifts right now
-SELECT public.expire_stale_shifts();
+-- 3. Expire any already-past shifts directly (no function call to avoid context issues)
+UPDATE public.shifts
+SET status = 'expired', updated_at = NOW()
+WHERE date < CURRENT_DATE
+  AND status IN ('open', 'pending');
