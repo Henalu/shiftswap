@@ -173,8 +173,7 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
               key={shift.id}
               shift={shift}
               currentUserId={authUser.id}
-              initialInterested={myRequestMap.has(shift.id)}
-              requestId={myRequestMap.get(shift.id) ?? null}
+              hasActiveProposal={myRequestMap.has(shift.id)}
             />
           ))}
         </div>

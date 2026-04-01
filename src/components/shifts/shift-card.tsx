@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, UserRound } from "lucide-react";
-import { InterestButton } from "./interest-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,18 +21,15 @@ import type { ShiftType, ShiftWithUser } from "@/types";
 interface ShiftCardProps {
   shift: ShiftWithUser;
   currentUserId: string | null;
-  initialInterested?: boolean;
-  requestId?: string | null;
+  hasActiveProposal?: boolean;
 }
 
 export function ShiftCard({
   shift,
   currentUserId,
-  initialInterested = false,
-  requestId = null,
+  hasActiveProposal = false,
 }: ShiftCardProps) {
   const isOwner = currentUserId === shift.user_id;
-  const showInterestButton = !isOwner && shift.status === "open";
   const timeRange = formatTimeRange(shift.start_time, shift.end_time);
 
   return (
@@ -98,12 +94,10 @@ export function ShiftCard({
             <ArrowRight className="size-4" />
           </Button>
         </Link>
-        {showInterestButton && (
-          <InterestButton
-            shiftId={shift.id}
-            initialInterested={initialInterested}
-            requestId={requestId}
-          />
+        {!isOwner && hasActiveProposal && (
+          <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
+            Propuesta enviada
+          </Badge>
         )}
       </CardFooter>
     </Card>

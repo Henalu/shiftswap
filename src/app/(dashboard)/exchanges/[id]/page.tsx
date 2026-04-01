@@ -15,12 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExchangeApprovalDecisionForm } from "@/app/(dashboard)/admin/exchanges/exchange-approval-decision-form";
-import { ExchangeRequesterSignatureForm } from "@/app/(dashboard)/exchanges/exchange-requester-signature-form";
 import { startConversation } from "@/app/(dashboard)/chat/actions";
 import {
   formatCompensationDateLabel,
   getAgreementSummary,
-  getMinimumCompensationDate,
 } from "@/lib/exchange-compensation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -50,11 +48,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   cancelExchange,
-  confirmExchange,
   confirmSignedExchangeCancellation,
   rejectSignedExchangeCancellation,
   requestSignedExchangeCancellation,
-  signExchange,
+  signAsInterested,
 } from "../actions";
 import type {
   ExchangeAgreementType,
@@ -114,10 +111,10 @@ interface ExchangeEventRow extends ExchangeEvent {
   actor: { id: string; full_name: string } | null;
 }
 
-async function signExchangeAction(formData: FormData): Promise<void> {
+async function signAsInterestedAction(formData: FormData): Promise<void> {
   "use server";
 
-  await signExchange(formData);
+  await signAsInterested(formData);
 }
 
 function renderStatusSummary(
@@ -125,26 +122,17 @@ function renderStatusSummary(
   viewerName: string,
   otherUserName: string
 ) {
-  if (exchange.status === "pending_confirmation") {
+  if (exchange.status === "accepted") {
     return (
       <>
-        El acuerdo sigue en fase de confirmacion. Cuando ambas personas acepten,
-        la solicitud formal se abrira aqui para firma interna.
+        La propuesta ha sido aceptada. Falta que{" "}
+        <strong>{exchange.requester.full_name}</strong> firme la solicitud para
+        enviarla a validacion del departamento.
       </>
     );
   }
 
-  if (exchange.status === "confirmed") {
-    return (
-      <>
-        El acuerdo ya existe. Falta que <strong>{viewerName}</strong> y{" "}
-        <strong>{otherUserName}</strong> firmen la solicitud dentro de la app
-        para enviarla a aprobacion.
-      </>
-    );
-  }
-
-  if (exchange.status === "pending_department_approval") {
+  if (exchange.status === "pending_validation") {
     if (exchange.cancellation_requested_by) {
       return (
         <>
@@ -156,8 +144,8 @@ function renderStatusSummary(
 
     return (
       <>
-        Las firmas de ambas personas ya estan registradas. El expediente queda
-        pendiente de decision por parte del responsable del departamento.
+        Las firmas ya estan registradas. El expediente queda pendiente de
+        validacion por parte del responsable del departamento.
       </>
     );
   }
@@ -335,31 +323,27 @@ export default async function ExchangeDetailPage({
     });
   const otherUser = isOwner ? typed.requester : typed.owner;
   const hasPendingCancellationRequest =
-    typed.status === "pending_department_approval" &&
+    typed.status === "pending_validation" &&
     Boolean(typed.cancellation_requested_by);
   const isCancellationRequester =
     hasPendingCancellationRequest && typed.cancellation_requested_by === authUser.id;
   const canRequestFormalCancellation =
     isParticipant &&
-    typed.status === "pending_department_approval" &&
+    typed.status === "pending_validation" &&
     !hasPendingCancellationRequest;
   const canRespondToFormalCancellation =
     isParticipant &&
-    typed.status === "pending_department_approval" &&
+    typed.status === "pending_validation" &&
     hasPendingCancellationRequest &&
     !isCancellationRequester;
   const canCancelDirectly =
-    isParticipant &&
-    (typed.status === "pending_confirmation" || typed.status === "confirmed");
+    isParticipant && typed.status === "accepted";
   const canOpenChat =
     isParticipant && EXCHANGE_CAN_CHAT_STATUSES.includes(typed.status);
-  const canConfirm = typed.status === "pending_confirmation" && isRequester;
   const canSign =
-    typed.status === "confirmed" &&
-    ((isOwner && !typed.signed_by_user_a_at) ||
-      (isRequester && !typed.signed_by_user_b_at));
+    typed.status === "accepted" && isRequester && !typed.signed_by_user_b_at;
   const showApprovalForm =
-    isApproverReviewer && typed.status === "pending_department_approval";
+    isApproverReviewer && typed.status === "pending_validation";
   const timeRange = formatTimeRange(typed.shift.start_time, typed.shift.end_time);
   const viewerDisplayName = isParticipant
     ? isOwner
@@ -367,7 +351,6 @@ export default async function ExchangeDetailPage({
       : typed.requester.full_name
     : "las dos partes";
   const showExportButton = EXCHANGE_EXPORTABLE_STATUSES.includes(typed.status);
-  const minimumCompensationDate = getMinimumCompensationDate();
   const agreementSummary = getAgreementSummary({
     agreementType: typed.agreement_type,
     compensationShiftType: typed.compensation_shift_type,
@@ -385,14 +368,12 @@ export default async function ExchangeDetailPage({
     signedName,
     canCurrentUserSign,
     extraContent,
-    actionSlot,
   }: {
     label: string;
     signedAt: string | null;
     signedName: string | null;
     canCurrentUserSign: boolean;
     extraContent?: ReactNode;
-    actionSlot?: ReactNode;
   }) => {
     return (
       <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4">
@@ -419,10 +400,8 @@ export default async function ExchangeDetailPage({
             <Badge className="border-emerald-500/15 bg-emerald-500/10 text-emerald-700">
               Firmado
             </Badge>
-          ) : actionSlot ? (
-            actionSlot
           ) : canCurrentUserSign ? (
-            <form action={signExchangeAction}>
+            <form action={signAsInterestedAction}>
               <input type="hidden" name="exchange_id" value={typed.id} />
               <Button type="submit" size="sm">
                 Firmar solicitud
@@ -566,7 +545,7 @@ export default async function ExchangeDetailPage({
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       La deuda de 1 turno quedara registrada en el ledger cuando
-                      la solicitud pase a revision departamental.
+                      la solicitud pase a validacion.
                     </p>
                   )}
                 </div>
@@ -680,13 +659,6 @@ export default async function ExchangeDetailPage({
               <CardTitle className="text-base">Acciones disponibles</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-3">
-              {canConfirm && (
-                <form action={confirmExchange}>
-                  <input type="hidden" name="exchange_id" value={typed.id} />
-                  <Button type="submit">Confirmar acuerdo</Button>
-                </form>
-              )}
-
               {canOpenChat && (
                 <form action={startConversation}>
                   <input type="hidden" name="shift_id" value={typed.shift_id} />
@@ -734,7 +706,7 @@ export default async function ExchangeDetailPage({
                 </form>
               )}
 
-              {typed.status === "pending_department_approval" && isCancellationRequester && (
+              {typed.status === "pending_validation" && isCancellationRequester && (
                 <Button type="button" variant="outline" disabled>
                   Retirada solicitada
                 </Button>
@@ -759,65 +731,52 @@ export default async function ExchangeDetailPage({
             </CardContent>
           </Card>
 
-          {typed.status === "confirmed" && isParticipant && (
+          {typed.status === "accepted" && isParticipant && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Firmas de empleados</CardTitle>
+                <CardTitle className="text-base">Firma de la solicitud</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-muted-foreground">
-                  La firma se registra dentro de la app. Cuando ambas partes
-                  firmen, la solicitud pasara automaticamente a revision del
-                  departamento.
+                  La firma del propietario queda registrada al aceptar la
+                  propuesta. Solo falta la firma del solicitante para enviar el
+                  expediente a validacion.
                 </p>
 
                 {renderSignatureStatus({
                   label: typed.owner.full_name,
                   signedAt: typed.signed_by_user_a_at,
                   signedName: typed.signed_by_user_a_name,
-                  canCurrentUserSign: isOwner && canSign,
+                  canCurrentUserSign: false,
                 })}
 
                 {renderSignatureStatus({
                   label: typed.requester.full_name,
                   signedAt: typed.signed_by_user_b_at,
                   signedName: typed.signed_by_user_b_name,
-                  canCurrentUserSign: isRequester && canSign,
-                  actionSlot:
-                    isRequester && canSign ? (
-                      <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
-                        Requiere acuerdo
-                      </Badge>
-                    ) : undefined,
-                  extraContent:
-                    isRequester && canSign ? (
-                      <ExchangeRequesterSignatureForm
-                        exchangeId={typed.id}
-                        ownerName={typed.owner.full_name}
-                        minimumCompensationDate={minimumCompensationDate}
-                      />
-                    ) : typed.agreement_type ? (
-                      <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4 text-sm leading-6 text-muted-foreground">
-                        {agreementSummary}
-                      </div>
-                    ) : undefined,
+                  canCurrentUserSign: canSign,
+                  extraContent: typed.agreement_type ? (
+                    <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                      {agreementSummary}
+                    </div>
+                  ) : undefined,
                 })}
               </CardContent>
             </Card>
           )}
 
-          {typed.status === "pending_department_approval" && (
+          {typed.status === "pending_validation" && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  Revision departamental
+                  Validacion departamental
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {isApproverReviewer
                     ? "La solicitud ya esta lista para tu decision. Revisa el contexto, deja observaciones si hace falta y resuelvela desde aqui."
-                    : "La solicitud ya ha salido de la fase de negociacion y queda pendiente de revision por parte del departamento."}
+                    : "La solicitud ya ha salido de la fase de firma y queda pendiente de validacion por parte del departamento."}
                 </p>
 
                 {showApprovalForm ? (

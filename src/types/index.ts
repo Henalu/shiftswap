@@ -4,16 +4,16 @@
 // Status enums
 // ============================================
 
-export type ShiftStatus = 'open' | 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'expired';
+export type ShiftStatus = 'open' | 'negotiating' | 'completed' | 'cancelled' | 'expired';
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
 export type ExchangeStatus =
-  | 'pending_confirmation'
-  | 'confirmed'
-  | 'pending_department_approval'
+  | 'accepted'
+  | 'pending_validation'
   | 'approved'
   | 'rejected'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'expired';
 export type ExchangeAgreementType = 'hours_bank' | 'shift_exchange';
 export type ShiftDebtTransactionStatus =
   | 'pending_approval'
@@ -191,6 +191,8 @@ export interface BillingWebhookEvent {
 // Shift
 // ============================================
 
+export type AcceptedModality = 'hours_bank' | 'shift_exchange';
+
 export interface Shift {
   id: string;
   user_id: string;
@@ -201,6 +203,7 @@ export interface Shift {
   department_id: string;
   description?: string;
   status: ShiftStatus;
+  accepted_modalities: AcceptedModality[];
   created_at: string;
   updated_at: string;
 }
@@ -219,6 +222,9 @@ export interface ShiftRequest {
   shift_id: string;
   interested_user_id: string;
   message?: string;
+  agreement_type: ExchangeAgreementType;
+  compensation_shift_date?: string | null;
+  compensation_shift_type?: ShiftType | null;
   status: RequestStatus;
   created_at: string;
 }
@@ -305,13 +311,13 @@ export interface JobPositionChangeRequest {
 }
 
 export type ExchangeEventType =
-  | 'exchange_created'
-  | 'agreement_confirmed'
-  | 'participant_signed'
-  | 'submitted_for_approval'
+  | 'proposal_accepted'
+  | 'interested_signed'
+  | 'submitted_for_validation'
   | 'department_approved'
   | 'department_rejected'
   | 'exchange_cancelled'
+  | 'exchange_expired'
   | 'cancellation_requested'
   | 'cancellation_rejected'
   | 'support_document_attached';
@@ -368,18 +374,17 @@ export interface NotificationData {
 }
 
 export type NotificationType =
-  | 'shift_request'
-  | 'request_accepted'
-  | 'request_rejected'
+  | 'proposal_received'
+  | 'proposal_accepted'
+  | 'proposal_rejected'
   | 'shift_cancelled'
   | 'new_message'
-  | 'exchange_confirmed'
   | 'exchange_signed'
   | 'exchange_document_added'
   | 'exchange_cancelled'
   | 'exchange_cancellation_requested'
   | 'exchange_cancellation_rejected'
-  | 'exchange_pending_approval'
+  | 'exchange_pending_validation'
   | 'exchange_department_approved'
   | 'exchange_department_rejected'
   | 'department_change_requested'

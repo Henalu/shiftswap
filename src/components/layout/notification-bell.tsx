@@ -78,9 +78,7 @@ function getNotificationAppearance(type: NotificationType): NotificationAppearan
           "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
       };
     case "exchange_department_approved":
-    case "request_accepted":
-    case "exchange_confirmed":
-    case "exchange_signed":
+    case "proposal_accepted":
     case "account_approved":
       return {
         label: "Aprobado",
@@ -88,7 +86,7 @@ function getNotificationAppearance(type: NotificationType): NotificationAppearan
         iconClassName:
           "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
       };
-    case "request_rejected":
+    case "proposal_rejected":
     case "shift_cancelled":
     case "exchange_cancelled":
     case "exchange_department_rejected":
@@ -99,8 +97,8 @@ function getNotificationAppearance(type: NotificationType): NotificationAppearan
         iconClassName:
           "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
       };
-    case "shift_request":
-    case "exchange_pending_approval":
+    case "proposal_received":
+    case "exchange_pending_validation":
     case "exchange_cancellation_requested":
     case "exchange_cancellation_rejected":
       return {

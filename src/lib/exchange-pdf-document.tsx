@@ -441,7 +441,7 @@ function getStatusPalette(status: ExchangeStatus) {
     };
   }
 
-  if (status === "pending_department_approval") {
+  if (status === "pending_validation") {
     return {
       backgroundColor: BRAND.warningSoft,
       borderColor: "#fdba74",
@@ -488,12 +488,12 @@ function getApprovalLabel(exchange: ExchangePdfData) {
     return "Rechazado por departamento";
   }
 
-  if (exchange.status === "pending_department_approval") {
+  if (exchange.status === "pending_validation") {
     return "Pendiente de aprobacion";
   }
 
-  if (exchange.status === "confirmed") {
-    return "Pendiente de firmas";
+  if (exchange.status === "accepted") {
+    return "Pendiente de firma";
   }
 
   return EXCHANGE_STATUS_LABELS[exchange.status];
@@ -512,7 +512,7 @@ function getDecisionText(exchange: ExchangePdfData) {
     return "La solicitud fue rechazada por el taller o departamento. Revisa el expediente en ShiftSwap para continuar.";
   }
 
-  if (exchange.status === "pending_department_approval") {
+  if (exchange.status === "pending_validation") {
     return "La solicitud ya cuenta con acuerdo y firmas de las partes. Queda pendiente de resolucion por parte del taller o departamento.";
   }
 

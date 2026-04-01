@@ -23,10 +23,7 @@ import {
 import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
-import {
-  cancelExchange,
-  confirmExchange,
-} from "./actions";
+import { cancelExchange } from "./actions";
 import type { ExchangeStatus, ShiftType } from "@/types";
 
 interface ExchangeRow {
@@ -39,7 +36,6 @@ interface ExchangeRow {
   submitted_for_approval_at: string | null;
   department_reviewed_at: string | null;
   department_decision_notes: string | null;
-  signed_by_user_a_at: string | null;
   signed_by_user_b_at: string | null;
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
@@ -63,43 +59,37 @@ function renderExchangeMessage(
   const isOwner = exchange.user_a_id === authUserId;
   const otherUser = isOwner ? exchange.requester : exchange.owner;
   const hasPendingCancellationRequest =
-    exchange.status === "pending_department_approval" &&
+    exchange.status === "pending_validation" &&
     Boolean(exchange.cancellation_requested_by);
 
-  if (exchange.status === "pending_confirmation") {
+  if (exchange.status === "accepted") {
     return isOwner
-      ? `Esperando la confirmacion final de ${otherUser.full_name} para abrir la solicitud formal.`
-      : `${otherUser.full_name} ya ha aceptado el cambio. Confirma ahora para pasar a la firma interna.`;
+      ? `Has aceptado la propuesta de ${otherUser.full_name}. Esperando su firma para enviar a validacion.`
+      : `${otherUser.full_name} ha aceptado tu propuesta. Firma para enviar el expediente a validacion.`;
   }
 
-  if (exchange.status === "confirmed") {
-    const currentUserSigned = isOwner
-      ? Boolean(exchange.signed_by_user_a_at)
-      : Boolean(exchange.signed_by_user_b_at);
-
-    return currentUserSigned
-      ? "Tu firma ya esta registrada. Falta que la otra parte complete la suya para enviar el expediente a aprobacion."
-      : "El acuerdo ya existe. Tu siguiente paso es firmar la solicitud dentro de la app.";
-  }
-
-  if (exchange.status === "pending_department_approval") {
+  if (exchange.status === "pending_validation") {
     if (hasPendingCancellationRequest) {
       return "Hay una retirada pendiente entre participantes. El expediente queda en pausa hasta resolverla.";
     }
 
-    return "Las dos firmas ya estan registradas. Ahora toca esperar la decision del responsable del departamento.";
+    return "La solicitud esta firmada y queda pendiente de validacion por el departamento.";
   }
 
   if (exchange.status === "approved") {
-    return "El intercambio ya ha sido aprobado. Puedes abrir el expediente para revisar la resolucion y exportar el resumen.";
+    return "El intercambio ya ha sido aprobado. Puedes abrir el expediente para revisar la resolucion.";
   }
 
   if (exchange.status === "rejected") {
-    return "El departamento ha rechazado la solicitud. Revisa las observaciones y decide si vuelves a intentarlo.";
+    return "El departamento ha rechazado la solicitud. Revisa las observaciones.";
   }
 
   if (exchange.status === "cancelled") {
-    return "El expediente se ha cancelado antes de cerrarse.";
+    return "El expediente se ha cancelado.";
+  }
+
+  if (exchange.status === "expired") {
+    return "El turno caduco antes de completarse el intercambio.";
   }
 
   return "Este intercambio ya no requiere nuevas acciones.";
@@ -119,7 +109,7 @@ export default async function ExchangesPage() {
       `
       id, shift_id, user_a_id, user_b_id, status, confirmed_at,
       submitted_for_approval_at, department_reviewed_at, department_decision_notes,
-      signed_by_user_a_at, signed_by_user_b_at,
+      signed_by_user_b_at,
       cancellation_requested_by, cancellation_requested_at, created_at,
       shift:shifts!shift_id(
         id,
@@ -167,35 +157,35 @@ export default async function ExchangesPage() {
     ): exchange is ExchangeRow =>
       Boolean(exchange.shift) && Boolean(exchange.owner) && Boolean(exchange.requester)
   );
-  const pendingConfirmation = typedExchanges.filter(
-    (exchange) => exchange.status === "pending_confirmation"
+
+  const pendingSignature = typedExchanges.filter(
+    (exchange) => exchange.status === "accepted"
   );
   const activeWorkflow = typedExchanges.filter(
-    (exchange) =>
-      exchange.status === "confirmed" ||
-      exchange.status === "pending_department_approval"
+    (exchange) => exchange.status === "pending_validation"
   );
   const resolvedWorkflow = typedExchanges.filter(
     (exchange) =>
       exchange.status === "approved" ||
       exchange.status === "rejected" ||
       exchange.status === "cancelled" ||
-      exchange.status === "completed"
+      exchange.status === "completed" ||
+      exchange.status === "expired"
   );
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Acuerdos"
-        title="Intercambios"
-        description="Sigue cada expediente desde la confirmacion inicial hasta la firma, la aprobacion departamental y la resolucion final."
+        title="Cambios"
+        description="Sigue cada expediente desde la propuesta aceptada hasta la firma, la validacion y la resolucion final."
       />
 
       {typedExchanges.length === 0 ? (
         <EmptyState
           icon={<SearchX className="size-5" />}
           title="Todavia no tienes intercambios"
-          description="Cuando el propietario de un turno acepte tu solicitud, el expediente aparecera aqui con sus siguientes pasos."
+          description="Cuando el publicador de un turno acepte tu propuesta, el expediente aparecera aqui."
           action={
             <Link href="/shifts">
               <Button variant="outline">Explorar turnos</Button>
@@ -204,20 +194,19 @@ export default async function ExchangesPage() {
         />
       ) : (
         <>
-          {pendingConfirmation.length > 0 && (
+          {pendingSignature.length > 0 && (
             <section className="space-y-4">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  Pendientes de confirmacion
+                  Pendientes de firma
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Intercambios que aun necesitan la aceptacion final de la otra
-                  parte para arrancar el expediente formal.
+                  El publicador ya acepto tu propuesta. Firma para enviar a validacion.
                 </p>
               </div>
 
               <div className="space-y-4">
-                {pendingConfirmation.map((exchange) => {
+                {pendingSignature.map((exchange) => {
                   const isOwner = exchange.user_a_id === authUser.id;
                   const isRequester = exchange.user_b_id === authUser.id;
                   const otherUser = isOwner ? exchange.requester : exchange.owner;
@@ -249,19 +238,16 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
+                              {isRequester && !exchange.signed_by_user_b_at && (
+                                <Badge variant="outline">
+                                  <FileSignature className="size-3.5" />
+                                  Falta tu firma
+                                </Badge>
+                              )}
                             </div>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            {isRequester && (
-                              <form action={confirmExchange}>
-                                <input type="hidden" name="exchange_id" value={exchange.id} />
-                                <Button type="submit" size="sm">
-                                  Confirmar
-                                </Button>
-                              </form>
-                            )}
-
                             <form action={startConversation}>
                               <input type="hidden" name="shift_id" value={exchange.shift_id} />
                               <input type="hidden" name="other_user_id" value={otherUser.id} />
@@ -271,18 +257,28 @@ export default async function ExchangesPage() {
                               </Button>
                             </form>
 
+                            {isRequester && (
+                              <Link href={`/exchanges/${exchange.id}`}>
+                                <Button size="sm">
+                                  Firmar solicitud
+                                </Button>
+                              </Link>
+                            )}
+
+                            {isOwner && (
+                              <Link href={`/exchanges/${exchange.id}`}>
+                                <Button variant="ghost" size="sm">
+                                  Ver expediente
+                                </Button>
+                              </Link>
+                            )}
+
                             <form action={cancelExchange}>
                               <input type="hidden" name="exchange_id" value={exchange.id} />
                               <Button type="submit" variant="outline" size="sm">
                                 Cancelar
                               </Button>
                             </form>
-
-                            <Link href={`/exchanges/${exchange.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Ver expediente
-                              </Button>
-                            </Link>
                           </div>
                         </div>
                       </CardHeader>
@@ -306,11 +302,10 @@ export default async function ExchangesPage() {
             <section className="space-y-4">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  Solicitud formal en curso
+                  En validacion
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Expedientes que ya han pasado la negociacion y estan en fase
-                  de firma o revision departamental.
+                  Expedientes firmados que estan pendientes de revision por el departamento.
                 </p>
               </div>
 
@@ -322,9 +317,6 @@ export default async function ExchangesPage() {
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
-                  const currentUserSigned = isOwner
-                    ? Boolean(exchange.signed_by_user_a_at)
-                    : Boolean(exchange.signed_by_user_b_at);
 
                   return (
                     <Card key={exchange.id}>
@@ -349,18 +341,10 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
-                              {exchange.status === "confirmed" && !currentUserSigned && (
-                                <Badge variant="outline">
-                                  <FileSignature className="size-3.5" />
-                                  Falta tu firma
-                                </Badge>
-                              )}
-                              {exchange.status === "pending_department_approval" && (
-                                <Badge variant="outline">
-                                  <ShieldCheck className="size-3.5" />
-                                  En revision
-                                </Badge>
-                              )}
+                              <Badge variant="outline">
+                                <ShieldCheck className="size-3.5" />
+                                En revision
+                              </Badge>
                             </div>
                           </div>
 
@@ -376,11 +360,7 @@ export default async function ExchangesPage() {
 
                             <Link href={`/exchanges/${exchange.id}`}>
                               <Button size="sm">
-                                {exchange.status === "confirmed"
-                                  ? currentUserSigned
-                                    ? "Ver firmas"
-                                    : "Firmar solicitud"
-                                  : "Abrir expediente"}
+                                Abrir expediente
                               </Button>
                             </Link>
                           </div>
@@ -409,7 +389,7 @@ export default async function ExchangesPage() {
                   Historial y resoluciones
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Intercambios ya aprobados, rechazados, cancelados o cerrados.
+                  Intercambios aprobados, rechazados, cancelados o caducados.
                 </p>
               </div>
 

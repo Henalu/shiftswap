@@ -152,7 +152,7 @@ export async function approveExchangeRequest(
   }
 
   const target = await getApprovalTarget(exchangeId);
-  if (!target || target.status !== "pending_department_approval") {
+  if (!target || target.status !== "pending_validation") {
     return { error: "La solicitud ya no esta pendiente de aprobacion." };
   }
 
@@ -188,7 +188,7 @@ export async function approveExchangeRequest(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "pending_department_approval");
+    .eq("status", "pending_validation");
 
   if (updateError) {
     return { error: "No se pudo aprobar la solicitud. " + updateError.message };
@@ -199,7 +199,7 @@ export async function approveExchangeRequest(
   }
 
   await resolveNotifications({
-    dedupeKey: `exchange_pending_approval:${exchangeId}`,
+    dedupeKey: `exchange_pending_validation:${exchangeId}`,
     unresolvedOnly: true,
   });
 
@@ -224,7 +224,7 @@ export async function approveExchangeRequest(
     eventType: "department_approved",
     title: "Solicitud aprobada por el departamento",
     details: approvalNotes || "El cambio queda resuelto favorablemente dentro de la app.",
-    fromStatus: "pending_department_approval",
+    fromStatus: "pending_validation",
     toStatus: "approved",
   });
 
@@ -252,7 +252,7 @@ export async function rejectExchangeRequest(
   }
 
   const target = await getApprovalTarget(exchangeId);
-  if (!target || target.status !== "pending_department_approval") {
+  if (!target || target.status !== "pending_validation") {
     return { error: "La solicitud ya no esta pendiente de aprobacion." };
   }
 
@@ -288,7 +288,7 @@ export async function rejectExchangeRequest(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "pending_department_approval");
+    .eq("status", "pending_validation");
 
   if (updateError) {
     return { error: "No se pudo rechazar la solicitud. " + updateError.message };
@@ -301,7 +301,7 @@ export async function rejectExchangeRequest(
   await reopenRejectedShift(target.shift_id, target.user_b_id);
 
   await resolveNotifications({
-    dedupeKey: `exchange_pending_approval:${exchangeId}`,
+    dedupeKey: `exchange_pending_validation:${exchangeId}`,
     unresolvedOnly: true,
   });
 
@@ -327,7 +327,7 @@ export async function rejectExchangeRequest(
     eventType: "department_rejected",
     title: "Solicitud rechazada por el departamento",
     details: rejectionNotes,
-    fromStatus: "pending_department_approval",
+    fromStatus: "pending_validation",
     toStatus: "rejected",
   });
 

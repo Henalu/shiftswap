@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, MessageSquare, Users } from "lucide-react";
-import { InterestButton } from "@/components/shifts/interest-button";
+import { ProposeExchangeDialog } from "@/components/shifts/propose-exchange-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,9 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { startConversation } from "@/app/(dashboard)/chat/actions";
+import { withdrawProposal } from "@/components/shifts/actions";
 import {
+  EXCHANGE_AGREEMENT_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_STYLES,
   SHIFT_STATUS_LABELS,
@@ -21,9 +23,10 @@ import {
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
+import { formatCompensationDateLabel } from "@/lib/exchange-compensation";
 import { formatDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
-import type { ShiftRequestWithUser, ShiftType, ShiftWithUser } from "@/types";
+import type { AcceptedModality, ExchangeAgreementType, RequestStatus, ShiftType, ShiftWithUser } from "@/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -62,14 +65,14 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     department: shiftData.department,
   } as ShiftWithUser;
 
+  // If user has an active exchange for this shift, redirect to it
   const { data: activeExchange } = await supabase
     .from("exchanges")
     .select("id")
     .eq("shift_id", id)
     .in("status", [
-      "pending_confirmation",
-      "confirmed",
-      "pending_department_approval",
+      "accepted",
+      "pending_validation",
       "approved",
       "completed",
     ])
@@ -81,16 +84,17 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     redirect(`/exchanges/${activeExchange.id}`);
   }
 
+  // Mark related notifications as read
   const now = new Date().toISOString();
-
   await supabase
     .from("notifications")
     .update({ read: true, read_at: now })
     .eq("user_id", authUser.id)
-    .in("type", ["shift_request", "request_rejected", "shift_cancelled"])
+    .in("type", ["proposal_received", "proposal_rejected", "shift_cancelled"])
     .eq("read", false)
     .contains("data", { shift_id: id });
 
+  // Load proposals
   const { data: requests } = await supabase
     .from("shift_requests")
     .select(
@@ -104,26 +108,26 @@ export default async function ShiftDetailPage({ params }: PageProps) {
 
   const typedRequests = (requests ?? []).map((request) => ({
     ...request,
-    user: request.user,
-  })) as ShiftRequestWithUser[];
+    user: request.user as { id: string; email: string; full_name: string },
+  }));
 
   const timeRange = formatTimeRange(shift.start_time, shift.end_time);
   const isOwner = authUser.id === shift.user_id;
-  const showInterestButton = !isOwner && shift.status === "open";
-  const myActiveRequest = typedRequests.find(
+  const myActiveProposal = typedRequests.find(
     (request) =>
       request.user.id === authUser.id &&
       (request.status === "pending" || request.status === "accepted")
   );
-  const myRequest = typedRequests.find((request) => request.user.id === authUser.id);
-  const showMessageButton = !isOwner && !!myRequest;
+  const canPropose = !isOwner && shift.status === "open" && !myActiveProposal;
+  const showChatButton = !isOwner;
+  const acceptedModalities = (shift.accepted_modalities ?? ["hours_bank", "shift_exchange"]) as AcceptedModality[];
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Detalle"
         title="Detalle del turno"
-        description="Revisa la informacion clave, compara el horario y decide si quieres iniciar la conversacion o mostrar interes."
+        description="Revisa la informacion clave, compara el horario y decide si quieres proponer un intercambio."
         action={
           <Link href="/shifts">
             <Button variant="ghost">
@@ -177,15 +181,45 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               </p>
             </div>
 
+            {acceptedModalities.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Acepta
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {acceptedModalities.map((modality) => (
+                    <Badge key={modality} variant="outline" className="text-foreground">
+                      {EXCHANGE_AGREEMENT_LABELS[modality]}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
-              {showInterestButton && (
-                <InterestButton
+              {canPropose && (
+                <ProposeExchangeDialog
                   shiftId={shift.id}
-                  initialInterested={!!myActiveRequest}
-                  requestId={myActiveRequest?.id ?? null}
+                  acceptedModalities={acceptedModalities}
                 />
               )}
-              {showMessageButton && (
+
+              {myActiveProposal && myActiveProposal.status === "pending" && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
+                    Propuesta enviada
+                  </Badge>
+                  <form action={withdrawProposal}>
+                    <input type="hidden" name="request_id" value={myActiveProposal.id} />
+                    <input type="hidden" name="shift_id" value={shift.id} />
+                    <Button type="submit" variant="ghost" size="sm">
+                      Retirar propuesta
+                    </Button>
+                  </form>
+                </div>
+              )}
+
+              {showChatButton && (
                 <form action={startConversation}>
                   <input type="hidden" name="shift_id" value={shift.id} />
                   <input type="hidden" name="other_user_id" value={shift.user_id} />
@@ -203,16 +237,18 @@ export default async function ShiftDetailPage({ params }: PageProps) {
           <CardHeader>
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Users className="size-4 text-primary" />
-              Interesados
+              Propuestas
             </div>
             <CardDescription>
-              Personas que han mostrado interes en este turno.
+              {isOwner
+                ? "Propuestas recibidas en este turno."
+                : "Otras personas que han propuesto en este turno."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {typedRequests.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/80 bg-secondary/35 px-4 py-6 text-sm text-muted-foreground">
-                Aun no hay solicitudes. Cuando alguien se interese aparecera aqui.
+                Aun no hay propuestas. Cuando alguien proponga aparecera aqui.
               </div>
             ) : (
               <ul className="space-y-3">
@@ -222,16 +258,29 @@ export default async function ShiftDetailPage({ params }: PageProps) {
                     className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
+                      <div className="min-w-0 space-y-1">
                         <p className="truncate text-sm font-semibold text-foreground">
                           {request.user.full_name}
                         </p>
                         <p className="truncate text-sm text-muted-foreground">
                           {request.user.email}
                         </p>
+                        {request.agreement_type && (
+                          <p className="text-xs text-muted-foreground">
+                            {EXCHANGE_AGREEMENT_LABELS[request.agreement_type as ExchangeAgreementType]}
+                            {request.agreement_type === "shift_exchange" &&
+                              request.compensation_shift_date && (
+                                <>
+                                  {" — "}
+                                  {SHIFT_TYPE_LABELS[request.compensation_shift_type as ShiftType]}{" "}
+                                  del {formatCompensationDateLabel(request.compensation_shift_date)}
+                                </>
+                              )}
+                          </p>
+                        )}
                       </div>
-                      <Badge className={REQUEST_STATUS_STYLES[request.status]}>
-                        {REQUEST_STATUS_LABELS[request.status]}
+                      <Badge className={REQUEST_STATUS_STYLES[request.status as RequestStatus]}>
+                        {REQUEST_STATUS_LABELS[request.status as RequestStatus]}
                       </Badge>
                     </div>
                   </li>

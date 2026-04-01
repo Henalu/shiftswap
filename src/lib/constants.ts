@@ -27,8 +27,7 @@ export const SHIFT_TYPE_STYLES = {
 
 export const SHIFT_STATUS_LABELS = {
   open: "Disponible",
-  pending: "En negociacion",
-  confirmed: "Confirmado",
+  negotiating: "En tramite",
   completed: "Completado",
   cancelled: "Cancelado",
   expired: "Caducado",
@@ -42,22 +41,20 @@ export const REQUEST_STATUS_LABELS = {
 } as const satisfies Record<RequestStatus, string>;
 
 export const EXCHANGE_STATUS_LABELS = {
-  pending_confirmation: "Pendiente de confirmacion",
-  confirmed: "Pendiente de firmas",
-  pending_department_approval: "Pendiente de aprobacion",
+  accepted: "Aceptado",
+  pending_validation: "Pendiente de validacion",
   approved: "Aprobado",
   rejected: "Rechazado",
   completed: "Completado",
   cancelled: "Cancelado",
+  expired: "Caducado",
 } as const satisfies Record<ExchangeStatus, string>;
 
 export const SHIFT_STATUS_STYLES = {
   open:
     "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  pending:
+  negotiating:
     "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  confirmed:
-    "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   completed:
     "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   cancelled:
@@ -78,11 +75,9 @@ export const REQUEST_STATUS_STYLES = {
 } as const satisfies Record<RequestStatus, string>;
 
 export const EXCHANGE_STATUS_STYLES = {
-  pending_confirmation:
-    "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  confirmed:
+  accepted:
     "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  pending_department_approval:
+  pending_validation:
     "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
   approved:
     "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -92,6 +87,8 @@ export const EXCHANGE_STATUS_STYLES = {
     "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   cancelled:
     "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  expired:
+    "border-slate-400/15 bg-slate-400/10 text-slate-500 dark:text-slate-400",
 } as const satisfies Record<ExchangeStatus, string>;
 
 export const EXCHANGE_AGREEMENT_LABELS = {

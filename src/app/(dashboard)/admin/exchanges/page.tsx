@@ -91,7 +91,7 @@ export default async function AdminExchangesPage() {
       )
     `
     )
-    .in("status", ["pending_department_approval", "approved", "rejected"])
+    .in("status", ["pending_validation", "approved", "rejected"])
     .order("submitted_for_approval_at", { ascending: false });
 
   if (error) {
@@ -145,7 +145,7 @@ export default async function AdminExchangesPage() {
   );
 
   const pendingExchanges = scopedExchanges.filter(
-    (exchange) => exchange.status === "pending_department_approval"
+    (exchange) => exchange.status === "pending_validation"
   );
   const resolvedExchanges = scopedExchanges
     .filter(

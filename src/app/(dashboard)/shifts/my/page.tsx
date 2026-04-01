@@ -13,25 +13,28 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import {
+  EXCHANGE_AGREEMENT_LABELS,
   EXCHANGE_STATUS_LABELS,
   EXCHANGE_STATUS_STYLES,
-  REQUEST_STATUS_LABELS,
-  REQUEST_STATUS_STYLES,
   SHIFT_STATUS_LABELS,
   SHIFT_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
+import { formatCompensationDateLabel } from "@/lib/exchange-compensation";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
-import { acceptRequest, rejectRequest } from "./actions";
-import type { ExchangeStatus, RequestStatus, ShiftType } from "@/types";
+import { acceptProposal, rejectProposal } from "./actions";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
-interface RequestWithUser {
+interface ProposalWithUser {
   id: string;
   shift_id: string;
   interested_user_id: string;
-  status: RequestStatus;
+  agreement_type: string | null;
+  compensation_shift_date: string | null;
+  compensation_shift_type: string | null;
+  status: string;
   created_at: string;
   requester: {
     id: string;
@@ -40,7 +43,7 @@ interface RequestWithUser {
   };
 }
 
-interface ShiftWithRequests {
+interface ShiftWithProposals {
   id: string;
   date: string;
   start_time: string;
@@ -49,7 +52,7 @@ interface ShiftWithRequests {
   status: string;
   description: string | null;
   department: { id: string; name: string };
-  shift_requests: RequestWithUser[];
+  shift_requests: ProposalWithUser[];
 }
 
 interface ActiveExchange {
@@ -83,7 +86,8 @@ export default async function MyShiftsPage() {
       id, date, start_time, end_time, shift_type, status, description,
       department:departments!department_id(id, name),
       shift_requests(
-        id, shift_id, interested_user_id, status, created_at,
+        id, shift_id, interested_user_id, agreement_type,
+        compensation_shift_date, compensation_shift_type, status, created_at,
         requester:user_profiles!interested_user_id(id, email, full_name)
       )
     `
@@ -91,7 +95,7 @@ export default async function MyShiftsPage() {
     .eq("user_id", authUser.id)
     .order("date", { ascending: false });
 
-  const typedShifts = (shifts ?? []) as unknown as ShiftWithRequests[];
+  const typedShifts = (shifts ?? []) as unknown as ShiftWithProposals[];
   const shiftIds = typedShifts.map((shift) => shift.id);
 
   const { data: activeExchanges } =
@@ -108,9 +112,8 @@ export default async function MyShiftsPage() {
           )
           .in("shift_id", shiftIds)
           .in("status", [
-            "pending_confirmation",
-            "confirmed",
-            "pending_department_approval",
+            "accepted",
+            "pending_validation",
             "approved",
             "completed",
           ])
@@ -128,7 +131,7 @@ export default async function MyShiftsPage() {
       <PageHeader
         eyebrow="Gestion"
         title="Mis turnos"
-        description="Supervisa tus publicaciones, revisa solicitudes pendientes y detecta rapido cuando un turno ya esta evolucionando hacia un intercambio."
+        description="Supervisa tus publicaciones, revisa propuestas pendientes y detecta rapido cuando un turno ya esta evolucionando hacia un intercambio."
         action={
           <Link href="/shifts/new">
             <Button>
@@ -143,7 +146,7 @@ export default async function MyShiftsPage() {
         <EmptyState
           icon={<CalendarDays className="size-5" />}
           title="Aun no has publicado ningun turno"
-          description="Cuando publiques tu primer turno podras gestionar solicitudes, negociar y seguir el estado del intercambio desde aqui."
+          description="Cuando publiques tu primer turno podras gestionar propuestas y seguir el estado del intercambio desde aqui."
           action={
             <Link href="/shifts/new">
               <Button variant="outline">Publicar tu primer turno</Button>
@@ -159,18 +162,13 @@ export default async function MyShiftsPage() {
               ? `/exchanges/${activeExchange.id}`
               : `/shifts/${shift.id}`;
             const detailLabel = activeExchange ? "Ver intercambio" : "Ver detalle";
-            const pendingRequests = shift.shift_requests.filter(
+            const pendingProposals = shift.shift_requests.filter(
               (request) =>
                 request.status === "pending" &&
                 request.interested_user_id !== activeExchange?.user_b_id
             );
-            const otherRequests = shift.shift_requests.filter(
-              (request) =>
-                request.status !== "pending" &&
-                request.interested_user_id !== activeExchange?.user_b_id
-            );
             const hasPendingCancellationRequest =
-              activeExchange?.status === "pending_department_approval" &&
+              activeExchange?.status === "pending_validation" &&
               Boolean(activeExchange.cancellation_requested_by);
             const isCancellationRequester =
               hasPendingCancellationRequest &&
@@ -212,10 +210,9 @@ export default async function MyShiftsPage() {
                           {detailLabel}
                         </Button>
                       </Link>
-                      {!activeExchange &&
-                        (shift.status === "open" || shift.status === "pending") && (
-                          <CancelShiftButton shiftId={shift.id} />
-                        )}
+                      {!activeExchange && shift.status === "open" && (
+                        <CancelShiftButton shiftId={shift.id} />
+                      )}
                     </div>
                   </div>
 
@@ -254,97 +251,75 @@ export default async function MyShiftsPage() {
                           {hasPendingCancellationRequest ? (
                             isCancellationRequester ? (
                               <>
-                                Ya has solicitado la cancelacion de este intercambio
-                                firmado. Queda pendiente de respuesta por la otra
-                                parte.
+                                Ya has solicitado la cancelacion. Queda pendiente
+                                de respuesta por la otra parte.
                               </>
                             ) : (
                               <>
-                                La otra parte ha solicitado cancelar este intercambio
-                                firmado. Entra en el intercambio para confirmarlo o
-                                rechazarlo.
+                                La otra parte ha solicitado cancelar este intercambio.
+                                Entra en el intercambio para confirmarlo o rechazarlo.
                               </>
                             )
+                          ) : activeExchange.status === "accepted" ? (
+                            <>
+                              Propuesta aceptada. Cuando la otra parte firme, el
+                              expediente pasara a validacion.
+                            </>
                           ) : (
                             <>
                               Este caso ya se gestiona como intercambio. Usa la vista
-                              de detalle para consultar firmas, aprobacion, historial
-                              y acciones disponibles.
+                              de detalle para consultar el estado y las acciones disponibles.
                             </>
                           )}
                         </p>
                       </div>
-
-                      {shift.shift_requests.length > 1 && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <Users className="size-4 text-primary" />
-                            Otras solicitudes
-                          </div>
-                          {pendingRequests.length === 0 && otherRequests.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              No hay otras solicitudes asociadas a este turno.
-                            </p>
-                          ) : (
-                            <ul className="space-y-3">
-                              {[...pendingRequests, ...otherRequests].map((request) => (
-                                <li
-                                  key={request.id}
-                                  className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
-                                >
-                                  <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-semibold text-foreground">
-                                        {request.requester.full_name}
-                                      </p>
-                                      <p className="truncate text-sm text-muted-foreground">
-                                        {request.requester.email}
-                                      </p>
-                                    </div>
-                                    <Badge className={REQUEST_STATUS_STYLES[request.status]}>
-                                      {REQUEST_STATUS_LABELS[request.status]}
-                                    </Badge>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      )}
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <Users className="size-4 text-primary" />
-                        Interesados ({shift.shift_requests.length})
+                        Propuestas ({pendingProposals.length})
                       </div>
 
-                      {shift.shift_requests.length === 0 ? (
+                      {pendingProposals.length === 0 ? (
                         <p className="rounded-2xl border border-dashed border-border/80 bg-secondary/35 px-4 py-6 text-sm text-muted-foreground">
-                          Todavia nadie ha mostrado interes por este turno.
+                          Todavia nadie ha propuesto por este turno.
                         </p>
                       ) : (
                         <ul className="space-y-3">
-                          {pendingRequests.map((request) => (
+                          {pendingProposals.map((proposal) => (
                             <li
-                              key={request.id}
+                              key={proposal.id}
                               className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
                             >
                               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="min-w-0">
+                                <div className="min-w-0 space-y-1">
                                   <p className="truncate text-sm font-semibold text-foreground">
-                                    {request.requester.full_name}
+                                    {proposal.requester.full_name}
                                   </p>
                                   <p className="truncate text-sm text-muted-foreground">
-                                    {request.requester.email}
+                                    {proposal.requester.email}
                                   </p>
+                                  {proposal.agreement_type && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {EXCHANGE_AGREEMENT_LABELS[proposal.agreement_type as ExchangeAgreementType]}
+                                      {proposal.agreement_type === "shift_exchange" &&
+                                        proposal.compensation_shift_date && (
+                                          <>
+                                            {" — "}
+                                            {SHIFT_TYPE_LABELS[proposal.compensation_shift_type as ShiftType]}{" "}
+                                            del {formatCompensationDateLabel(proposal.compensation_shift_date)}
+                                          </>
+                                        )}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <form action={acceptRequest}>
+                                  <form action={acceptProposal}>
                                     <input
                                       type="hidden"
                                       name="request_id"
-                                      value={request.id}
+                                      value={proposal.id}
                                     />
                                     <input
                                       type="hidden"
@@ -355,11 +330,11 @@ export default async function MyShiftsPage() {
                                       Aceptar
                                     </Button>
                                   </form>
-                                  <form action={rejectRequest}>
+                                  <form action={rejectProposal}>
                                     <input
                                       type="hidden"
                                       name="request_id"
-                                      value={request.id}
+                                      value={proposal.id}
                                     />
                                     <input
                                       type="hidden"
@@ -371,27 +346,6 @@ export default async function MyShiftsPage() {
                                     </Button>
                                   </form>
                                 </div>
-                              </div>
-                            </li>
-                          ))}
-
-                          {otherRequests.map((request) => (
-                            <li
-                              key={request.id}
-                              className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-foreground">
-                                    {request.requester.full_name}
-                                  </p>
-                                  <p className="truncate text-sm text-muted-foreground">
-                                    {request.requester.email}
-                                  </p>
-                                </div>
-                                <Badge className={REQUEST_STATUS_STYLES[request.status]}>
-                                  {REQUEST_STATUS_LABELS[request.status]}
-                                </Badge>
                               </div>
                             </li>
                           ))}

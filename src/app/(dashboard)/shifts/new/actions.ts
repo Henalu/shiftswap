@@ -23,10 +23,21 @@ export async function createShift(
   const submittedStartTime = formData.get("start_time") as string | null;
   const submittedEndTime = formData.get("end_time") as string | null;
   const description = (formData.get("description") as string) || null;
+  const acceptedModalities = formData.getAll("accepted_modalities") as string[];
 
   if (!date || !shiftType) {
     return {
       error: "Completa la fecha y el tipo de turno para poder publicarlo.",
+    };
+  }
+
+  const validModalities = acceptedModalities.filter(
+    (m) => m === "hours_bank" || m === "shift_exchange"
+  );
+
+  if (validModalities.length === 0) {
+    return {
+      error: "Selecciona al menos una modalidad de compensacion.",
     };
   }
 
@@ -111,6 +122,7 @@ export async function createShift(
     end_time: schedule.endTime,
     shift_type: shiftType,
     description: description || undefined,
+    accepted_modalities: validModalities,
     status: "open",
   });
 

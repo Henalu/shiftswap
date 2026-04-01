@@ -14,13 +14,13 @@ interface WorkflowStep {
 }
 
 function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
-  const agreementComplete = status !== "pending_confirmation";
-  const signaturesComplete =
-    status === "pending_department_approval" ||
+  const proposalAccepted = true; // Always true once exchange exists
+  const signatureComplete =
+    status === "pending_validation" ||
     status === "approved" ||
     status === "rejected" ||
     status === "completed";
-  const approvalComplete =
+  const validationComplete =
     status === "approved" || status === "rejected" || status === "completed";
   const resolvedComplete =
     status === "approved" ||
@@ -30,28 +30,28 @@ function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
 
   return [
     {
-      key: "agreement",
-      label: "Acuerdo",
-      description: "Ambas personas aceptan negociar el cambio.",
-      state: agreementComplete ? "complete" : "current",
+      key: "proposal",
+      label: "Propuesta aceptada",
+      description: "El propietario acepta una propuesta de intercambio.",
+      state: proposalAccepted ? "complete" : "current",
     },
     {
-      key: "signatures",
-      label: "Firmas",
-      description: "La solicitud formal se firma dentro de la app.",
-      state: signaturesComplete
+      key: "signature",
+      label: "Firma",
+      description: "El solicitante firma la solicitud dentro de la app.",
+      state: signatureComplete
         ? "complete"
-        : status === "confirmed"
+        : status === "accepted"
           ? "current"
           : "upcoming",
     },
     {
-      key: "approval",
-      label: "Aprobacion",
+      key: "validation",
+      label: "Validacion",
       description: "El responsable del departamento revisa y decide.",
-      state: approvalComplete
+      state: validationComplete
         ? "complete"
-        : status === "pending_department_approval"
+        : status === "pending_validation"
           ? "current"
           : "upcoming",
     },

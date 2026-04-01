@@ -72,7 +72,11 @@ export function getHoursBankTransactionStatusForExchange(
     return "active";
   }
 
-  if (exchangeStatus === "rejected" || exchangeStatus === "cancelled") {
+  if (
+    exchangeStatus === "rejected" ||
+    exchangeStatus === "cancelled" ||
+    exchangeStatus === "expired"
+  ) {
     return "voided";
   }
 

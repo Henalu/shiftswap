@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { cancelShift } from "@/app/(dashboard)/shifts/my/actions";
+import { cancelShift } from "@/components/shifts/actions";
 
 interface CancelShiftButtonProps {
   shiftId: string;

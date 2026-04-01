@@ -146,6 +146,35 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
               : "Selecciona primero el tipo de turno para ver el horario que se publicara."}
           </p>
 
+          <div className="space-y-3">
+            <Label>Modalidades aceptadas</Label>
+            <p className="text-sm text-muted-foreground">
+              Elige que tipo de propuestas quieres recibir para este turno.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="accepted_modalities"
+                  value="hours_bank"
+                  defaultChecked
+                  className="size-4 rounded border-border"
+                />
+                Bolsa de horas
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="accepted_modalities"
+                  value="shift_exchange"
+                  defaultChecked
+                  className="size-4 rounded border-border"
+                />
+                Intercambio de turno
+              </label>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="description">Notas opcionales</Label>
             <textarea
@@ -164,7 +193,7 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
 
         <CardFooter className="flex flex-wrap justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            El turno se publicara listo para recibir interes.
+            El turno se publicara listo para recibir propuestas.
           </p>
           <Button type="submit">Publicar turno</Button>
         </CardFooter>

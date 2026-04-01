@@ -13,9 +13,8 @@ import type {
 } from "@/types";
 
 export const ACTIVE_EXCHANGE_STATUSES: readonly ExchangeStatus[] = [
-  "pending_confirmation",
-  "confirmed",
-  "pending_department_approval",
+  "accepted",
+  "pending_validation",
   "approved",
   "completed",
 ];
@@ -25,25 +24,25 @@ export const EXCHANGE_HISTORY_STATUSES: readonly ExchangeStatus[] = [
   "rejected",
   "completed",
   "cancelled",
+  "expired",
 ];
 
 export const EXCHANGE_CAN_CHAT_STATUSES: readonly ExchangeStatus[] = [
-  "pending_confirmation",
-  "confirmed",
-  "pending_department_approval",
+  "accepted",
+  "pending_validation",
   "approved",
 ];
 
 export const EXCHANGE_SUPPORTING_DOCUMENT_STATUSES: readonly ExchangeStatus[] = [
-  "confirmed",
-  "pending_department_approval",
+  "accepted",
+  "pending_validation",
   "approved",
   "rejected",
 ];
 
 export const EXCHANGE_EXPORTABLE_STATUSES: readonly ExchangeStatus[] = [
-  "confirmed",
-  "pending_department_approval",
+  "accepted",
+  "pending_validation",
   "approved",
   "rejected",
   "completed",

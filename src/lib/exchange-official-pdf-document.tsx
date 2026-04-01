@@ -460,7 +460,7 @@ function getDecisionText(exchange: ExchangeOfficialPdfData): string {
     return "Solicitud rechazada por el taller o departamento.";
   }
 
-  if (exchange.status === "pending_department_approval") {
+  if (exchange.status === "pending_validation") {
     return "Pendiente de resolución por parte del taller o departamento.";
   }
 
