@@ -36,11 +36,31 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
     .select("role, company_id, department_id")
     .eq("id", authUser.id)
     .maybeSingle();
+
+  if (!profile && profileError) {
+    // DB error (e.g. RLS issue) — do NOT redirect to /profile to avoid loop
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Marketplace interno"
+          title="Turnos disponibles"
+          description="No se ha podido cargar tu perfil."
+        />
+        <div className="rounded-2xl border border-destructive/15 bg-destructive/10 p-6 text-sm text-foreground">
+          <p className="font-semibold">Error al cargar los datos</p>
+          <p className="mt-2 text-muted-foreground">
+            No hemos podido obtener tu perfil para mostrar los turnos. Recarga la pagina
+            o contacta con un administrador si el problema persiste.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!profile?.department_id) {
     redirect("/profile?setup=1");

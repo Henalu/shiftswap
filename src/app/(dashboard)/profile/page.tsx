@@ -69,7 +69,10 @@ export default async function ProfilePage() {
   }
 
   const adminClient = createAdminClient();
-  const { data: profile, error: profileError } = await adminClient
+  let profile: ProfilePageProfile | null = null;
+  let profileLoadError = false;
+
+  const { data: profileData, error: profileError } = await adminClient
     .from("user_profiles")
     .select(
       "id, full_name, email, phone, avatar_url, signature_url, employee_id, company_id, department_id, job_position_id"
@@ -79,11 +82,40 @@ export default async function ProfilePage() {
 
   if (profileError) {
     console.error("[profile/page] DB error fetching profile:", profileError);
-    redirect("/shifts");
+    // Fallback: try a minimal query without potentially-missing columns
+    const { data: fallback } = await adminClient
+      .from("user_profiles")
+      .select("id, full_name, email, phone, avatar_url, employee_id, company_id, department_id, job_position_id")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    if (fallback) {
+      profile = { ...fallback, signature_url: null } as ProfilePageProfile;
+    } else {
+      profileLoadError = true;
+    }
+  } else {
+    profile = profileData as ProfilePageProfile | null;
   }
 
-  if (!profile) {
-    redirect("/shifts");
+  if (profileLoadError || !profile) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <PageHeader
+          eyebrow="Cuenta"
+          title="Mi perfil"
+          description="No se ha podido cargar tu perfil."
+        />
+        <div className="rounded-2xl border border-destructive/15 bg-destructive/10 p-6 text-sm text-foreground">
+          <p className="font-semibold">Error al cargar el perfil</p>
+          <p className="mt-2 text-muted-foreground">
+            No hemos podido obtener tus datos. Esto puede ocurrir si faltan migraciones
+            en la base de datos o si hay un problema temporal de conexion. Intenta
+            recargar la pagina.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const [

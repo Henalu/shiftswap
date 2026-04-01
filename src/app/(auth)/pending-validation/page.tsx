@@ -26,7 +26,26 @@ export default async function PendingValidationPage() {
   const accountState = await getAccountGateState(user.id);
 
   if (!accountState) {
-    redirect("/profile?setup=1");
+    // No profile row yet — show pending state, do NOT redirect to /profile (it's inside the dashboard gate)
+    return (
+      <Card className="border-border/80">
+        <CardHeader className="space-y-3">
+          <CardTitle>Cuenta pendiente de revision</CardTitle>
+          <CardDescription>
+            Tu solicitud ya esta registrada y ahora debe revisarla un administrador.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          <p>
+            Hasta que tu cuenta se valide, no podras entrar al dashboard. En cuanto se
+            apruebe, podras iniciar sesion con normalidad.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <LogoutButton />
+        </CardFooter>
+      </Card>
+    );
   }
 
   if (accountState.validation_status === "approved") {

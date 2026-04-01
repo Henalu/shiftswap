@@ -56,9 +56,12 @@ src/
 │   │   │   ├── page.tsx            # Lista de expedientes + fases del workflow + boton Chat
 │   │   │   ├── [id]/page.tsx       # Expediente formal + firmas + aprobacion + PDF corporativo
 │   │   │   └── actions.ts          # confirm/cancel + sign + retirada + soporte documental
+│   │   ├── help/
+│   │   │   └── page.tsx            # FAQ con secciones por rol (member + admin)
+│   │   ├── onboarding-actions.ts   # completeOnboarding server action
 │   │   ├── profile/
-│   │   │   ├── page.tsx            # Perfil (Server Component)
-│   │   │   ├── profile-form.tsx    # Formulario perfil + avatar upload
+│   │   │   ├── page.tsx            # Perfil (Server Component) — safe landing, never redirects to /shifts
+│   │   │   ├── profile-form.tsx    # Formulario perfil + avatar upload + firma digital
 │   │   │   └── actions.ts          # updateProfile (INSERT o UPDATE)
 │   │   ├── admin/
 │   │   │   ├── page.tsx            # Dashboard admin
@@ -82,8 +85,11 @@ src/
 ├── components/
 │   ├── layout/
 │   │   ├── header.tsx              # Logo + mobile nav + avatar dropdown
-│   │   ├── notification-bell.tsx   # Centro de notificaciones + badge + navegación
+│   │   ├── notification-bell.tsx   # Centro de notificaciones + badge + navegacion
+│   │   ├── onboarding-modal.tsx    # Modal primera sesion con links a firma/ayuda + "no volver a mostrar"
 │   │   └── sidebar-nav.tsx         # Client Component con active state
+│   ├── profile/
+│   │   └── signature-pad.tsx       # Canvas de firma digital (upload a Supabase Storage)
 │   ├── shifts/
 │   │   ├── shift-card.tsx
 │   │   ├── shift-filters.tsx       # Filtros por URL searchParams
@@ -130,7 +136,8 @@ supabase/
 │   ├── 00022_normalize_shift_schedule.sql      # Horarios oficiales por shift_type
 │   ├── 00023_job_positions_and_profile_scope.sql # Puestos de trabajo por departamento operativo
 │   ├── 00024_job_position_change_requests.sql  # Solicitudes de cambio de puesto
-│   └── 00025_pilot_readiness_and_billing_foundation.sql # Rate limiting + billing foundation
+│   ├── 00025_pilot_readiness_and_billing_foundation.sql # Rate limiting + billing foundation
+│   └── 00028_phase3_signature_and_onboarding.sql # signature_url, onboarding_completed_at, signatures bucket
 └── seeds/
     └── 01_demo_data.sql            # 1 empresa + 3 departamentos (UUIDs fijos)
 ```
@@ -195,6 +202,23 @@ supabase/
 - **Rutas publicas operativas:** `/api/health` y el webhook de Stripe deben seguir accesibles fuera del gate del dashboard.
 - **Emails transaccionales base:** Resend se usa de forma optativa para aprobacion y rechazo de cuenta; faltan aun los correos del ciclo comercial completo.
 
+### Firma digital - patrones clave
+- **Fuente de verdad:** `user_profiles.signature_url` apunta al PNG subido a Supabase Storage (bucket `signatures`, path `{userId}/signature.png`).
+- **Gate obligatorio:** `requireSignature(userId)` en `src/lib/user-profiles.ts` devuelve `{ error }` si no hay firma. Se aplica en: `createShift`, `proposeExchange`, `acceptProposal`, `signAsInterested`, `approveExchangeRequest`, `rejectExchangeRequest`.
+- **Componente:** `SignaturePad` en `src/components/profile/signature-pad.tsx` — canvas vanilla (480x200), soporte tactil, guarda PNG a Storage.
+- **PDF:** ambos documentos (`exchange-pdf-document.tsx` y `exchange-official-pdf-document.tsx`) renderizan la firma como `<PdfImage>` cuando la URL existe.
+
+### Onboarding - patrones clave
+- **Trigger:** `user_profiles.onboarding_completed_at IS NULL` -> mostrar modal.
+- **Componente:** `OnboardingModal` en `src/components/layout/onboarding-modal.tsx`, renderizado en el dashboard layout.
+- **Checkbox:** "No volver a mostrar" llama a `completeOnboarding()` server action que persiste timestamp.
+- **Sin bloqueo:** el modal es informativo, no impide usar la app.
+
+### Help - patrones clave
+- **Ruta:** `/help` dentro del grupo `(dashboard)`, accesible para todos los roles.
+- **Contenido por rol:** miembros ven secciones basicas; admins ven ademas aprobaciones, validaciones y gestion de departamento.
+- **Navegacion:** presente en `ACCOUNT_NAVIGATION_ITEMS` con icono `CircleHelp`.
+
 ## Convenciones de Código
 
 ### Nombrado
@@ -222,6 +246,13 @@ supabase/
 - Turnos nocturnos (fin < inicio) son válidos — no validar que `end_time > start_time`
 - Si trabajas en notificaciones, asumir que la base activa debe tener aplicadas `00013_notifications_center.sql` y `00014_notification_center_state_and_dedupe.sql`
 - Server Actions que mutan estado deben devolver `{ success: true }` (no `null`) para que Client Components reaccionen visualmente sin esperar re-render
+
+### Redirects entre paginas — reglas de seguridad
+- **`/profile` es la pagina segura del dashboard:** nunca redirigir desde perfil a `/shifts` ni a ninguna pagina que pueda redirigir de vuelta a `/profile`. Si la carga falla, mostrar error en la propia pagina.
+- **Antes de anadir `redirect(X)` en cualquier pagina, verificar** que X no redirige de vuelta al origen bajo ninguna condicion (error de DB, columna inexistente, perfil incompleto). El grafo de redirects debe ser un DAG, nunca un ciclo.
+- **Diferenciar query fallida de dato ausente:** si la query falla (error de DB), mostrar error en pagina. Si el dato es null pero la query funciono (p.ej. `department_id` ausente), redirigir al lugar correcto.
+- **Columnas nuevas en queries criticas:** si se anade una columna nueva a un SELECT critico (perfil, layout), incluir un fallback por si la migracion no esta aplicada. Mejor aun: hacer la query de columnas nuevas por separado.
+- **Referencia completa:** ver `LESSONS.md` para el historial de bugs y patrones defensivos.
 
 ### Estilos
 - Tailwind CSS como sistema principal

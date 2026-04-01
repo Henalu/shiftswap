@@ -18,11 +18,30 @@ export default async function NewShiftPage() {
   }
 
   const adminClient = createAdminClient();
-  const { data: profile } = await adminClient
+  const { data: profile, error: profileError } = await adminClient
     .from("user_profiles")
     .select("department_id")
     .eq("id", authUser.id)
-    .single();
+    .maybeSingle();
+
+  if (!profile && profileError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Publicacion"
+          title="Publicar nuevo turno"
+          description="No se ha podido cargar tu perfil."
+        />
+        <div className="rounded-2xl border border-destructive/15 bg-destructive/10 p-6 text-sm text-foreground">
+          <p className="font-semibold">Error al cargar los datos</p>
+          <p className="mt-2 text-muted-foreground">
+            No hemos podido verificar tu departamento para publicar un turno. Recarga la
+            pagina o contacta con un administrador.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!profile?.department_id) {
     redirect("/profile?setup=1");
