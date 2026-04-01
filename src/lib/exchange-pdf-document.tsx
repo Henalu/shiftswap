@@ -50,6 +50,7 @@ export interface ExchangePdfPerson {
   employee_id: string | null;
   category: string | null;
   position: string | null;
+  signature_url: string | null;
 }
 
 export interface ExchangePdfApprover {
@@ -652,11 +653,13 @@ function SignatureCard({
   role,
   signerName,
   signedAt,
+  signatureImageUrl,
 }: {
   title: string;
   role: string;
   signerName: string;
   signedAt: string | null;
+  signatureImageUrl?: string | null;
 }) {
   const isSigned = Boolean(signedAt);
   const badgeStyle = isSigned
@@ -701,6 +704,13 @@ function SignatureCard({
             )} a las ${formatTime(signedAt as string)}.`
           : "La firma aun no consta dentro del expediente exportado."}
       </Text>
+
+      {isSigned && signatureImageUrl ? (
+        <PdfImage
+          src={signatureImageUrl}
+          style={{ width: 160, height: 60, objectFit: "contain", marginBottom: 6 }}
+        />
+      ) : null}
 
       <View style={styles.signatureLineWrap}>
         <View style={styles.signatureLine}>
@@ -877,12 +887,14 @@ export function ExchangeCorporatePdf({
               role="Firma del propietario"
               signerName={ownerSignerName}
               signedAt={exchange.signed_by_user_a_at}
+              signatureImageUrl={exchange.owner.signature_url}
             />
             <SignatureCard
               title={exchange.requester.full_name}
               role="Firma del solicitante"
               signerName={requesterSignerName}
               signedAt={exchange.signed_by_user_b_at}
+              signatureImageUrl={exchange.requester.signature_url}
             />
           </View>
         </View>

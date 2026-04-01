@@ -15,6 +15,7 @@ import {
   syncHoursBankDebtTransactionStatus,
   upsertHoursBankDebtTransaction,
 } from "@/lib/exchange-compensation";
+import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
@@ -135,6 +136,9 @@ export async function signAsInterested(
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "No autenticado." };
+
+  const signatureCheck = await requireSignature(user.id);
+  if (signatureCheck.error) return { error: signatureCheck.error };
 
   const { data: exchange } = await supabase
     .from("exchanges")

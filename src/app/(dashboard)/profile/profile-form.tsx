@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SignaturePad } from "@/components/profile/signature-pad";
 import { PANEL_CLASSNAME, cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfile } from "./actions";
@@ -38,7 +39,7 @@ import type { UserProfile } from "@/types";
 interface ProfileFormProps {
   profile: Pick<
     UserProfile,
-    "full_name" | "email" | "phone" | "avatar_url" | "employee_id"
+    "full_name" | "email" | "phone" | "avatar_url" | "signature_url" | "employee_id"
   >;
   companyName: string;
   areaName: string;
@@ -89,6 +90,9 @@ export function ProfileForm({
   const [email, setEmail] = useState(profile.email ?? "");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     profile.avatar_url ?? null
+  );
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(
+    profile.signature_url ?? null
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -238,6 +242,24 @@ export function ProfileForm({
               onChange={handleFileChange}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-2">
+          <CardTitle>Firma digital</CardTitle>
+          <CardDescription>
+            Tu firma se usara automaticamente en todos los documentos que firmes
+            dentro de ShiftSwap. Configurarla es obligatorio para operar en la
+            plataforma.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SignaturePad
+            userId={userId}
+            currentSignatureUrl={signatureUrl}
+            onSaved={setSignatureUrl}
+          />
         </CardContent>
       </Card>
 

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { OnboardingModal } from "@/components/layout/onboarding-modal";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { AlertTriangle } from "lucide-react";
 import { resolveBillingGateState } from "@/lib/billing";
@@ -25,7 +26,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const [accountState, { data: profile }, { data: notifications }, unreadResult] =
+  const [accountState, { data: profile }, { data: notifications }, unreadResult, { data: onboardingRow }] =
     await Promise.all([
       getAccountGateState(authUser.id),
       supabase
@@ -46,6 +47,11 @@ export default async function DashboardLayout({
         .eq("user_id", authUser.id)
         .eq("read", false)
         .is("resolved_at", null),
+      supabase
+        .from("user_profiles")
+        .select("onboarding_completed_at")
+        .eq("id", authUser.id)
+        .maybeSingle(),
     ]);
 
   if (
@@ -65,6 +71,7 @@ export default async function DashboardLayout({
   const typedNotifications = (notifications ?? []) as Notification[];
   const unreadCount = unreadResult.count ?? 0;
   const role = accountState?.role ?? "member";
+  const showOnboarding = !(onboardingRow as { onboarding_completed_at: string | null } | null)?.onboarding_completed_at;
 
   let companyName: string | undefined;
   if (accountState?.company_id) {
@@ -118,6 +125,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <MobileBottomNav />
+      {showOnboarding && <OnboardingModal />}
     </div>
   );
 }

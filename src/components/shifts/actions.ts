@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import { isExchangeAgreementType } from "@/lib/exchange-compensation";
 import { isShiftType } from "@/lib/shifts";
+import { requireSignature } from "@/lib/user-profiles";
 import { formatShortDate } from "@/lib/utils";
 
 export interface ProposalState {
@@ -31,6 +32,9 @@ export async function proposeExchange(
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Debes iniciar sesion." };
+
+  const signatureCheck = await requireSignature(user.id);
+  if (signatureCheck.error) return { error: signatureCheck.error };
 
   const [{ data: profile }, { data: shift }] = await Promise.all([
     supabase

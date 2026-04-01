@@ -10,6 +10,7 @@ import {
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 import type { ExchangeAgreementType, ExchangeStatus } from "@/types";
 
@@ -151,6 +152,9 @@ export async function approveExchangeRequest(
     return { error: "No tienes permisos para aprobar este cambio." };
   }
 
+  const signatureCheck = await requireSignature(actor.id);
+  if (signatureCheck.error) return { error: signatureCheck.error };
+
   const target = await getApprovalTarget(exchangeId);
   if (!target || target.status !== "pending_validation") {
     return { error: "La solicitud ya no esta pendiente de aprobacion." };
@@ -250,6 +254,9 @@ export async function rejectExchangeRequest(
   if (!actor) {
     return { error: "No tienes permisos para rechazar este cambio." };
   }
+
+  const signatureCheck = await requireSignature(actor.id);
+  if (signatureCheck.error) return { error: signatureCheck.error };
 
   const target = await getApprovalTarget(exchangeId);
   if (!target || target.status !== "pending_validation") {

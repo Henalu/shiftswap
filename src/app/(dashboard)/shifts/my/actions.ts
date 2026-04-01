@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { recordExchangeEvent } from "@/lib/exchange-workflow";
 import { getAgreementSummary } from "@/lib/exchange-compensation";
+import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 import {
   createNotification,
@@ -40,6 +41,9 @@ export async function acceptProposal(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) return;
+
+  const signatureCheck = await requireSignature(user.id);
+  if (signatureCheck.error) return;
 
   // Validate shift ownership and open status
   const { data: shift } = await supabase

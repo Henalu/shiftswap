@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarDays,
   BriefcaseBusiness,
+  CircleHelp,
   ClipboardCheck,
   CreditCard,
   MessageSquare,
@@ -57,6 +58,12 @@ export const ACCOUNT_NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Mi perfil",
     description: "Consulta tus datos y preferencias basicas.",
     icon: User,
+  },
+  {
+    href: "/help",
+    label: "Ayuda",
+    description: "Aprende como funciona la app y resuelve dudas.",
+    icon: CircleHelp,
   },
   {
     href: "/billing",
@@ -127,6 +134,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname === "/exchanges" || pathname.startsWith("/exchanges/");
     case "/profile":
       return pathname === "/profile" || pathname.startsWith("/profile/");
+    case "/help":
+      return pathname === "/help" || pathname.startsWith("/help/");
     case "/billing":
       return pathname === "/billing" || pathname.startsWith("/billing/");
     case "/admin/exchanges":

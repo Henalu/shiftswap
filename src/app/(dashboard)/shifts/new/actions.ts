@@ -8,6 +8,7 @@ import {
   isShiftType,
   matchesShiftSchedule,
 } from "@/lib/shifts";
+import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 
 export interface CreateShiftState {
@@ -68,6 +69,9 @@ export async function createShift(
   if (!user) {
     return { error: "No autorizado." };
   }
+
+  const signatureCheck = await requireSignature(user.id);
+  if (signatureCheck.error) return { error: signatureCheck.error };
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")

@@ -68,6 +68,8 @@ export interface UserProfile {
   validated_by?: string | null;
   validated_at?: string | null;
   validation_notes?: string | null;
+  signature_url?: string | null;
+  onboarding_completed_at?: string | null;
   is_admin?: boolean;
   created_at: string;
   updated_at: string;

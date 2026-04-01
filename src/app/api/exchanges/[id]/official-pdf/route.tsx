@@ -54,6 +54,7 @@ interface ExchangeOfficialDocumentDetail {
     employee_id: string | null;
     department_id: string | null;
     job_position_id: string | null;
+    signature_url: string | null;
   };
   requester: {
     id: string;
@@ -62,6 +63,7 @@ interface ExchangeOfficialDocumentDetail {
     employee_id: string | null;
     department_id: string | null;
     job_position_id: string | null;
+    signature_url: string | null;
   };
   departmentApprover: {
     full_name: string;
@@ -137,7 +139,8 @@ export async function GET(
         email,
         employee_id,
         department_id,
-        job_position_id
+        job_position_id,
+        signature_url
       ),
       requester:user_profiles!user_b_id(
         id,
@@ -145,7 +148,8 @@ export async function GET(
         email,
         employee_id,
         department_id,
-        job_position_id
+        job_position_id,
+        signature_url
       ),
       departmentApprover:user_profiles!department_approver_id(full_name)
     `
@@ -312,12 +316,14 @@ export async function GET(
             employee_id: typedExchange.owner.employee_id,
             category: ownerDepartment?.name ?? null,
             position: ownerJobPosition?.name ?? null,
+            signature_url: typedExchange.owner.signature_url,
           },
           requester: {
             full_name: typedExchange.requester.full_name,
             employee_id: typedExchange.requester.employee_id,
             category: requesterDepartment?.name ?? null,
             position: requesterJobPosition?.name ?? null,
+            signature_url: typedExchange.requester.signature_url,
           },
           departmentApprover: typedExchange.departmentApprover,
         } satisfies ExchangeOfficialPdfData}

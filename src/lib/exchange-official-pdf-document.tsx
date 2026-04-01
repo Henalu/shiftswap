@@ -13,6 +13,7 @@ export interface ExchangeOfficialPdfPerson {
   employee_id: string | null;
   category: string | null;
   position: string | null;
+  signature_url: string | null;
 }
 
 export interface ExchangeOfficialPdfApprover {
@@ -287,6 +288,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 8.4,
     textAlign: "center",
+  },
+  signatureImage: {
+    width: 140,
+    height: 52,
+    objectFit: "contain" as const,
+    marginBottom: 4,
   },
   diligenceSection: {
     paddingHorizontal: 16,
@@ -577,9 +584,11 @@ function InlineField({
 function SignatureBlock({
   signatureName,
   formalName,
+  signatureImageUrl,
 }: {
   signatureName: string;
   formalName: string;
+  signatureImageUrl?: string | null;
 }) {
   const signatureShortName = getSignatureShortName(signatureName);
   const showSignatureCaption = shouldShowSignatureCaption(
@@ -589,6 +598,9 @@ function SignatureBlock({
 
   return (
     <View style={styles.signatureColumn}>
+      {signatureName && signatureImageUrl ? (
+        <PdfImage src={signatureImageUrl} style={styles.signatureImage} />
+      ) : null}
       <View style={styles.signatureLine}>
         <Text style={styles.signatureText}>{signatureShortName}</Text>
       </View>
@@ -790,10 +802,12 @@ export function ExchangeOfficialShiftChangePdf({
               <SignatureBlock
                 signatureName={ownerSignature}
                 formalName={ownerFormalName}
+                signatureImageUrl={exchange.owner.signature_url}
               />
               <SignatureBlock
                 signatureName={requesterSignature}
                 formalName={requesterFormalName}
+                signatureImageUrl={exchange.requester.signature_url}
               />
             </View>
           </View>

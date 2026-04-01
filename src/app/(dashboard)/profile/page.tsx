@@ -28,6 +28,7 @@ type ProfilePageProfile = Pick<
   | "email"
   | "phone"
   | "avatar_url"
+  | "signature_url"
   | "employee_id"
   | "company_id"
   | "department_id"
@@ -71,7 +72,7 @@ export default async function ProfilePage() {
   const { data: profile, error: profileError } = await adminClient
     .from("user_profiles")
     .select(
-      "id, full_name, email, phone, avatar_url, employee_id, company_id, department_id, job_position_id"
+      "id, full_name, email, phone, avatar_url, signature_url, employee_id, company_id, department_id, job_position_id"
     )
     .eq("id", authUser.id)
     .maybeSingle();

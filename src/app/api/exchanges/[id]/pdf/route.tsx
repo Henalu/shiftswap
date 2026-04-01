@@ -52,12 +52,14 @@ interface ExchangeDocumentDetail {
     full_name: string;
     email: string;
     employee_id: string | null;
+    signature_url: string | null;
   };
   requester: {
     id: string;
     full_name: string;
     email: string;
     employee_id: string | null;
+    signature_url: string | null;
   };
   departmentApprover: {
     full_name: string;
@@ -116,8 +118,8 @@ export async function GET(
           company:companies!company_id(name)
         )
       ),
-      owner:user_profiles!user_a_id(id, full_name, email, employee_id),
-      requester:user_profiles!user_b_id(id, full_name, email, employee_id),
+      owner:user_profiles!user_a_id(id, full_name, email, employee_id, signature_url),
+      requester:user_profiles!user_b_id(id, full_name, email, employee_id, signature_url),
       departmentApprover:user_profiles!department_approver_id(full_name, email)
     `
     )
@@ -225,12 +227,14 @@ export async function GET(
             employee_id: typedExchange.owner.employee_id,
             category: null,
             position: null,
+            signature_url: typedExchange.owner.signature_url,
           },
           requester: {
             full_name: typedExchange.requester.full_name,
             employee_id: typedExchange.requester.employee_id,
             category: null,
             position: null,
+            signature_url: typedExchange.requester.signature_url,
           },
           departmentApprover: typedExchange.departmentApprover,
           hours_bank_status:
