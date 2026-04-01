@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Eraser, Loader2, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { updateSignatureUrl } from "@/app/(dashboard)/profile/actions";
 
 interface SignaturePadProps {
   userId: string;
@@ -167,13 +168,10 @@ export function SignaturePad({
 
       const signatureUrl = `${publicUrl}?t=${Date.now()}`;
 
-      const { error: updateError } = await supabase
-        .from("user_profiles")
-        .update({ signature_url: signatureUrl })
-        .eq("id", userId);
+      const result = await updateSignatureUrl(signatureUrl);
 
-      if (updateError) {
-        toast.error("No se pudo guardar la firma en tu perfil.");
+      if (result.error) {
+        toast.error(result.error);
         setSaving(false);
         return;
       }

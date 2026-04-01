@@ -5,6 +5,7 @@ import { OnboardingModal } from "@/components/layout/onboarding-modal";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { AlertTriangle } from "lucide-react";
 import { resolveBillingGateState } from "@/lib/billing";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   getAccountGateState,
@@ -25,6 +26,8 @@ export default async function DashboardLayout({
   if (!authUser) {
     redirect("/login");
   }
+
+  const adminClient = createAdminClient();
 
   const [accountState, { data: profile }, { data: notifications }, unreadResult, { data: onboardingRow }] =
     await Promise.all([
@@ -47,7 +50,7 @@ export default async function DashboardLayout({
         .eq("user_id", authUser.id)
         .eq("read", false)
         .is("resolved_at", null),
-      supabase
+      adminClient
         .from("user_profiles")
         .select("onboarding_completed_at")
         .eq("id", authUser.id)

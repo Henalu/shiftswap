@@ -116,6 +116,33 @@ async function getJobPositionChangeApproverIds(
   ];
 }
 
+export async function updateSignatureUrl(
+  signatureUrl: string
+): Promise<UpdateProfileResult> {
+  if (!signatureUrl?.trim()) {
+    return { error: "La URL de la firma no es valida." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "No autenticado." };
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("user_profiles")
+    .update({ signature_url: signatureUrl.trim() })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/profile");
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+
 export async function updateProfile(
   formData: FormData
 ): Promise<UpdateProfileResult> {
