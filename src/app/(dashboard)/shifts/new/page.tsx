@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { ShiftForm } from "./shift-form";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { getMonthRange, todayISO, formatDateISO } from "@/lib/calendar";
+import { getUserCalendar } from "@/lib/calendar-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,6 +67,13 @@ export default async function NewShiftPage() {
         .maybeSingle()
     : { data: null };
 
+  // Load calendar for the next 60 days to enable client-side hints
+  const today = todayISO();
+  const futureDate = formatDateISO(
+    new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+  );
+  const calendarDays = await getUserCalendar(authUser.id, today, futureDate);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -83,6 +92,7 @@ export default async function NewShiftPage() {
       <ShiftForm
         areaName={parentDepartment?.name ?? department.name}
         departmentName={department.name}
+        calendarDays={calendarDays}
       />
     </div>
   );

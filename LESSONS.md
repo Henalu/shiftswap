@@ -145,6 +145,63 @@ Usar funciones `SECURITY DEFINER` (`get_user_role`, `get_user_company`,
 
 ---
 
+## 8. Column-level GRANTs en PostgreSQL rompen operaciones silenciosamente
+
+**Fecha:** 2026-04-02
+**Severidad:** critica (5 bugs simultaneos)
+
+### Que paso
+Migration 00016 configuro GRANTs a nivel de columna en `user_profiles`. Migrations posteriores
+(00023 para `job_position_id`, 00028 para `signature_url` y `onboarding_completed_at`) anadieron
+columnas pero NO actualizaron los GRANTs. Como resultado:
+- El guardado de firma fallaba para todos los usuarios (no UPDATE en signature_url)
+- El onboarding modal reaparecia siempre (no SELECT en onboarding_completed_at)
+- El super admin no podia acceder a modulos admin (layout cascaba)
+- Server-side exception en toda la app
+
+### Regla aprendida
+**Cuando una migration usa GRANTs a nivel de columna, toda migration posterior que anada
+columnas a esa tabla DEBE incluir los GRANTs correspondientes.** Si no, las operaciones
+client-side fallan silenciosamente (la query devuelve null sin error visible en Supabase).
+
+### Patron defensivo
+Para columnas sensibles, usar `createAdminClient()` (service role) que bypasea tanto
+RLS como column-level grants. Para el resto, siempre verificar en la migration:
+```sql
+-- Si ya existen GRANTs a nivel de columna en la tabla, anadir las nuevas:
+GRANT SELECT (nueva_columna) ON public.tabla TO authenticated;
+GRANT UPDATE (nueva_columna) ON public.tabla TO authenticated;
+```
+
+### Como detectarlo
+Si una operacion de Supabase client-side devuelve null pero el admin client funciona,
+buscar GRANTs a nivel de columna con:
+```sql
+SELECT column_name, privilege_type FROM information_schema.column_privileges
+WHERE table_name = 'user_profiles' AND grantee = 'authenticated';
+```
+
+---
+
+## 9. Ampliar un union type rompe todos los Record<Type, ...> del proyecto
+
+**Fecha:** 2026-04-02
+**Severidad:** media (rompe build)
+
+### Que paso
+Al anadir `normal_full` y `normal_short` a `ShiftType`, todos los objetos tipados como
+`Record<ShiftType, string>` fallaron: `SHIFT_TYPE_LABELS`, `SHIFT_TYPE_STYLES`,
+`OFFICIAL_SHIFT_LABELS` en el PDF, y `SHIFT_TYPE_SCHEDULES`.
+
+### Regla aprendida
+Al ampliar un union type, buscar todos los `Record<TipoAmpliado, ...>` en el proyecto
+y actualizarlos en el mismo cambio. Un grep rapido lo resuelve:
+```bash
+grep -rn "Record<ShiftType" src/
+```
+
+---
+
 ## Checklist antes de merge
 
 - [ ] Verificar que no se crean redirects circulares (`grep -r "redirect(" src/app/`)

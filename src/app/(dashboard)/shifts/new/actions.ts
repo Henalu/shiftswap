@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isValidWorkDay } from "@/lib/calendar";
+import { getUserCalendarInput } from "@/lib/calendar-data";
 import { SHIFT_TYPE_LABELS } from "@/lib/constants";
 import {
   getShiftSchedule,
@@ -115,6 +117,18 @@ export async function createShift(
       error:
         "Tu cuenta sigue asociada a un area general. Necesitas un departamento operativo final para publicar turnos.",
     };
+  }
+
+  // Calendar validation: check if the user can work this shift on this date
+  const calendarConfig = await getUserCalendarInput({
+    userId: user.id,
+    startDate: date,
+    endDate: date,
+  });
+
+  const workDayCheck = isValidWorkDay(date, shiftType, calendarConfig);
+  if (!workDayCheck.valid) {
+    return { error: workDayCheck.reason };
   }
 
   const { error } = await supabase.from("shifts").insert({

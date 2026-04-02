@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SHIFT_TYPE_LABELS } from "@/lib/constants";
+import {
+  CALENDAR_DAY_TYPE_LABELS,
+  SHIFT_TYPE_LABELS,
+} from "@/lib/constants";
+import { calendarDayTypeToShiftType, type CalendarDay } from "@/lib/calendar";
 import { getShiftSchedule, isShiftType } from "@/lib/shifts";
 import { formatTimeRange, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import type { ShiftType } from "@/types";
@@ -21,11 +25,33 @@ import { createShift } from "./actions";
 interface ShiftFormProps {
   areaName: string;
   departmentName: string;
+  calendarDays?: CalendarDay[] | null;
 }
 
-export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
+export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormProps) {
   const [state, formAction] = useActionState(createShift, {});
+  const [selectedDate, setSelectedDate] = useState("");
   const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">("");
+
+  // Build a lookup map for calendar hints
+  const calendarMap = useMemo(() => {
+    if (!calendarDays) return null;
+    const map = new Map<string, CalendarDay>();
+    for (const day of calendarDays) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [calendarDays]);
+
+  // When date changes, auto-select shift type from calendar
+  const calendarHint = calendarMap?.get(selectedDate) ?? null;
+  const calendarWarning = calendarHint
+    ? calendarHint.dayType === "rest"
+      ? "No trabajas este dia segun tu calendario."
+      : calendarHint.isVacation
+        ? "Tienes vacaciones registradas para este dia."
+        : null
+    : null;
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
@@ -69,15 +95,36 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
                 type="date"
                 required
                 min={new Date().toISOString().split("T")[0]}
+                value={selectedDate}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  setSelectedDate(date);
+                  // Auto-populate shift type from calendar
+                  if (calendarMap) {
+                    const day = calendarMap.get(date);
+                    if (day) {
+                      const shiftType = calendarDayTypeToShiftType(day.dayType);
+                      setSelectedShiftType(shiftType ?? "");
+                    } else {
+                      setSelectedShiftType("");
+                    }
+                  }
+                }}
               />
+              {calendarWarning && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{calendarWarning}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="shift_type">Tipo de turno</Label>
+              {calendarHint && !calendarWarning && (
+                <input type="hidden" name="shift_type" value={selectedShiftType} />
+              )}
               <select
                 id="shift_type"
-                name="shift_type"
-                required
+                name={calendarHint && !calendarWarning ? undefined : "shift_type"}
+                required={!(calendarHint && !calendarWarning)}
                 value={selectedShiftType}
                 onChange={(event) => {
                   const nextValue = event.target.value;
@@ -85,6 +132,7 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
                 }}
                 className={FORM_CONTROL_CLASSNAME}
                 aria-describedby="shift-schedule-help shift-schedule-current"
+                disabled={!!(calendarHint && !calendarWarning)}
               >
                 <option value="">Selecciona un tipo</option>
                 {(Object.entries(SHIFT_TYPE_LABELS) as [ShiftType, string][]).map(
@@ -95,6 +143,11 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
                   )
                 )}
               </select>
+              {calendarHint && !calendarWarning && (
+                <p className="text-xs text-muted-foreground">
+                  Tipo asignado por tu calendario: {CALENDAR_DAY_TYPE_LABELS[calendarHint.dayType]}.
+                </p>
+              )}
             </div>
           </div>
 
@@ -106,7 +159,7 @@ export function ShiftForm({ areaName, departmentName }: ShiftFormProps) {
               El horario se asigna automaticamente segun el tipo de turno.
             </p>
             <p className="mt-1 text-muted-foreground">
-              Manana 06:00 - 14:00, Tarde 14:00 - 22:00 y Noche 22:00 - 06:00.
+              Manana 06:00-14:00, Tarde 14:00-22:00, Noche 22:00-06:00, J. completa 08:00-16:00, J. reducida 08:00-14:00.
             </p>
           </div>
 

@@ -29,7 +29,75 @@ export type DepartmentChangeRequestStatus =
 export type JobPositionChangeRequestStatus = DepartmentChangeRequestStatus;
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'member' | 'department_admin' | 'hr_admin' | 'super_admin';
-export type ShiftType = 'morning' | 'afternoon' | 'night';
+export type ShiftType = 'morning' | 'afternoon' | 'night' | 'normal_full' | 'normal_short';
+export type ScheduleTypeCode = '3t5' | 'jornada_normal';
+export type CalendarDayType =
+  | 'morning'
+  | 'afternoon'
+  | 'night'
+  | 'rest'
+  | 'normal_full'
+  | 'normal_short'
+  | 'vacation';
+// ============================================
+// Calendar / Rotation
+// ============================================
+
+export interface RotationPattern {
+  id: string;
+  code: string;
+  label: string;
+  sequence: string[];
+  cycle_length: number;
+  created_at: string;
+}
+
+export interface RotationGroup {
+  id: string;
+  code: string;
+  label: string;
+  rotation_pattern_id: string;
+  reference_date: string;
+  created_at: string;
+}
+
+export interface AreaScheduleConfig {
+  id: string;
+  department_id: string;
+  schedule_type: ScheduleTypeCode;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserRotationAssignment {
+  id: string;
+  user_id: string;
+  rotation_group_id: string;
+  effective_from: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Vacation {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleOverride {
+  id: string;
+  user_id: string;
+  date: string;
+  override_type: string;
+  reason?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
 export type BillingOwnerType = 'user' | 'company';
 export type BillingAccessState =
   | 'inactive'

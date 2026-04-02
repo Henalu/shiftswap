@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isValidWorkDay } from "@/lib/calendar";
+import { getUserCalendarInput } from "@/lib/calendar-data";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import { isExchangeAgreementType } from "@/lib/exchange-compensation";
 import { isShiftType } from "@/lib/shifts";
@@ -104,6 +106,22 @@ export async function proposeExchange(
     }
 
     compensationShiftType = compensationShiftTypeValue;
+
+    // Validate compensation shift against proposer's calendar
+    const calendarConfig = await getUserCalendarInput({
+      userId: user.id,
+      startDate: compensationShiftDate,
+      endDate: compensationShiftDate,
+    });
+
+    const workDayCheck = isValidWorkDay(
+      compensationShiftDate,
+      compensationShiftTypeValue,
+      calendarConfig
+    );
+    if (!workDayCheck.valid) {
+      return { error: `El turno que ofreces a cambio: ${workDayCheck.reason}` };
+    }
   }
 
   // Reactivate a withdrawn proposal if exists

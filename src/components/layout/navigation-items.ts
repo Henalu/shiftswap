@@ -3,7 +3,9 @@
 import {
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   BriefcaseBusiness,
+  CalendarCog,
   CircleHelp,
   ClipboardCheck,
   CreditCard,
@@ -39,6 +41,12 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
     icon: CalendarCheck,
   },
   {
+    href: "/calendar",
+    label: "Calendario",
+    description: "Consulta tu horario mensual y vacaciones.",
+    icon: CalendarRange,
+  },
+  {
     href: "/chat",
     label: "Chat",
     description: "Habla con otros companeros sobre cada cambio.",
@@ -50,6 +58,14 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
     description: "Revisa acuerdos, firmas y estado del expediente.",
     icon: Repeat,
   },
+];
+
+/** Mobile bottom nav: replaces "Mis turnos" with "Calendario" to keep 4 columns. */
+export const MOBILE_NAVIGATION_ITEMS: NavigationItem[] = [
+  PRIMARY_NAVIGATION_ITEMS[0], // Tablon
+  PRIMARY_NAVIGATION_ITEMS[2], // Calendario
+  PRIMARY_NAVIGATION_ITEMS[3], // Chat
+  PRIMARY_NAVIGATION_ITEMS[4], // Cambios
 ];
 
 export const ACCOUNT_NAVIGATION_ITEMS: NavigationItem[] = [
@@ -103,6 +119,12 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
       description: "Revisa altas y accesos antes de aprobarlos.",
       icon: ShieldCheck,
     },
+    {
+      href: "/admin/schedule-config",
+      label: "Calendarios",
+      description: "Configura tipo de jornada y grupos de rotacion.",
+      icon: CalendarCog,
+    },
   ];
 
   if (isSuperAdmin(role)) {
@@ -128,6 +150,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       );
     case "/shifts/my":
       return pathname.startsWith("/shifts/my") || pathname.startsWith("/shifts/new");
+    case "/calendar":
+      return pathname === "/calendar" || pathname.startsWith("/calendar/");
     case "/chat":
       return pathname === "/chat" || pathname.startsWith("/chat/");
     case "/exchanges":
@@ -148,6 +172,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname.startsWith("/admin/job-position-changes");
     case "/admin/users":
       return pathname.startsWith("/admin/users");
+    case "/admin/schedule-config":
+      return pathname.startsWith("/admin/schedule-config");
     default:
       return pathname === href || pathname.startsWith(`${href}/`);
   }

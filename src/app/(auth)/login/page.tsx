@@ -45,7 +45,7 @@ export default function LoginPage() {
       </CardHeader>
 
       <form action={formAction}>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6">
           {state.error ? (
             <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {state.error}

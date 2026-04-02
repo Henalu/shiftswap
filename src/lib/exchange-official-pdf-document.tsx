@@ -51,6 +51,8 @@ const OFFICIAL_SHIFT_LABELS: Record<ShiftType, string> = {
   morning: "Mañana",
   afternoon: "Tarde",
   night: "Noche",
+  normal_full: "Jornada completa",
+  normal_short: "Jornada reducida",
 };
 
 const SIGNATURE_NAME_CONNECTORS = new Set([

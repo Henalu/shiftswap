@@ -18,6 +18,14 @@ export const SHIFT_TYPE_SCHEDULES = {
     startTime: "22:00",
     endTime: "06:00",
   },
+  normal_full: {
+    startTime: "08:00",
+    endTime: "16:00",
+  },
+  normal_short: {
+    startTime: "08:00",
+    endTime: "14:00",
+  },
 } as const satisfies Record<ShiftType, ShiftSchedule>;
 
 export const SHIFT_TYPE_VALUES = Object.keys(

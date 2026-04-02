@@ -13,8 +13,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Parse a date string into a local Date. For date-only strings (YYYY-MM-DD),
+ * forces local timezone to avoid the UTC-midnight shift that causes off-by-one
+ * day errors in western timezones.
+ */
+function parseLocalDate(date: Date | string): Date {
+  if (date instanceof Date) return date;
+  // Date-only format: "2026-01-15" — parsed as UTC by spec, causing off-by-one
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(date);
+}
+
 export function formatDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = parseLocalDate(date);
   return d.toLocaleDateString(SPANISH_LOCALE, {
     weekday: "long",
     year: "numeric",
@@ -24,7 +39,7 @@ export function formatDate(date: Date | string): string {
 }
 
 export function formatShortDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = parseLocalDate(date);
   return d.toLocaleDateString(SPANISH_LOCALE, {
     day: "2-digit",
     month: "2-digit",
