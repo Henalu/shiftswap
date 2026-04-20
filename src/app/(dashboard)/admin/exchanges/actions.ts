@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { syncHoursBankDebtTransactionStatus } from "@/lib/exchange-compensation";
+import { syncHoursBankDebtTransactionStatus } from "@/lib/exchange-compensation-server";
 import {
   canReviewExchange,
   getAuthenticatedExchangeActor,

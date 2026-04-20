@@ -12,9 +12,11 @@ import {
 } from "@/lib/exchange-workflow";
 import {
   getAgreementSummary,
+} from "@/lib/exchange-compensation";
+import {
   syncHoursBankDebtTransactionStatus,
   upsertHoursBankDebtTransaction,
-} from "@/lib/exchange-compensation";
+} from "@/lib/exchange-compensation-server";
 import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
