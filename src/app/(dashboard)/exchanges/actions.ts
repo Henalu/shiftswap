@@ -12,14 +12,16 @@ import {
 } from "@/lib/exchange-workflow";
 import {
   getAgreementSummary,
+  getMadridDateInputValue,
 } from "@/lib/exchange-compensation";
 import {
   syncHoursBankDebtTransactionStatus,
   upsertHoursBankDebtTransaction,
 } from "@/lib/exchange-compensation-server";
-import { requireSignature } from "@/lib/user-profiles";
-import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
+import { pickFirstRelation } from "@/lib/supabase-relations";
+import { createClient } from "@/lib/supabase/server";
+import { requireSignature } from "@/lib/user-profiles";
 import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 export interface ExchangeMutationResult {
@@ -39,6 +41,7 @@ interface ExchangeParticipantRow {
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
   signed_by_user_b_at?: string | null;
+  shift?: { date: string } | { date: string }[] | null;
 }
 
 interface ShiftScopeRow {
@@ -54,6 +57,8 @@ function revalidateExchangeViews(exchangeId: string, shiftId: string) {
   revalidatePath(`/shifts/${shiftId}`);
   revalidatePath("/shifts");
   revalidatePath("/shifts/my");
+  revalidatePath("/shifts/new");
+  revalidatePath("/calendar");
   revalidatePath("/chat");
   revalidatePath("/admin");
   revalidatePath("/admin/exchanges");
@@ -61,7 +66,7 @@ function revalidateExchangeViews(exchangeId: string, shiftId: string) {
 
 async function resolveExchangeInbox(
   exchangeId: string,
-  userIds: string[]
+  userIds: string[],
 ): Promise<void> {
   await resolveNotifications({
     userIds,
@@ -81,14 +86,14 @@ async function resolveExchangeInbox(
 
 async function reopenShiftAfterExchangeReset(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  shiftId: string
+  shiftId: string,
 ): Promise<void> {
   await supabase.from("shifts").update({ status: "open" }).eq("id", shiftId);
 }
 
 async function getShiftScope(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  shiftId: string
+  shiftId: string,
 ): Promise<{ company_id: string | null; department_id: string | null }> {
   const { data } = await supabase
     .from("shifts")
@@ -96,7 +101,7 @@ async function getShiftScope(
       `
       department_id,
       department:departments!department_id(company_id)
-    `
+    `,
     )
     .eq("id", shiftId)
     .single();
@@ -111,7 +116,7 @@ async function getShiftScope(
 
 async function getUserFullName(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string
+  userId: string,
 ): Promise<string> {
   const { data } = await supabase
     .from("user_profiles")
@@ -122,12 +127,49 @@ async function getUserFullName(
   return data?.full_name ?? "Empleado";
 }
 
+function getFirstExchangeDate({
+  shiftDate,
+  compensationShiftDate,
+}: {
+  shiftDate: string;
+  compensationShiftDate?: string | null;
+}): string {
+  if (!compensationShiftDate) {
+    return shiftDate;
+  }
+
+  return compensationShiftDate < shiftDate ? compensationShiftDate : shiftDate;
+}
+
+function canCancelExchangeBeforeFirstDate({
+  status,
+  shiftDate,
+  compensationShiftDate,
+}: {
+  status: ExchangeStatus;
+  shiftDate: string;
+  compensationShiftDate?: string | null;
+}): boolean {
+  if (
+    status !== "accepted" &&
+    status !== "pending_validation" &&
+    status !== "approved"
+  ) {
+    return false;
+  }
+
+  return (
+    getMadridDateInputValue() <
+    getFirstExchangeDate({ shiftDate, compensationShiftDate })
+  );
+}
+
 /**
  * signAsInterested — the interested party (user_b) signs explicitly.
  * This is the only explicit signature in v2; publisher's signature is implicit at acceptance.
  */
 export async function signAsInterested(
-  formData: FormData
+  formData: FormData,
 ): Promise<ExchangeMutationResult> {
   const exchangeId = formData.get("exchange_id") as string;
   if (!exchangeId) return { error: "Intercambio invalido." };
@@ -147,7 +189,7 @@ export async function signAsInterested(
     .select(
       `id, shift_id, user_a_id, user_b_id, status,
        signed_by_user_b_at, agreement_type,
-       compensation_shift_date, compensation_shift_type`
+       compensation_shift_date, compensation_shift_type`,
     )
     .eq("id", exchangeId)
     .eq("user_b_id", user.id)
@@ -158,6 +200,18 @@ export async function signAsInterested(
     return { error: "Esta solicitud ya no admite firma." };
   }
 
+  const isInvalidRestExchange =
+    exchange.agreement_type === "shift_exchange" &&
+    (!exchange.compensation_shift_type ||
+      exchange.compensation_shift_type === "rest");
+
+  if (isInvalidRestExchange) {
+    return {
+      error:
+        "Esta solicitud ya no es valida porque no se pueden intercambiar descansos.",
+    };
+  }
+
   if (exchange.signed_by_user_b_at) {
     return { success: true };
   }
@@ -166,7 +220,6 @@ export async function signAsInterested(
   const signerName = await getUserFullName(supabase, user.id);
   const ownerName = await getUserFullName(supabase, exchange.user_a_id);
 
-  // Sign and immediately submit for validation
   const { error: signError } = await supabase
     .from("exchanges")
     .update({
@@ -181,8 +234,6 @@ export async function signAsInterested(
   if (signError) {
     return { error: signError.message };
   }
-
-  // Update shift status (stays negotiating — no change needed)
 
   const agreementSummary = getAgreementSummary({
     agreementType: exchange.agreement_type,
@@ -210,7 +261,6 @@ export async function signAsInterested(
     toStatus: "pending_validation",
   });
 
-  // Create hours_bank debt if applicable
   if (exchange.agreement_type === "hours_bank") {
     await upsertHoursBankDebtTransaction({
       exchangeId,
@@ -222,7 +272,6 @@ export async function signAsInterested(
     });
   }
 
-  // Notify both participants
   const participantIds = [exchange.user_a_id, exchange.user_b_id];
   for (const participantId of participantIds) {
     await createNotification({
@@ -239,7 +288,6 @@ export async function signAsInterested(
     });
   }
 
-  // Notify approvers
   const scope = await getShiftScope(supabase, exchange.shift_id);
   const approverIds = await getScopedExchangeApproverIds(scope);
 
@@ -260,7 +308,6 @@ export async function signAsInterested(
     });
   }
 
-  // Resolve prior notifications
   await resolveNotifications({
     userIds: participantIds,
     types: ["proposal_accepted", "exchange_document_added"],
@@ -274,7 +321,7 @@ export async function signAsInterested(
 }
 
 export async function attachExchangeDocument(
-  formData: FormData
+  formData: FormData,
 ): Promise<ExchangeMutationResult> {
   const exchangeId = formData.get("exchange_id") as string;
   const file = formData.get("document");
@@ -318,7 +365,7 @@ export async function attachExchangeDocument(
 
   const path = getExchangeDocumentStoragePath(
     exchangeId,
-    documentKind.extension
+    documentKind.extension,
   );
   const bytes = new Uint8Array(await file.arrayBuffer());
 
@@ -327,7 +374,8 @@ export async function attachExchangeDocument(
     .list(exchangeId);
 
   const filesToRemove =
-    existingDocuments?.map((document) => `${exchangeId}/${document.name}`) ?? [];
+    existingDocuments?.map((document) => `${exchangeId}/${document.name}`) ??
+    [];
 
   if (filesToRemove.length > 0) {
     await supabase.storage.from("exchange-documents").remove(filesToRemove);
@@ -380,7 +428,8 @@ export async function attachExchangeDocument(
     actorId: user.id,
     eventType: "support_document_attached",
     title: "Soporte adicional adjuntado",
-    details: "Se ha subido un documento de apoyo para complementar la solicitud.",
+    details:
+      "Se ha subido un documento de apoyo para complementar la solicitud.",
     metadata: {
       extension: documentKind.extension,
     },
@@ -392,7 +441,7 @@ export async function attachExchangeDocument(
 }
 
 export async function requestSignedExchangeCancellation(
-  formData: FormData
+  formData: FormData,
 ): Promise<void> {
   const exchangeId = formData.get("exchange_id") as string;
   if (!exchangeId) return;
@@ -407,16 +456,29 @@ export async function requestSignedExchangeCancellation(
   const { data: exchange } = await supabase
     .from("exchanges")
     .select(
-      "id, shift_id, user_a_id, user_b_id, status, cancellation_requested_by, cancellation_requested_at"
+      "id, shift_id, user_a_id, user_b_id, status, compensation_shift_date, cancellation_requested_by, cancellation_requested_at, shift:shifts!shift_id(date)",
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .single();
 
   const typedExchange = exchange as ExchangeParticipantRow | null;
 
   if (!typedExchange) return;
+
+  const shift = pickFirstRelation(typedExchange.shift);
+  if (
+    !shift?.date ||
+    !canCancelExchangeBeforeFirstDate({
+      status: typedExchange.status,
+      shiftDate: shift.date,
+      compensationShiftDate: typedExchange.compensation_shift_date,
+    })
+  ) {
+    revalidateExchangeViews(exchangeId, typedExchange.shift_id);
+    return;
+  }
 
   if (typedExchange.cancellation_requested_by) {
     revalidateExchangeViews(exchangeId, typedExchange.shift_id);
@@ -432,7 +494,7 @@ export async function requestSignedExchangeCancellation(
       cancellation_requested_at: requestedAt,
     })
     .eq("id", exchangeId)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .is("cancellation_requested_by", null);
 
   if (error) return;
@@ -446,7 +508,7 @@ export async function requestSignedExchangeCancellation(
     userId: otherUserId,
     type: "exchange_cancellation_requested",
     title: "Solicitud de retirada",
-    body: "La otra parte ha pedido retirar la solicitud antes de la decision del departamento.",
+    body: "La otra parte ha pedido cancelar el acuerdo antes de la primera fecha implicada.",
     dedupeKey: `exchange_cancellation_requested:${exchangeId}`,
     data: {
       exchange_id: exchangeId,
@@ -460,14 +522,15 @@ export async function requestSignedExchangeCancellation(
     actorId: user.id,
     eventType: "cancellation_requested",
     title: "Retirada solicitada",
-    details: "Una de las partes ha pedido cancelar la solicitud antes de la validacion.",
+    details:
+      "Una de las partes ha pedido cancelar el acuerdo antes de la primera fecha implicada.",
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);
 }
 
 export async function confirmSignedExchangeCancellation(
-  formData: FormData
+  formData: FormData,
 ): Promise<void> {
   const exchangeId = formData.get("exchange_id") as string;
   if (!exchangeId) return;
@@ -482,11 +545,11 @@ export async function confirmSignedExchangeCancellation(
   const { data: exchange } = await supabase
     .from("exchanges")
     .select(
-      "id, shift_id, user_a_id, user_b_id, status, cancellation_requested_by, cancellation_requested_at"
+      "id, shift_id, user_a_id, user_b_id, status, agreement_type, compensation_shift_date, compensation_shift_type, cancellation_requested_by, cancellation_requested_at, shift:shifts!shift_id(date)",
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .not("cancellation_requested_by", "is", null)
     .single();
 
@@ -500,6 +563,19 @@ export async function confirmSignedExchangeCancellation(
     return;
   }
 
+  const shift = pickFirstRelation(typedExchange.shift);
+  if (
+    !shift?.date ||
+    !canCancelExchangeBeforeFirstDate({
+      status: typedExchange.status,
+      shiftDate: shift.date,
+      compensationShiftDate: typedExchange.compensation_shift_date,
+    })
+  ) {
+    revalidateExchangeViews(exchangeId, typedExchange.shift_id);
+    return;
+  }
+
   const requesterUserId = typedExchange.cancellation_requested_by;
 
   const { error: cancelError } = await supabase
@@ -510,7 +586,7 @@ export async function confirmSignedExchangeCancellation(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .eq("cancellation_requested_by", typedExchange.cancellation_requested_by);
 
   if (cancelError) return;
@@ -547,8 +623,9 @@ export async function confirmSignedExchangeCancellation(
     actorId: user.id,
     eventType: "exchange_cancelled",
     title: "Solicitud cancelada",
-    details: "La retirada ha sido confirmada por la otra parte y el expediente se cierra.",
-    fromStatus: "pending_validation",
+    details:
+      "La retirada ha sido confirmada por la otra parte y el expediente se cierra.",
+    fromStatus: typedExchange.status,
     toStatus: "cancelled",
   });
 
@@ -556,7 +633,7 @@ export async function confirmSignedExchangeCancellation(
 }
 
 export async function rejectSignedExchangeCancellation(
-  formData: FormData
+  formData: FormData,
 ): Promise<void> {
   const exchangeId = formData.get("exchange_id") as string;
   if (!exchangeId) return;
@@ -571,11 +648,11 @@ export async function rejectSignedExchangeCancellation(
   const { data: exchange } = await supabase
     .from("exchanges")
     .select(
-      "id, shift_id, user_a_id, user_b_id, status, cancellation_requested_by, cancellation_requested_at"
+      "id, shift_id, user_a_id, user_b_id, status, compensation_shift_date, cancellation_requested_by, cancellation_requested_at, shift:shifts!shift_id(date)",
     )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .not("cancellation_requested_by", "is", null)
     .single();
 
@@ -589,6 +666,19 @@ export async function rejectSignedExchangeCancellation(
     return;
   }
 
+  const shift = pickFirstRelation(typedExchange.shift);
+  if (
+    !shift?.date ||
+    !canCancelExchangeBeforeFirstDate({
+      status: typedExchange.status,
+      shiftDate: shift.date,
+      compensationShiftDate: typedExchange.compensation_shift_date,
+    })
+  ) {
+    revalidateExchangeViews(exchangeId, typedExchange.shift_id);
+    return;
+  }
+
   const requesterUserId = typedExchange.cancellation_requested_by;
 
   const { error } = await supabase
@@ -598,7 +688,7 @@ export async function rejectSignedExchangeCancellation(
       cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
-    .eq("status", "pending_validation")
+    .in("status", ["pending_validation", "approved"])
     .eq("cancellation_requested_by", typedExchange.cancellation_requested_by);
 
   if (error) return;
@@ -650,13 +740,28 @@ export async function cancelExchange(formData: FormData): Promise<void> {
 
   const { data: exchange } = await supabase
     .from("exchanges")
-    .select("id, shift_id, user_a_id, user_b_id, status")
+    .select(
+      "id, shift_id, user_a_id, user_b_id, status, agreement_type, compensation_shift_date, compensation_shift_type, shift:shifts!shift_id(date)",
+    )
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
     .eq("status", "accepted")
     .single();
 
   if (!exchange) return;
+
+  const shift = pickFirstRelation(exchange.shift);
+  if (
+    !shift?.date ||
+    !canCancelExchangeBeforeFirstDate({
+      status: exchange.status,
+      shiftDate: shift.date,
+      compensationShiftDate: exchange.compensation_shift_date,
+    })
+  ) {
+    revalidateExchangeViews(exchangeId, exchange.shift_id);
+    return;
+  }
 
   await supabase
     .from("exchanges")
@@ -665,7 +770,10 @@ export async function cancelExchange(formData: FormData): Promise<void> {
 
   await reopenShiftAfterExchangeReset(supabase, exchange.shift_id);
 
-  await resolveExchangeInbox(exchangeId, [exchange.user_a_id, exchange.user_b_id]);
+  await resolveExchangeInbox(exchangeId, [
+    exchange.user_a_id,
+    exchange.user_b_id,
+  ]);
 
   const otherUserId =
     user.id === exchange.user_a_id ? exchange.user_b_id : exchange.user_a_id;
@@ -688,7 +796,8 @@ export async function cancelExchange(formData: FormData): Promise<void> {
     actorId: user.id,
     eventType: "exchange_cancelled",
     title: "Expediente cancelado",
-    details: "La solicitud se ha cancelado antes de enviarse a validacion.",
+    details:
+      "La solicitud se ha cancelado antes de que llegue la primera fecha acordada.",
     fromStatus: exchange.status,
     toStatus: "cancelled",
   });

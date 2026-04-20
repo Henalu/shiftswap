@@ -1,5 +1,6 @@
 import type {
   CalendarDayType,
+  CalendarExchangeOverlayKind,
   DepartmentChangeRequestStatus,
   ExchangeAgreementType,
   ExchangeStatus,
@@ -191,6 +192,27 @@ export const CALENDAR_DAY_TYPE_DOT_COLORS = {
   normal_short: "bg-cyan-500",
   vacation: "bg-emerald-500",
 } as const satisfies Record<CalendarDayType, string>;
+
+export const CALENDAR_EXCHANGE_OVERLAY_LABELS = {
+  received: "Intercambio recibido",
+  delivered: "Turno cedido",
+  same_day_swap: "Intercambio en ambos sentidos",
+} as const satisfies Record<CalendarExchangeOverlayKind, string>;
+
+export const CALENDAR_EXCHANGE_OVERLAY_STYLES = {
+  received:
+    "border-amber-500/20 bg-amber-500/12 text-amber-700 dark:text-amber-300",
+  delivered:
+    "border-rose-500/20 bg-rose-500/12 text-rose-700 dark:text-rose-300",
+  same_day_swap:
+    "border-fuchsia-500/20 bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-300",
+} as const satisfies Record<CalendarExchangeOverlayKind, string>;
+
+export const CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS = {
+  received: "bg-amber-500",
+  delivered: "bg-rose-500",
+  same_day_swap: "bg-fuchsia-500",
+} as const satisfies Record<CalendarExchangeOverlayKind, string>;
 
 export const ROTATION_GROUP_LABELS: Record<string, string> = {
   A: "Grupo A",

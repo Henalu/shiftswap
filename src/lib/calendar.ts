@@ -1,9 +1,14 @@
 import {
   CALENDAR_DAY_TYPE_LABELS,
-  COMPENSATION_SHIFT_TYPE_LABELS,
   SHIFT_TYPE_LABELS,
 } from "@/lib/constants";
-import type { CalendarDayType, ShiftType, ScheduleTypeCode } from "@/types";
+import type {
+  CalendarDayType,
+  CalendarExchangeOverlayEntry,
+  CalendarExchangeOverlayKind,
+  ShiftType,
+  ScheduleTypeCode,
+} from "@/types";
 
 // ============================================
 // Types for calendar generation
@@ -14,6 +19,14 @@ export interface CalendarDay {
   dayType: CalendarDayType;
   isVacation: boolean;
   isOverride: boolean;
+  exchangeOverlay: CalendarDayExchangeOverlay | null;
+}
+
+export interface CalendarDayExchangeOverlay {
+  kind: CalendarExchangeOverlayKind;
+  exchangeId: string;
+  receivedShiftType: ShiftType | null;
+  deliveredShiftType: ShiftType | null;
 }
 
 export interface CalendarInput {
@@ -51,16 +64,8 @@ const SEQUENCE_MAP: Record<string, CalendarDayType> = {
 
 /** Difference in days between two YYYY-MM-DD strings. */
 function diffDays(a: string, b: string): number {
-  const msA = Date.UTC(
-    +a.slice(0, 4),
-    +a.slice(5, 7) - 1,
-    +a.slice(8, 10)
-  );
-  const msB = Date.UTC(
-    +b.slice(0, 4),
-    +b.slice(5, 7) - 1,
-    +b.slice(8, 10)
-  );
+  const msA = Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10));
+  const msB = Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10));
   return Math.round((msB - msA) / 86_400_000);
 }
 
@@ -69,7 +74,7 @@ function isoDayOfWeek(dateStr: string): number {
   const d = new Date(
     +dateStr.slice(0, 4),
     +dateStr.slice(5, 7) - 1,
-    +dateStr.slice(8, 10)
+    +dateStr.slice(8, 10),
   );
   return d.getDay() === 0 ? 7 : d.getDay();
 }
@@ -81,7 +86,7 @@ function isoDayOfWeek(dateStr: string): number {
 export function get3T5DayType(
   targetDate: string,
   referenceDate: string,
-  sequence: string[]
+  sequence: string[],
 ): CalendarDayType {
   const cycleLength = sequence.length;
   const daysDiff = diffDays(referenceDate, targetDate);
@@ -107,7 +112,7 @@ export function getNormalDayType(targetDate: string): CalendarDayType {
  */
 function isOnVacation(
   date: string,
-  vacations: { start_date: string; end_date: string }[]
+  vacations: { start_date: string; end_date: string }[],
 ): boolean {
   return vacations.some((v) => date >= v.start_date && date <= v.end_date);
 }
@@ -117,7 +122,7 @@ function isOnVacation(
  */
 function findOverride(
   date: string,
-  overrides: { date: string; override_type: string }[]
+  overrides: { date: string; override_type: string }[],
 ): string | null {
   const match = overrides.find((o) => o.date === date);
   return match ? match.override_type : null;
@@ -130,7 +135,7 @@ function addDays(dateStr: string, n: number): string {
   const d = new Date(
     +dateStr.slice(0, 4),
     +dateStr.slice(5, 7) - 1,
-    +dateStr.slice(8, 10)
+    +dateStr.slice(8, 10),
   );
   d.setDate(d.getDate() + n);
   const y = d.getFullYear();
@@ -146,7 +151,7 @@ function addDays(dateStr: string, n: number): string {
 export function generateCalendar(
   startDate: string,
   endDate: string,
-  input: CalendarInput
+  input: CalendarInput,
 ): CalendarDay[] {
   const days: CalendarDay[] = [];
   let current = startDate;
@@ -158,7 +163,7 @@ export function generateCalendar(
       dayType = get3T5DayType(
         current,
         input.rotation.referenceDate,
-        input.rotation.sequence
+        input.rotation.sequence,
       );
     } else {
       dayType = getNormalDayType(current);
@@ -183,6 +188,7 @@ export function generateCalendar(
       dayType,
       isVacation: vacation,
       isOverride,
+      exchangeOverlay: null,
     });
 
     current = addDays(current, 1);
@@ -196,7 +202,7 @@ export function generateCalendar(
  * Returns null for rest/vacation (not publishable).
  */
 export function calendarDayTypeToShiftType(
-  dayType: CalendarDayType
+  dayType: CalendarDayType,
 ): ShiftType | null {
   switch (dayType) {
     case "morning":
@@ -220,8 +226,8 @@ export function calendarDayTypeToShiftType(
  * and vacations are not offerable.
  */
 export function calendarDayTypeToCompensationShiftType(
-  dayType: CalendarDayType
-): ShiftType | "rest" | null {
+  dayType: CalendarDayType,
+): ShiftType | null {
   switch (dayType) {
     case "morning":
       return "morning";
@@ -233,11 +239,95 @@ export function calendarDayTypeToCompensationShiftType(
       return "normal_full";
     case "normal_short":
       return "normal_short";
-    case "rest":
-      return "rest";
     default:
       return null;
   }
+}
+
+export function mergeCalendarDaysWithExchangeOverlays(
+  days: CalendarDay[],
+  entries: CalendarExchangeOverlayEntry[],
+): CalendarDay[] {
+  if (entries.length === 0) {
+    return days;
+  }
+
+  const overlayByDate = new Map<string, CalendarDayExchangeOverlay>();
+
+  for (const entry of entries) {
+    const current = overlayByDate.get(entry.date) ?? {
+      kind: entry.kind,
+      exchangeId: entry.exchangeId,
+      receivedShiftType: null,
+      deliveredShiftType: null,
+    };
+
+    if (entry.kind === "received") {
+      current.receivedShiftType = entry.shiftType;
+    } else {
+      current.deliveredShiftType = entry.shiftType;
+    }
+
+    current.kind =
+      current.receivedShiftType && current.deliveredShiftType
+        ? "same_day_swap"
+        : current.receivedShiftType
+          ? "received"
+          : "delivered";
+
+    overlayByDate.set(entry.date, current);
+  }
+
+  return days.map((day) => ({
+    ...day,
+    exchangeOverlay: overlayByDate.get(day.date) ?? null,
+  }));
+}
+
+export function getCalendarDayBlockedShiftTypes(
+  day: CalendarDay | null | undefined,
+): ShiftType[] {
+  if (!day?.exchangeOverlay) {
+    return [];
+  }
+
+  const blockedShiftTypes = new Set<ShiftType>();
+
+  if (day.exchangeOverlay.receivedShiftType) {
+    blockedShiftTypes.add(day.exchangeOverlay.receivedShiftType);
+  }
+
+  if (day.exchangeOverlay.deliveredShiftType) {
+    blockedShiftTypes.add(day.exchangeOverlay.deliveredShiftType);
+  }
+
+  return [...blockedShiftTypes];
+}
+
+export function isShiftTypeBlockedByExchange(
+  day: CalendarDay | null | undefined,
+  shiftType: ShiftType,
+): boolean {
+  return getCalendarDayBlockedShiftTypes(day).includes(shiftType);
+}
+
+export function getCalendarDayBlockedShiftReason(
+  day: CalendarDay | null | undefined,
+  shiftType: ShiftType,
+): "received" | "delivered" | null {
+  if (!day?.exchangeOverlay) {
+    return null;
+  }
+
+  if (day.exchangeOverlay.receivedShiftType === shiftType) {
+    return "received";
+  }
+
+  if (day.exchangeOverlay.deliveredShiftType === shiftType) {
+    return "delivered";
+  }
+
+  return null;
 }
 
 /**
@@ -247,7 +337,7 @@ export function calendarDayTypeToCompensationShiftType(
 export function isValidWorkDay(
   date: string,
   shiftType: ShiftType,
-  config: CalendarConfig
+  config: CalendarConfig,
 ): { valid: true } | { valid: false; reason: string } {
   // Graceful degradation: no config → skip validation
   if (!config.configured) {
@@ -290,8 +380,8 @@ export function isValidWorkDay(
 
 export function isValidCompensationDay(
   date: string,
-  compensationShiftType: ShiftType | "rest",
-  config: CalendarConfig
+  compensationShiftType: ShiftType,
+  config: CalendarConfig,
 ): { valid: true } | { valid: false; reason: string } {
   if (!config.configured) {
     return { valid: true };
@@ -311,7 +401,16 @@ export function isValidCompensationDay(
     };
   }
 
-  const expectedCompensationType = calendarDayTypeToCompensationShiftType(day.dayType);
+  if (day.dayType === "rest") {
+    return {
+      valid: false,
+      reason: "No puedes ofrecer un dia de descanso como cambio.",
+    };
+  }
+
+  const expectedCompensationType = calendarDayTypeToCompensationShiftType(
+    day.dayType,
+  );
 
   if (!expectedCompensationType) {
     return {
@@ -322,11 +421,9 @@ export function isValidCompensationDay(
 
   if (expectedCompensationType !== compensationShiftType) {
     const expectedLabel =
-      COMPENSATION_SHIFT_TYPE_LABELS[expectedCompensationType] ??
-      day.dayType;
+      SHIFT_TYPE_LABELS[expectedCompensationType] ?? day.dayType;
     const actualLabel =
-      COMPENSATION_SHIFT_TYPE_LABELS[compensationShiftType] ??
-      compensationShiftType;
+      SHIFT_TYPE_LABELS[compensationShiftType] ?? compensationShiftType;
     return {
       valid: false,
       reason: `Tu calendario indica ${expectedLabel} para este dia, no ${actualLabel}.`,
@@ -340,7 +437,10 @@ export function isValidCompensationDay(
 // Date helpers (exported for pages)
 // ============================================
 
-export function getMonthRange(year: number, month: number): { start: string; end: string } {
+export function getMonthRange(
+  year: number,
+  month: number,
+): { start: string; end: string } {
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const end = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;

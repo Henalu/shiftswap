@@ -18,6 +18,7 @@ import { ExchangeApprovalDecisionForm } from "@/app/(dashboard)/admin/exchanges/
 import { startConversation } from "@/app/(dashboard)/chat/actions";
 import {
   formatCompensationDateLabel,
+  getMadridDateInputValue,
   getAgreementSummary,
 } from "@/lib/exchange-compensation";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -110,6 +111,17 @@ interface ShiftDebtTransactionRow {
 
 interface ExchangeEventRow extends ExchangeEvent {
   actor: { id: string; full_name: string } | null;
+}
+
+function getFirstExchangeDate(
+  shiftDate: string,
+  compensationShiftDate: string | null,
+): string {
+  if (!compensationShiftDate) {
+    return shiftDate;
+  }
+
+  return compensationShiftDate < shiftDate ? compensationShiftDate : shiftDate;
 }
 
 async function signAsInterestedAction(formData: FormData): Promise<void> {
@@ -322,21 +334,28 @@ export default async function ExchangeDetailPage({
     });
   const otherUser = isOwner ? typed.requester : typed.owner;
   const hasPendingCancellationRequest =
-    typed.status === "pending_validation" &&
+    (typed.status === "pending_validation" || typed.status === "approved") &&
     Boolean(typed.cancellation_requested_by);
   const isCancellationRequester =
     hasPendingCancellationRequest && typed.cancellation_requested_by === authUser.id;
+  const canCancelBeforeFirstDate =
+    isParticipant &&
+    ["accepted", "pending_validation", "approved"].includes(typed.status) &&
+    getMadridDateInputValue() <
+      getFirstExchangeDate(typed.shift.date, typed.compensation_shift_date);
   const canRequestFormalCancellation =
     isParticipant &&
-    typed.status === "pending_validation" &&
-    !hasPendingCancellationRequest;
+    (typed.status === "pending_validation" || typed.status === "approved") &&
+    !hasPendingCancellationRequest &&
+    canCancelBeforeFirstDate;
   const canRespondToFormalCancellation =
     isParticipant &&
-    typed.status === "pending_validation" &&
+    (typed.status === "pending_validation" || typed.status === "approved") &&
     hasPendingCancellationRequest &&
-    !isCancellationRequester;
+    !isCancellationRequester &&
+    canCancelBeforeFirstDate;
   const canCancelDirectly =
-    isParticipant && typed.status === "accepted";
+    isParticipant && typed.status === "accepted" && canCancelBeforeFirstDate;
   const canOpenChat =
     isParticipant && EXCHANGE_CAN_CHAT_STATUSES.includes(typed.status);
   const canSign =
@@ -698,7 +717,7 @@ export default async function ExchangeDetailPage({
                 </form>
               )}
 
-              {typed.status === "pending_validation" && isCancellationRequester && (
+              {hasPendingCancellationRequest && isCancellationRequester && (
                 <Button type="button" variant="outline" disabled>
                   Retirada solicitada
                 </Button>
@@ -720,6 +739,17 @@ export default async function ExchangeDetailPage({
                   </form>
                 </>
               )}
+
+              {isParticipant &&
+                ["accepted", "pending_validation", "approved"].includes(
+                  typed.status,
+                ) &&
+                !canCancelBeforeFirstDate && (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Ya no puede cancelarse este acuerdo porque ha llegado la
+                    primera fecha implicada en el intercambio.
+                  </p>
+                )}
             </CardContent>
           </Card>
 

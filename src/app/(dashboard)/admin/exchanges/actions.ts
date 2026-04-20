@@ -12,7 +12,7 @@ import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
-import type { ExchangeAgreementType, ExchangeStatus } from "@/types";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 export interface ExchangeApprovalMutationResult {
   success?: true;
@@ -24,6 +24,7 @@ interface ApprovalTarget {
   shift_id: string;
   status: ExchangeStatus;
   agreement_type: ExchangeAgreementType | null;
+  compensation_shift_type?: ShiftType | "rest" | null;
   user_a_id: string;
   user_b_id: string;
   owner: { id: string; full_name: string };
@@ -46,16 +47,20 @@ function revalidateExchangeApprovalViews(exchangeId: string, shiftId: string) {
   revalidatePath(`/exchanges/${exchangeId}`);
   revalidatePath("/shifts");
   revalidatePath("/shifts/my");
+  revalidatePath("/shifts/new");
+  revalidatePath("/calendar");
   revalidatePath(`/shifts/${shiftId}`);
 }
 
-async function getApprovalTarget(exchangeId: string): Promise<ApprovalTarget | null> {
+async function getApprovalTarget(
+  exchangeId: string,
+): Promise<ApprovalTarget | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("exchanges")
     .select(
       `
-      id, shift_id, status, agreement_type, user_a_id, user_b_id,
+      id, shift_id, status, agreement_type, compensation_shift_type, user_a_id, user_b_id,
       owner:user_profiles!user_a_id(id, full_name),
       requester:user_profiles!user_b_id(id, full_name),
       shift:shifts!shift_id(
@@ -63,7 +68,7 @@ async function getApprovalTarget(exchangeId: string): Promise<ApprovalTarget | n
         department_id,
         department:departments!department_id(id, name, company_id)
       )
-    `
+    `,
     )
     .eq("id", exchangeId)
     .maybeSingle();
@@ -123,7 +128,7 @@ async function getAuthenticatedApprovalActor() {
 
 async function reopenRejectedShift(
   shiftId: string,
-  requesterId: string
+  requesterId: string,
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -138,10 +143,12 @@ async function reopenRejectedShift(
 }
 
 export async function approveExchangeRequest(
-  formData: FormData
+  formData: FormData,
 ): Promise<ExchangeApprovalMutationResult> {
   const exchangeId = (formData.get("exchange_id") as string | null)?.trim();
-  const approvalNotes = (formData.get("approval_notes") as string | null)?.trim();
+  const approvalNotes = (
+    formData.get("approval_notes") as string | null
+  )?.trim();
 
   if (!exchangeId) {
     return { error: "La solicitud es invalida." };
@@ -162,7 +169,8 @@ export async function approveExchangeRequest(
 
   if (target.user_a_id === actor.id || target.user_b_id === actor.id) {
     return {
-      error: "La aprobacion debe resolverla una tercera persona del departamento.",
+      error:
+        "La aprobacion debe resolverla una tercera persona del departamento.",
     };
   }
 
@@ -175,6 +183,17 @@ export async function approveExchangeRequest(
     })
   ) {
     return { error: "Tu rol no tiene alcance sobre este intercambio." };
+  }
+
+  if (
+    target.agreement_type === "shift_exchange" &&
+    (!target.compensation_shift_type ||
+      target.compensation_shift_type === "rest")
+  ) {
+    return {
+      error:
+        "La solicitud no es valida porque no se pueden intercambiar descansos.",
+    };
   }
 
   const now = new Date().toISOString();
@@ -227,7 +246,9 @@ export async function approveExchangeRequest(
     actorId: actor.id,
     eventType: "department_approved",
     title: "Solicitud aprobada por el departamento",
-    details: approvalNotes || "El cambio queda resuelto favorablemente dentro de la app.",
+    details:
+      approvalNotes ||
+      "El cambio queda resuelto favorablemente dentro de la app.",
     fromStatus: "pending_validation",
     toStatus: "approved",
   });
@@ -237,10 +258,12 @@ export async function approveExchangeRequest(
 }
 
 export async function rejectExchangeRequest(
-  formData: FormData
+  formData: FormData,
 ): Promise<ExchangeApprovalMutationResult> {
   const exchangeId = (formData.get("exchange_id") as string | null)?.trim();
-  const rejectionNotes = (formData.get("rejection_notes") as string | null)?.trim();
+  const rejectionNotes = (
+    formData.get("rejection_notes") as string | null
+  )?.trim();
 
   if (!exchangeId) {
     return { error: "La solicitud es invalida." };
@@ -265,7 +288,8 @@ export async function rejectExchangeRequest(
 
   if (target.user_a_id === actor.id || target.user_b_id === actor.id) {
     return {
-      error: "La decision debe resolverla una tercera persona del departamento.",
+      error:
+        "La decision debe resolverla una tercera persona del departamento.",
     };
   }
 
@@ -298,7 +322,9 @@ export async function rejectExchangeRequest(
     .eq("status", "pending_validation");
 
   if (updateError) {
-    return { error: "No se pudo rechazar la solicitud. " + updateError.message };
+    return {
+      error: "No se pudo rechazar la solicitud. " + updateError.message,
+    };
   }
 
   if (target.agreement_type === "hours_bank") {

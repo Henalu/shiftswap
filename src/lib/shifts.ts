@@ -29,13 +29,8 @@ export const SHIFT_TYPE_SCHEDULES = {
 } as const satisfies Record<ShiftType, ShiftSchedule>;
 
 export const SHIFT_TYPE_VALUES = Object.keys(
-  SHIFT_TYPE_SCHEDULES
+  SHIFT_TYPE_SCHEDULES,
 ) as ShiftType[];
-
-export const COMPENSATION_SHIFT_TYPE_VALUES = [
-  ...SHIFT_TYPE_VALUES,
-  "rest",
-] as const;
 
 function normalizeShiftClock(value: string | null | undefined): string {
   if (!value) {
@@ -46,16 +41,16 @@ function normalizeShiftClock(value: string | null | undefined): string {
   return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
 }
 
-export function isShiftType(value: string | null | undefined): value is ShiftType {
+export function isShiftType(
+  value: string | null | undefined,
+): value is ShiftType {
   return SHIFT_TYPE_VALUES.includes(value as ShiftType);
 }
 
 export function isCompensationShiftType(
-  value: string | null | undefined
-): value is ShiftType | "rest" {
-  return COMPENSATION_SHIFT_TYPE_VALUES.includes(
-    value as (typeof COMPENSATION_SHIFT_TYPE_VALUES)[number]
-  );
+  value: string | null | undefined,
+): value is ShiftType {
+  return isShiftType(value);
 }
 
 export function getShiftSchedule(shiftType: ShiftType): ShiftSchedule {
@@ -65,7 +60,7 @@ export function getShiftSchedule(shiftType: ShiftType): ShiftSchedule {
 export function matchesShiftSchedule(
   shiftType: ShiftType,
   startTime: string | null | undefined,
-  endTime: string | null | undefined
+  endTime: string | null | undefined,
 ): boolean {
   const schedule = getShiftSchedule(shiftType);
 

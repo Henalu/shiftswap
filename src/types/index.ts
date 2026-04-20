@@ -39,6 +39,16 @@ export type CalendarDayType =
   | 'normal_full'
   | 'normal_short'
   | 'vacation';
+export type CalendarExchangeOverlayKind =
+  | 'received'
+  | 'delivered'
+  | 'same_day_swap';
+export interface CalendarExchangeOverlayEntry {
+  exchangeId: string;
+  date: string;
+  kind: Exclude<CalendarExchangeOverlayKind, 'same_day_swap'>;
+  shiftType: ShiftType;
+}
 // ============================================
 // Calendar / Rotation
 // ============================================

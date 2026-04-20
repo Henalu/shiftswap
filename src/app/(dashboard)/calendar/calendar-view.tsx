@@ -5,11 +5,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, PANEL_CLASSNAME } from "@/lib/utils";
 import {
+  CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS,
+  CALENDAR_EXCHANGE_OVERLAY_LABELS,
   CALENDAR_DAY_TYPE_LABELS,
   CALENDAR_DAY_TYPE_DOT_COLORS,
 } from "@/lib/constants";
 import type { CalendarDay } from "@/lib/calendar";
-import type { CalendarDayType } from "@/types";
+import type { CalendarDayType, CalendarExchangeOverlayKind } from "@/types";
 import { CalendarDayCell } from "@/app/(dashboard)/calendar/calendar-day-cell";
 
 const WEEKDAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -23,6 +25,11 @@ const LEGEND_ITEMS: CalendarDayType[] = [
   "normal_short",
   "rest",
   "vacation",
+];
+const EXCHANGE_LEGEND_ITEMS: CalendarExchangeOverlayKind[] = [
+  "received",
+  "delivered",
+  "same_day_swap",
 ];
 
 interface CalendarViewProps {
@@ -53,6 +60,14 @@ export function CalendarView({
   // Filter legend to only show day types present in this month
   const presentTypes = new Set(days.map((d) => d.dayType));
   const activeLegend = LEGEND_ITEMS.filter((t) => presentTypes.has(t));
+  const presentExchangeTypes = new Set(
+    days
+      .map((day) => day.exchangeOverlay?.kind)
+      .filter((kind): kind is CalendarExchangeOverlayKind => Boolean(kind)),
+  );
+  const activeExchangeLegend = EXCHANGE_LEGEND_ITEMS.filter((kind) =>
+    presentExchangeTypes.has(kind),
+  );
 
   return (
     <div className={cn(PANEL_CLASSNAME, "overflow-hidden")}>
@@ -125,7 +140,7 @@ export function CalendarView({
       </div>
 
       {/* Legend */}
-      {activeLegend.length > 0 && (
+      {(activeLegend.length > 0 || activeExchangeLegend.length > 0) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border/40 px-4 py-3 sm:px-6">
           {activeLegend.map((type) => (
             <div key={type} className="flex items-center gap-1.5">
@@ -138,6 +153,20 @@ export function CalendarView({
               />
               <span className="text-[11px] text-muted-foreground">
                 {CALENDAR_DAY_TYPE_LABELS[type]}
+              </span>
+            </div>
+          ))}
+          {activeExchangeLegend.map((type) => (
+            <div key={type} className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "size-2.5 rounded-full",
+                  CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS[type],
+                )}
+              />
+              <span className="text-[11px] text-muted-foreground">
+                {CALENDAR_EXCHANGE_OVERLAY_LABELS[type]}
               </span>
             </div>
           ))}

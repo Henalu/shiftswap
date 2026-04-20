@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidCompensationDay } from "@/lib/calendar";
 import { getUserCalendarInput } from "@/lib/calendar-data";
+import { findActiveExchangeSlotLock } from "@/lib/exchange-slot-locks";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import {
   getMinimumCompensationDate,
@@ -21,7 +22,7 @@ export interface ProposalState {
 
 export async function proposeExchange(
   _prevState: ProposalState | null,
-  formData: FormData
+  formData: FormData,
 ): Promise<ProposalState> {
   const shiftId = formData.get("shift_id") as string;
   const agreementTypeValue = (formData.get("agreement_type") as string)?.trim();
@@ -66,7 +67,9 @@ export async function proposeExchange(
   }
 
   if (shift.department_id !== profile.department_id) {
-    return { error: "Solo puedes proponer en turnos de tu propio departamento." };
+    return {
+      error: "Solo puedes proponer en turnos de tu propio departamento.",
+    };
   }
 
   const modalities = (shift.accepted_modalities ?? []) as string[];
@@ -102,16 +105,13 @@ export async function proposeExchange(
 
     const minimumCompensationDate = getMinimumCompensationDate();
     if (
-      !isCompensationDateValid(
-        compensationShiftDate,
-        minimumCompensationDate
-      )
+      !isCompensationDateValid(compensationShiftDate, minimumCompensationDate)
     ) {
       return { error: "La fecha del turno ofrecido debe ser futura." };
     }
 
     if (!isCompensationShiftType(compensationShiftTypeValue)) {
-      return { error: "Selecciona el tipo de turno que ofreces." };
+      return { error: "Selecciona un turno de trabajo valido para ofrecer." };
     }
 
     compensationShiftType = compensationShiftTypeValue;
@@ -126,11 +126,24 @@ export async function proposeExchange(
     const compensationDayCheck = isValidCompensationDay(
       compensationShiftDate,
       compensationShiftTypeValue,
-      calendarConfig
+      calendarConfig,
     );
     if (!compensationDayCheck.valid) {
       return {
         error: `El turno que ofreces a cambio: ${compensationDayCheck.reason}`,
+      };
+    }
+
+    const activeExchangeLock = await findActiveExchangeSlotLock({
+      userId: user.id,
+      date: compensationShiftDate,
+      shiftType: compensationShiftTypeValue,
+    });
+
+    if (activeExchangeLock) {
+      return {
+        error:
+          "Ese turno ya esta comprometido en un intercambio aceptado y no puedes volver a ofrecerlo.",
       };
     }
   }
@@ -157,7 +170,9 @@ export async function proposeExchange(
       })
       .eq("id", withdrawn.id);
 
-    if (updateError) return { error: updateError.message };
+    if (updateError) {
+      return { error: updateError.message };
+    }
     requestId = withdrawn.id;
   } else {
     const { data: newRequest, error } = await supabase
@@ -173,17 +188,15 @@ export async function proposeExchange(
       .select("id")
       .single();
 
-    if (error) return { error: error.message };
+    if (error) {
+      return { error: error.message };
+    }
     requestId = newRequest.id;
   }
 
   // Notify shift owner
   const [{ data: shiftData }, { data: proposerProfile }] = await Promise.all([
-    supabase
-      .from("shifts")
-      .select("user_id, date")
-      .eq("id", shiftId)
-      .single(),
+    supabase.from("shifts").select("user_id, date").eq("id", shiftId).single(),
     supabase
       .from("user_profiles")
       .select("full_name")
@@ -214,9 +227,7 @@ export async function proposeExchange(
   return { success: true };
 }
 
-export async function withdrawProposal(
-  formData: FormData
-): Promise<void> {
+export async function withdrawProposal(formData: FormData): Promise<void> {
   const requestId = formData.get("request_id") as string;
   const shiftId = formData.get("shift_id") as string;
 

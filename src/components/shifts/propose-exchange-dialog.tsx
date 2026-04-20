@@ -14,16 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  COMPENSATION_SHIFT_TYPE_LABELS,
-  CALENDAR_DAY_TYPE_STYLES,
-} from "@/lib/constants";
+import { CALENDAR_DAY_TYPE_STYLES, SHIFT_TYPE_LABELS } from "@/lib/constants";
 import {
   calendarDayTypeToCompensationShiftType,
+  getCalendarDayBlockedShiftReason,
   type CalendarDay,
 } from "@/lib/calendar";
 import { getMinimumCompensationDate } from "@/lib/exchange-compensation";
-import { isCompensationShiftType } from "@/lib/shifts";
+import { isShiftType } from "@/lib/shifts";
 import { cn, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import type { AcceptedModality, ShiftType } from "@/types";
 import { proposeExchange } from "./actions";
@@ -42,9 +40,9 @@ export function ProposeExchangeDialog({
   const [state, formAction, isPending] = useActionState(proposeExchange, null);
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedShiftType, setSelectedShiftType] = useState<
-    ShiftType | "rest" | ""
-  >("");
+  const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">(
+    "",
+  );
 
   const acceptsHoursBank = acceptedModalities.includes("hours_bank");
   const acceptsShiftExchange = acceptedModalities.includes("shift_exchange");
@@ -66,19 +64,40 @@ export function ProposeExchangeDialog({
   const isAutomaticCalendarMode = Boolean(calendarMap);
   const calendarWarning = calendarHint?.isVacation
     ? "Tienes vacaciones registradas para este dia."
-    : calendarHint && !autoCompensationShiftType
-      ? "Ese dia no puede ofrecerse como compensacion."
-      : null;
+    : calendarHint?.dayType === "rest"
+      ? "No puedes ofrecer un dia de descanso como cambio."
+      : calendarHint && !autoCompensationShiftType
+        ? "Ese dia no puede ofrecerse como compensacion."
+        : null;
   const fallbackDateWarning =
     isAutomaticCalendarMode && selectedDate && !calendarHint
       ? "No hemos podido anticipar esa fecha con el calendario cargado."
       : null;
+  const exchangeLockReason =
+    calendarHint && selectedShiftType
+      ? getCalendarDayBlockedShiftReason(calendarHint, selectedShiftType)
+      : null;
+  const exchangeLockWarning =
+    exchangeLockReason === "received"
+      ? "Ese turno ya lo has recibido en otro intercambio activo y no puedes volver a ofrecerlo."
+      : exchangeLockReason === "delivered"
+        ? "Ese turno ya lo has cedido en otro intercambio activo y no puedes volver a ofrecerlo."
+        : null;
   const canSubmitShiftExchange = isAutomaticCalendarMode
-    ? Boolean(selectedDate && autoCompensationShiftType && !calendarWarning)
+    ? Boolean(
+        selectedDate &&
+          autoCompensationShiftType &&
+          !calendarWarning &&
+          !exchangeLockWarning,
+      )
     : Boolean(selectedDate && selectedShiftType);
   const readOnlyShiftLabel = autoCompensationShiftType
-    ? COMPENSATION_SHIFT_TYPE_LABELS[autoCompensationShiftType]
-    : "";
+    ? SHIFT_TYPE_LABELS[autoCompensationShiftType]
+    : calendarHint?.isVacation
+      ? "Vacaciones no intercambiables"
+      : calendarHint?.dayType === "rest"
+        ? "Descanso no intercambiable"
+        : "";
 
   useEffect(() => {
     if (!state?.success) return;
@@ -133,10 +152,16 @@ export function ProposeExchangeDialog({
 
             <form action={formAction} className="space-y-5">
               <input type="hidden" name="shift_id" value={shiftId} />
-              <input type="hidden" name="agreement_type" value="shift_exchange" />
+              <input
+                type="hidden"
+                name="agreement_type"
+                value="shift_exchange"
+              />
 
               <div className="space-y-2">
-                <Label htmlFor="compensation_shift_date">Fecha del turno que ofreces</Label>
+                <Label htmlFor="compensation_shift_date">
+                  Fecha del turno que ofreces
+                </Label>
                 <Input
                   id="compensation_shift_date"
                   name="compensation_shift_date"
@@ -166,17 +191,25 @@ export function ProposeExchangeDialog({
                     description={calendarWarning}
                   />
                 )}
-                {calendarHint && autoCompensationShiftType && !calendarWarning && (
-                  <CalendarDateContext
-                    day={calendarHint}
-                    title="Compensacion detectada"
-                    description={
-                      autoCompensationShiftType === "rest"
-                        ? "Tu calendario marca descanso para este dia. Si envias la propuesta, ofreceras ese descanso."
-                        : `Tu calendario marca ${readOnlyShiftLabel.toLowerCase()} para este dia. La propuesta ofrecera automaticamente ese turno.`
-                    }
-                  />
-                )}
+                {calendarHint &&
+                  !calendarWarning &&
+                  exchangeLockWarning && (
+                    <CalendarDateContext
+                      day={calendarHint}
+                      title="Turno ya comprometido"
+                      description={exchangeLockWarning}
+                    />
+                  )}
+                {calendarHint &&
+                  autoCompensationShiftType &&
+                  !calendarWarning &&
+                  !exchangeLockWarning && (
+                    <CalendarDateContext
+                      day={calendarHint}
+                      title="Compensacion detectada"
+                      description={`Tu calendario marca ${readOnlyShiftLabel.toLowerCase()} para este dia. La propuesta ofrecera automaticamente ese turno.`}
+                    />
+                  )}
                 {fallbackDateWarning && (
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
                     {fallbackDateWarning}
@@ -185,7 +218,9 @@ export function ProposeExchangeDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="compensation_shift_type">Turno que ofreces</Label>
+                <Label htmlFor="compensation_shift_type">
+                  Turno que ofreces
+                </Label>
                 {isAutomaticCalendarMode ? (
                   <>
                     {autoCompensationShiftType ? (
@@ -202,14 +237,15 @@ export function ProposeExchangeDialog({
                         "items-center font-medium",
                         calendarHint && autoCompensationShiftType
                           ? CALENDAR_DAY_TYPE_STYLES[calendarHint.dayType]
-                          : "text-muted-foreground"
+                          : "text-muted-foreground",
                       )}
                     >
-                      {readOnlyShiftLabel || "Selecciona primero una fecha valida"}
+                      {readOnlyShiftLabel ||
+                        "Selecciona primero una fecha valida"}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      El tipo se rellena automaticamente con lo que realmente tienes
-                      ese dia en tu calendario.
+                      El tipo se rellena automaticamente con lo que realmente
+                      tienes ese dia en tu calendario.
                     </p>
                   </>
                 ) : (
@@ -222,16 +258,18 @@ export function ProposeExchangeDialog({
                       onChange={(event) => {
                         const nextValue = event.target.value;
                         setSelectedShiftType(
-                          isCompensationShiftType(nextValue) ? nextValue : ""
+                          isShiftType(nextValue) ? nextValue : "",
                         );
                       }}
                       className={FORM_CONTROL_CLASSNAME}
                     >
                       <option value="">Selecciona</option>
-                      {(Object.entries(COMPENSATION_SHIFT_TYPE_LABELS) as [
-                        ShiftType | "rest",
-                        string,
-                      ][]).map(([value, label]) => (
+                      {(
+                        Object.entries(SHIFT_TYPE_LABELS) as [
+                          ShiftType,
+                          string,
+                        ][]
+                      ).map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}
                         </option>
@@ -239,7 +277,7 @@ export function ProposeExchangeDialog({
                     </select>
                     <p className="text-xs text-muted-foreground">
                       No hemos podido cargar tu calendario. Elige manualmente el
-                      turno o descanso que ofreces.
+                      turno que ofreces.
                     </p>
                   </>
                 )}

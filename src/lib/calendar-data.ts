@@ -3,7 +3,11 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDepartmentArea } from "@/lib/departments";
 import type { CalendarConfig, CalendarInput, CalendarDay } from "@/lib/calendar";
-import { generateCalendar } from "@/lib/calendar";
+import {
+  generateCalendar,
+  mergeCalendarDaysWithExchangeOverlays,
+} from "@/lib/calendar";
+import { getUserCalendarExchangeOverlayEntries } from "@/lib/exchange-slot-locks";
 import type { Department } from "@/types";
 
 // ============================================
@@ -146,5 +150,14 @@ export async function getUserCalendar(
     return null;
   }
 
-  return generateCalendar(startDate, endDate, config);
+  const [days, overlayEntries] = await Promise.all([
+    Promise.resolve(generateCalendar(startDate, endDate, config)),
+    getUserCalendarExchangeOverlayEntries({
+      userId,
+      startDate,
+      endDate,
+    }),
+  ]);
+
+  return mergeCalendarDaysWithExchangeOverlays(days, overlayEntries);
 }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { isValidWorkDay } from "@/lib/calendar";
 import { getUserCalendarInput } from "@/lib/calendar-data";
 import { SHIFT_TYPE_LABELS } from "@/lib/constants";
+import { findActiveExchangeSlotLock } from "@/lib/exchange-slot-locks";
 import {
   getShiftSchedule,
   isShiftType,
@@ -129,6 +130,19 @@ export async function createShift(
   const workDayCheck = isValidWorkDay(date, shiftType, calendarConfig);
   if (!workDayCheck.valid) {
     return { error: workDayCheck.reason };
+  }
+
+  const activeExchangeLock = await findActiveExchangeSlotLock({
+    userId: user.id,
+    date,
+    shiftType,
+  });
+
+  if (activeExchangeLock) {
+    return {
+      error:
+        "Ese turno ya forma parte de un intercambio activo y no puede volver a publicarse.",
+    };
   }
 
   const { error } = await supabase.from("shifts").insert({

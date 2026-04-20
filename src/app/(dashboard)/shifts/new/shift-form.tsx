@@ -17,7 +17,11 @@ import {
   CALENDAR_DAY_TYPE_LABELS,
   SHIFT_TYPE_LABELS,
 } from "@/lib/constants";
-import { calendarDayTypeToShiftType, type CalendarDay } from "@/lib/calendar";
+import {
+  calendarDayTypeToShiftType,
+  getCalendarDayBlockedShiftReason,
+  type CalendarDay,
+} from "@/lib/calendar";
 import { getShiftSchedule, isShiftType } from "@/lib/shifts";
 import { formatTimeRange, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import type { ShiftType } from "@/types";
@@ -57,8 +61,20 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
     calendarMap && selectedDate && !calendarHint
       ? "No hemos podido anticipar esa fecha con el calendario cargado."
       : null;
+  const exchangeLockReason =
+    calendarHint && selectedShiftType
+      ? getCalendarDayBlockedShiftReason(calendarHint, selectedShiftType)
+      : null;
+  const exchangeLockWarning =
+    exchangeLockReason === "received"
+      ? "Ese turno ya lo has recibido mediante un intercambio activo y no puede publicarse de nuevo."
+      : exchangeLockReason === "delivered"
+        ? "Ese turno ya lo has cedido en un intercambio activo y no puede volver a publicarse."
+        : null;
   const isCalendarControlledDate = Boolean(calendarHint);
-  const isPublishBlockedByCalendar = Boolean(calendarHint && calendarWarning);
+  const isPublishBlockedByCalendar = Boolean(
+    (calendarHint && calendarWarning) || exchangeLockWarning,
+  );
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
@@ -125,7 +141,14 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
                   description={calendarWarning}
                 />
               )}
-              {calendarHint && !calendarWarning && (
+              {calendarHint && !calendarWarning && exchangeLockWarning && (
+                <CalendarDateContext
+                  day={calendarHint}
+                  title="Turno ya comprometido"
+                  description={exchangeLockWarning}
+                />
+              )}
+              {calendarHint && !calendarWarning && !exchangeLockWarning && (
                 <CalendarDateContext
                   day={calendarHint}
                   title="Asignacion detectada"

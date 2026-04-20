@@ -20,6 +20,7 @@ import {
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
+import { getMadridDateInputValue } from "@/lib/exchange-compensation";
 import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
@@ -32,6 +33,7 @@ interface ExchangeRow {
   user_a_id: string;
   user_b_id: string;
   status: ExchangeStatus;
+  compensation_shift_date: string | null;
   confirmed_at: string | null;
   submitted_for_approval_at: string | null;
   department_reviewed_at: string | null;
@@ -52,6 +54,17 @@ interface ExchangeRow {
   requester: { id: string; full_name: string; email: string };
 }
 
+function getFirstExchangeDate(
+  shiftDate: string,
+  compensationShiftDate: string | null,
+): string {
+  if (!compensationShiftDate) {
+    return shiftDate;
+  }
+
+  return compensationShiftDate < shiftDate ? compensationShiftDate : shiftDate;
+}
+
 function renderExchangeMessage(
   exchange: ExchangeRow,
   authUserId: string
@@ -59,7 +72,7 @@ function renderExchangeMessage(
   const isOwner = exchange.user_a_id === authUserId;
   const otherUser = isOwner ? exchange.requester : exchange.owner;
   const hasPendingCancellationRequest =
-    exchange.status === "pending_validation" &&
+    (exchange.status === "pending_validation" || exchange.status === "approved") &&
     Boolean(exchange.cancellation_requested_by);
 
   if (exchange.status === "accepted") {
@@ -77,6 +90,10 @@ function renderExchangeMessage(
   }
 
   if (exchange.status === "approved") {
+    if (hasPendingCancellationRequest) {
+      return "Hay una retirada pendiente entre participantes antes de la primera fecha del acuerdo.";
+    }
+
     return "El intercambio ya ha sido aprobado. Puedes abrir el expediente para revisar la resolucion.";
   }
 
@@ -107,7 +124,7 @@ export default async function ExchangesPage() {
     .from("exchanges")
     .select(
       `
-      id, shift_id, user_a_id, user_b_id, status, confirmed_at,
+      id, shift_id, user_a_id, user_b_id, status, compensation_shift_date, confirmed_at,
       submitted_for_approval_at, department_reviewed_at, department_decision_notes,
       signed_by_user_b_at,
       cancellation_requested_by, cancellation_requested_at, created_at,
@@ -214,6 +231,12 @@ export default async function ExchangesPage() {
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
+                  const canCancelBeforeFirstDate =
+                    getMadridDateInputValue() <
+                    getFirstExchangeDate(
+                      exchange.shift.date,
+                      exchange.compensation_shift_date,
+                    );
 
                   return (
                     <Card key={exchange.id}>
@@ -273,12 +296,14 @@ export default async function ExchangesPage() {
                               </Link>
                             )}
 
-                            <form action={cancelExchange}>
-                              <input type="hidden" name="exchange_id" value={exchange.id} />
-                              <Button type="submit" variant="outline" size="sm">
-                                Cancelar
-                              </Button>
-                            </form>
+                            {canCancelBeforeFirstDate && (
+                              <form action={cancelExchange}>
+                                <input type="hidden" name="exchange_id" value={exchange.id} />
+                                <Button type="submit" variant="outline" size="sm">
+                                  Cancelar
+                                </Button>
+                              </form>
+                            )}
                           </div>
                         </div>
                       </CardHeader>

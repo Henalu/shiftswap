@@ -91,7 +91,7 @@ export default async function MyShiftsPage() {
         compensation_shift_date, compensation_shift_type, status, created_at,
         requester:user_profiles!interested_user_id(id, email, full_name)
       )
-    `
+    `,
     )
     .eq("user_id", authUser.id)
     .order("date", { ascending: false });
@@ -109,7 +109,7 @@ export default async function MyShiftsPage() {
             id, shift_id, user_b_id, status,
             cancellation_requested_by, cancellation_requested_at,
             requester:user_profiles!user_b_id(id, email, full_name)
-          `
+          `,
           )
           .in("shift_id", shiftIds)
           .in("status", [
@@ -121,7 +121,8 @@ export default async function MyShiftsPage() {
           .order("created_at", { ascending: false });
 
   const activeExchangeByShiftId = new Map<string, ActiveExchange>();
-  for (const exchange of (activeExchanges ?? []) as unknown as ActiveExchange[]) {
+  for (const exchange of (activeExchanges ??
+    []) as unknown as ActiveExchange[]) {
     if (!activeExchangeByShiftId.has(exchange.shift_id)) {
       activeExchangeByShiftId.set(exchange.shift_id, exchange);
     }
@@ -162,11 +163,13 @@ export default async function MyShiftsPage() {
             const detailHref = activeExchange
               ? `/exchanges/${activeExchange.id}`
               : `/shifts/${shift.id}`;
-            const detailLabel = activeExchange ? "Ver intercambio" : "Ver detalle";
+            const detailLabel = activeExchange
+              ? "Ver intercambio"
+              : "Ver detalle";
             const pendingProposals = shift.shift_requests.filter(
               (request) =>
                 request.status === "pending" &&
-                request.interested_user_id !== activeExchange?.user_b_id
+                request.interested_user_id !== activeExchange?.user_b_id,
             );
             const hasPendingCancellationRequest =
               activeExchange?.status === "pending_validation" &&
@@ -195,7 +198,11 @@ export default async function MyShiftsPage() {
                         {formatShortDate(shift.date)} · {timeRange}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Badge className={SHIFT_TYPE_STYLES[shift.shift_type as ShiftType]}>
+                        <Badge
+                          className={
+                            SHIFT_TYPE_STYLES[shift.shift_type as ShiftType]
+                          }
+                        >
                           {SHIFT_TYPE_LABELS[shift.shift_type as ShiftType]}
                         </Badge>
                         <Badge className={statusClassName}>{statusLabel}</Badge>
@@ -240,11 +247,17 @@ export default async function MyShiftsPage() {
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <Badge className={EXCHANGE_STATUS_STYLES[activeExchange.status]}>
+                            <Badge
+                              className={
+                                EXCHANGE_STATUS_STYLES[activeExchange.status]
+                              }
+                            >
                               {EXCHANGE_STATUS_LABELS[activeExchange.status]}
                             </Badge>
                             {hasPendingCancellationRequest && (
-                              <Badge variant="outline">Cancelacion pendiente</Badge>
+                              <Badge variant="outline">
+                                Cancelacion pendiente
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -252,13 +265,14 @@ export default async function MyShiftsPage() {
                           {hasPendingCancellationRequest ? (
                             isCancellationRequester ? (
                               <>
-                                Ya has solicitado la cancelacion. Queda pendiente
-                                de respuesta por la otra parte.
+                                Ya has solicitado la cancelacion. Queda
+                                pendiente de respuesta por la otra parte.
                               </>
                             ) : (
                               <>
-                                La otra parte ha solicitado cancelar este intercambio.
-                                Entra en el intercambio para confirmarlo o rechazarlo.
+                                La otra parte ha solicitado cancelar este
+                                intercambio. Entra en el intercambio para
+                                confirmarlo o rechazarlo.
                               </>
                             )
                           ) : activeExchange.status === "accepted" ? (
@@ -268,8 +282,9 @@ export default async function MyShiftsPage() {
                             </>
                           ) : (
                             <>
-                              Este caso ya se gestiona como intercambio. Usa la vista
-                              de detalle para consultar el estado y las acciones disponibles.
+                              Este caso ya se gestiona como intercambio. Usa la
+                              vista de detalle para consultar el estado y las
+                              acciones disponibles.
                             </>
                           )}
                         </p>
@@ -288,74 +303,103 @@ export default async function MyShiftsPage() {
                         </p>
                       ) : (
                         <ul className="space-y-3">
-                          {pendingProposals.map((proposal) => (
-                            <li
-                              key={proposal.id}
-                              className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
-                            >
-                              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="min-w-0 space-y-1">
-                                  <p className="truncate text-sm font-semibold text-foreground">
-                                    {proposal.requester.full_name}
-                                  </p>
-                                  <p className="truncate text-sm text-muted-foreground">
-                                    {proposal.requester.email}
-                                  </p>
-                                  {proposal.agreement_type && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {EXCHANGE_AGREEMENT_LABELS[proposal.agreement_type as ExchangeAgreementType]}
-                                      {proposal.agreement_type === "shift_exchange" &&
-                                        proposal.compensation_shift_date && (
-                                          <>
-                                            {" — "}
-                                            {proposal.compensation_shift_type
-                                              ? COMPENSATION_SHIFT_TYPE_LABELS[
-                                                  proposal.compensation_shift_type as
-                                                    | ShiftType
-                                                    | "rest"
-                                                ]
-                                              : "Pendiente"}{" "}
-                                            del {formatCompensationDateLabel(proposal.compensation_shift_date)}
-                                          </>
-                                        )}
+                          {pendingProposals.map((proposal) => {
+                            const isInvalidRestProposal =
+                              proposal.agreement_type === "shift_exchange" &&
+                              (!proposal.compensation_shift_type ||
+                                proposal.compensation_shift_type === "rest");
+
+                            return (
+                              <li
+                                key={proposal.id}
+                                className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4"
+                              >
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                  <div className="min-w-0 space-y-1">
+                                    <p className="truncate text-sm font-semibold text-foreground">
+                                      {proposal.requester.full_name}
                                     </p>
-                                  )}
+                                    <p className="truncate text-sm text-muted-foreground">
+                                      {proposal.requester.email}
+                                    </p>
+                                    {proposal.agreement_type && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {
+                                          EXCHANGE_AGREEMENT_LABELS[
+                                            proposal.agreement_type as ExchangeAgreementType
+                                          ]
+                                        }
+                                        {proposal.agreement_type ===
+                                          "shift_exchange" &&
+                                          proposal.compensation_shift_date && (
+                                            <>
+                                              {" — "}
+                                              {proposal.compensation_shift_type
+                                                ? COMPENSATION_SHIFT_TYPE_LABELS[
+                                                    proposal.compensation_shift_type as
+                                                      | ShiftType
+                                                      | "rest"
+                                                  ]
+                                                : "Pendiente"}{" "}
+                                              del{" "}
+                                              {formatCompensationDateLabel(
+                                                proposal.compensation_shift_date,
+                                              )}
+                                            </>
+                                          )}
+                                      </p>
+                                    )}
+                                    {isInvalidRestProposal && (
+                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                        Esta propuesta no es aceptable porque
+                                        ofrece un descanso.
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <form action={acceptProposal}>
+                                      <input
+                                        type="hidden"
+                                        name="request_id"
+                                        value={proposal.id}
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="shift_id"
+                                        value={shift.id}
+                                      />
+                                      <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={isInvalidRestProposal}
+                                      >
+                                        Aceptar
+                                      </Button>
+                                    </form>
+                                    <form action={rejectProposal}>
+                                      <input
+                                        type="hidden"
+                                        name="request_id"
+                                        value={proposal.id}
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="shift_id"
+                                        value={shift.id}
+                                      />
+                                      <Button
+                                        type="submit"
+                                        size="sm"
+                                        variant="outline"
+                                      >
+                                        Rechazar
+                                      </Button>
+                                    </form>
+                                  </div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <form action={acceptProposal}>
-                                    <input
-                                      type="hidden"
-                                      name="request_id"
-                                      value={proposal.id}
-                                    />
-                                    <input
-                                      type="hidden"
-                                      name="shift_id"
-                                      value={shift.id}
-                                    />
-                                    <Button type="submit" size="sm">
-                                      Aceptar
-                                    </Button>
-                                  </form>
-                                  <form action={rejectProposal}>
-                                    <input
-                                      type="hidden"
-                                      name="request_id"
-                                      value={proposal.id}
-                                    />
-                                    <input
-                                      type="hidden"
-                                      name="shift_id"
-                                      value={shift.id}
-                                    />
-                                    <Button type="submit" size="sm" variant="outline">
-                                      Rechazar
-                                    </Button>
-                                  </form>
-                                </div>
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ul>
                       )}
                     </div>
