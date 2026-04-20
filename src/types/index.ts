@@ -294,7 +294,7 @@ export interface ShiftRequest {
   message?: string;
   agreement_type: ExchangeAgreementType;
   compensation_shift_date?: string | null;
-  compensation_shift_type?: ShiftType | null;
+  compensation_shift_type?: ShiftType | "rest" | null;
   status: RequestStatus;
   created_at: string;
 }
@@ -315,7 +315,7 @@ export interface Exchange {
   status: ExchangeStatus;
   agreement_type?: ExchangeAgreementType | null;
   compensation_shift_date?: string | null;
-  compensation_shift_type?: ShiftType | null;
+  compensation_shift_type?: ShiftType | "rest" | null;
   document_url?: string;
   confirmed_at?: string;
   signed_by_user_a_at?: string;

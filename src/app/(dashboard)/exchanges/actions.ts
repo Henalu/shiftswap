@@ -33,7 +33,7 @@ interface ExchangeParticipantRow {
   status: ExchangeStatus;
   agreement_type?: ExchangeAgreementType | null;
   compensation_shift_date?: string | null;
-  compensation_shift_type?: ShiftType | null;
+  compensation_shift_type?: ShiftType | "rest" | null;
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
   signed_by_user_b_at?: string | null;

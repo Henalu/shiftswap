@@ -32,6 +32,11 @@ export const SHIFT_TYPE_VALUES = Object.keys(
   SHIFT_TYPE_SCHEDULES
 ) as ShiftType[];
 
+export const COMPENSATION_SHIFT_TYPE_VALUES = [
+  ...SHIFT_TYPE_VALUES,
+  "rest",
+] as const;
+
 function normalizeShiftClock(value: string | null | undefined): string {
   if (!value) {
     return "";
@@ -43,6 +48,14 @@ function normalizeShiftClock(value: string | null | undefined): string {
 
 export function isShiftType(value: string | null | undefined): value is ShiftType {
   return SHIFT_TYPE_VALUES.includes(value as ShiftType);
+}
+
+export function isCompensationShiftType(
+  value: string | null | undefined
+): value is ShiftType | "rest" {
+  return COMPENSATION_SHIFT_TYPE_VALUES.includes(
+    value as (typeof COMPENSATION_SHIFT_TYPE_VALUES)[number]
+  );
 }
 
 export function getShiftSchedule(shiftType: ShiftType): ShiftSchedule {

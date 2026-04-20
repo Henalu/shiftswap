@@ -13,6 +13,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import {
+  COMPENSATION_SHIFT_TYPE_LABELS,
   EXCHANGE_AGREEMENT_LABELS,
   EXCHANGE_STATUS_LABELS,
   EXCHANGE_STATUS_STYLES,
@@ -307,7 +308,13 @@ export default async function MyShiftsPage() {
                                         proposal.compensation_shift_date && (
                                           <>
                                             {" — "}
-                                            {SHIFT_TYPE_LABELS[proposal.compensation_shift_type as ShiftType]}{" "}
+                                            {proposal.compensation_shift_type
+                                              ? COMPENSATION_SHIFT_TYPE_LABELS[
+                                                  proposal.compensation_shift_type as
+                                                    | ShiftType
+                                                    | "rest"
+                                                ]
+                                              : "Pendiente"}{" "}
                                             del {formatCompensationDateLabel(proposal.compensation_shift_date)}
                                           </>
                                         )}

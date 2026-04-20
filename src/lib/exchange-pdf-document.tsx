@@ -7,6 +7,7 @@ import {
   View,
 } from "@react-pdf/renderer";
 import {
+  COMPENSATION_SHIFT_TYPE_LABELS,
   EXCHANGE_AGREEMENT_LABELS,
   EXCHANGE_STATUS_LABELS,
   SHIFT_DEBT_TRANSACTION_STATUS_LABELS,
@@ -80,7 +81,7 @@ export interface ExchangePdfData {
     shift_type: ShiftType;
     department_name: string;
     company_name: string | null;
-    target_shift_type: ShiftType | null;
+    target_shift_type: ShiftType | "rest" | null;
     target_shift_date: string | null;
   };
   owner: ExchangePdfPerson;
@@ -537,13 +538,17 @@ function getAgreementNarrative(
 
   if (exchange.agreement_type === "shift_exchange") {
     const targetShiftLabel = exchange.shift.target_shift_type
-      ? SHIFT_TYPE_LABELS[exchange.shift.target_shift_type]
+      ? COMPENSATION_SHIFT_TYPE_LABELS[exchange.shift.target_shift_type]
       : "turno pendiente";
     const targetShiftDate =
       formatCompensationDateLabel(exchange.shift.target_shift_date) ??
       "fecha pendiente";
+    const targetCompensationText =
+      exchange.shift.target_shift_type === "rest"
+        ? `el descanso del ${targetShiftDate}`
+        : `el turno de ${targetShiftLabel} del ${targetShiftDate}`;
 
-    return `${exchange.requester.full_name} solicita cubrir el turno de ${sourceShiftLabel} del ${sourceShiftDate} (${sourceShiftTime}) por ${exchange.owner.full_name}, con compensacion futura prevista para el turno de ${targetShiftLabel} del ${targetShiftDate}.`;
+    return `${exchange.requester.full_name} solicita cubrir el turno de ${sourceShiftLabel} del ${sourceShiftDate} (${sourceShiftTime}) por ${exchange.owner.full_name}, con compensacion futura prevista para ${targetCompensationText}.`;
   }
 
   return `${exchange.requester.full_name} solicita intercambiar con ${exchange.owner.full_name} el turno de ${sourceShiftLabel} del ${sourceShiftDate} (${sourceShiftTime}). El expediente conserva el estado operativo real de ShiftSwap y puede exportarse incluso antes de la resolucion final del departamento.`;
@@ -566,7 +571,7 @@ function getCompensationCardLines(exchange: ExchangePdfData) {
 
   if (exchange.agreement_type === "shift_exchange") {
     const targetShiftLabel = exchange.shift.target_shift_type
-      ? SHIFT_TYPE_LABELS[exchange.shift.target_shift_type]
+      ? COMPENSATION_SHIFT_TYPE_LABELS[exchange.shift.target_shift_type]
       : "Pendiente de definir";
     const targetShiftDate =
       formatCompensationDateLabel(exchange.shift.target_shift_date) ??

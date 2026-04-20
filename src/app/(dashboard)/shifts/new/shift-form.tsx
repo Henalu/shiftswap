@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import { CalendarDateContext } from "@/components/shifts/calendar-date-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,6 +53,10 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
         ? "Tienes vacaciones registradas para este dia."
         : null
     : null;
+  const calendarOutOfRangeWarning =
+    calendarMap && selectedDate && !calendarHint
+      ? "No hemos podido anticipar esa fecha con el calendario cargado."
+      : null;
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
@@ -111,8 +116,24 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
                   }
                 }}
               />
-              {calendarWarning && (
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{calendarWarning}</p>
+              {calendarHint && calendarWarning && (
+                <CalendarDateContext
+                  day={calendarHint}
+                  title="Fecha no publicable"
+                  description={calendarWarning}
+                />
+              )}
+              {calendarHint && !calendarWarning && (
+                <CalendarDateContext
+                  day={calendarHint}
+                  title="Asignacion detectada"
+                  description={`Tu calendario marca ${CALENDAR_DAY_TYPE_LABELS[calendarHint.dayType].toLowerCase()} para este dia. El tipo de turno y el horario se asignaran automaticamente.`}
+                />
+              )}
+              {calendarOutOfRangeWarning && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                  {calendarOutOfRangeWarning}
+                </p>
               )}
             </div>
 

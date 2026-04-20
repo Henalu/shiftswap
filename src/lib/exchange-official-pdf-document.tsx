@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
+import { COMPENSATION_SHIFT_TYPE_LABELS } from "@/lib/constants";
 import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 export interface ExchangeOfficialPdfPerson {
@@ -39,7 +40,7 @@ export interface ExchangeOfficialPdfData {
     end_time: string;
     shift_type: ShiftType;
     department_name: string;
-    target_shift_type: ShiftType | null;
+    target_shift_type: ShiftType | "rest" | null;
     target_shift_date: string | null;
   };
   owner: ExchangeOfficialPdfPerson;
@@ -438,9 +439,15 @@ function getDateParts(value: string | null | undefined) {
   return formatted.split("/");
 }
 
-function getOfficialShiftLabel(shiftType: ShiftType | null | undefined): string {
+function getOfficialShiftLabel(
+  shiftType: ShiftType | "rest" | null | undefined
+): string {
   if (!shiftType) {
     return "";
+  }
+
+  if (shiftType === "rest") {
+    return COMPENSATION_SHIFT_TYPE_LABELS.rest;
   }
 
   return OFFICIAL_SHIFT_LABELS[shiftType];
@@ -483,17 +490,23 @@ function getValue(value: string | null | undefined): string {
 function buildRequestedShiftSummary(exchange: ExchangeOfficialPdfData): {
   shiftLabel: string;
   dateLabel: string;
+  prefixLabel: string;
 } {
   if (exchange.agreement_type === "shift_exchange") {
     return {
       shiftLabel: getOfficialShiftLabel(exchange.shift.target_shift_type),
       dateLabel: formatShortDate(exchange.shift.target_shift_date),
+      prefixLabel:
+        exchange.shift.target_shift_type === "rest"
+          ? " por el descanso "
+          : " por el turno ",
     };
   }
 
   return {
     shiftLabel: "",
     dateLabel: "",
+    prefixLabel: " por el turno ",
   };
 }
 
@@ -773,7 +786,7 @@ export function ExchangeOfficialShiftChangePdf({
                   {formatShortDate(exchange.shift.date)}
                 </Text>
               </View>
-              <Text style={styles.fieldLabel}> por el turno </Text>
+              <Text style={styles.fieldLabel}>{requestedShift.prefixLabel}</Text>
               <View
                 style={[
                   styles.fieldBox,

@@ -23,7 +23,7 @@ interface ExchangeDocumentDetail {
   status: ExchangeStatus;
   agreement_type: ExchangeAgreementType | null;
   compensation_shift_date: string | null;
-  compensation_shift_type: ShiftType | null;
+  compensation_shift_type: ShiftType | "rest" | null;
   created_at: string;
   confirmed_at: string | null;
   signed_by_user_a_at: string | null;

@@ -1,5 +1,6 @@
 import {
   CALENDAR_DAY_TYPE_LABELS,
+  COMPENSATION_SHIFT_TYPE_LABELS,
   SHIFT_TYPE_LABELS,
 } from "@/lib/constants";
 import type { CalendarDayType, ShiftType, ScheduleTypeCode } from "@/types";
@@ -214,6 +215,32 @@ export function calendarDayTypeToShiftType(
 }
 
 /**
+ * Map CalendarDayType → compensation_shift_type.
+ * Work days keep their shift type, rest maps to "rest",
+ * and vacations are not offerable.
+ */
+export function calendarDayTypeToCompensationShiftType(
+  dayType: CalendarDayType
+): ShiftType | "rest" | null {
+  switch (dayType) {
+    case "morning":
+      return "morning";
+    case "afternoon":
+      return "afternoon";
+    case "night":
+      return "night";
+    case "normal_full":
+      return "normal_full";
+    case "normal_short":
+      return "normal_short";
+    case "rest":
+      return "rest";
+    default:
+      return null;
+  }
+}
+
+/**
  * Validate whether a user can publish/offer a shift on a given date.
  * Returns { valid: true } or { valid: false, reason: string }.
  */
@@ -255,6 +282,54 @@ export function isValidWorkDay(
     return {
       valid: false,
       reason: `Tu calendario indica turno de ${expectedLabel} para este dia, no ${actualLabel}.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+export function isValidCompensationDay(
+  date: string,
+  compensationShiftType: ShiftType | "rest",
+  config: CalendarConfig
+): { valid: true } | { valid: false; reason: string } {
+  if (!config.configured) {
+    return { valid: true };
+  }
+
+  const days = generateCalendar(date, date, config);
+  const day = days[0];
+
+  if (!day) {
+    return { valid: true };
+  }
+
+  if (day.isVacation) {
+    return {
+      valid: false,
+      reason: "Tienes vacaciones registradas para este dia.",
+    };
+  }
+
+  const expectedCompensationType = calendarDayTypeToCompensationShiftType(day.dayType);
+
+  if (!expectedCompensationType) {
+    return {
+      valid: false,
+      reason: "Ese dia no puede ofrecerse como compensacion.",
+    };
+  }
+
+  if (expectedCompensationType !== compensationShiftType) {
+    const expectedLabel =
+      COMPENSATION_SHIFT_TYPE_LABELS[expectedCompensationType] ??
+      day.dayType;
+    const actualLabel =
+      COMPENSATION_SHIFT_TYPE_LABELS[compensationShiftType] ??
+      compensationShiftType;
+    return {
+      valid: false,
+      reason: `Tu calendario indica ${expectedLabel} para este dia, no ${actualLabel}.`,
     };
   }
 

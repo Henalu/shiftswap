@@ -19,6 +19,11 @@ export const SHIFT_TYPE_LABELS = {
   normal_short: "Jornada reducida",
 } as const satisfies Record<ShiftType, string>;
 
+export const COMPENSATION_SHIFT_TYPE_LABELS = {
+  ...SHIFT_TYPE_LABELS,
+  rest: "Descanso",
+} as const satisfies Record<ShiftType | "rest", string>;
+
 export const SHIFT_TYPE_STYLES = {
   morning:
     "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -31,6 +36,11 @@ export const SHIFT_TYPE_STYLES = {
   normal_short:
     "border-cyan-500/15 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
 } as const satisfies Record<ShiftType, string>;
+
+export const COMPENSATION_SHIFT_TYPE_STYLES = {
+  ...SHIFT_TYPE_STYLES,
+  rest: "border-muted bg-muted/50 text-muted-foreground",
+} as const satisfies Record<ShiftType | "rest", string>;
 
 export const SHIFT_STATUS_LABELS = {
   open: "Disponible",

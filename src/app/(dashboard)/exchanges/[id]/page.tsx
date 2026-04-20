@@ -33,6 +33,7 @@ import {
   EXCHANGE_AGREEMENT_STYLES,
   EXCHANGE_STATUS_LABELS,
   EXCHANGE_STATUS_STYLES,
+  COMPENSATION_SHIFT_TYPE_LABELS,
   SHIFT_DEBT_TRANSACTION_STATUS_LABELS,
   SHIFT_DEBT_TRANSACTION_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
@@ -69,7 +70,7 @@ interface ExchangeDetail {
   status: ExchangeStatus;
   agreement_type: ExchangeAgreementType | null;
   compensation_shift_date: string | null;
-  compensation_shift_type: ShiftType | null;
+  compensation_shift_type: ShiftType | "rest" | null;
   document_url: string | null;
   confirmed_at: string | null;
   signed_by_user_a_at: string | null;
@@ -499,11 +500,11 @@ export default async function ExchangeDetailPage({
 
                   <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Turno futuro acordado
+                      Compensacion futura acordada
                     </p>
                     <p className="mt-2 text-sm font-semibold text-foreground">
                       {typed.compensation_shift_type
-                        ? SHIFT_TYPE_LABELS[typed.compensation_shift_type]
+                        ? COMPENSATION_SHIFT_TYPE_LABELS[typed.compensation_shift_type]
                         : "Pendiente"}
                     </p>
                   </div>

@@ -1,7 +1,7 @@
 import {
+  COMPENSATION_SHIFT_TYPE_LABELS,
   EXCHANGE_AGREEMENT_LABELS,
   SHIFT_DEBT_TRANSACTION_STATUS_LABELS,
-  SHIFT_TYPE_LABELS,
 } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -91,7 +91,7 @@ export function getAgreementSummary({
   requesterName,
 }: {
   agreementType: ExchangeAgreementType | null | undefined;
-  compensationShiftType?: ShiftType | null;
+  compensationShiftType?: ShiftType | "rest" | null;
   compensationShiftDate?: string | null;
   ownerName: string;
   requesterName: string;
@@ -105,12 +105,26 @@ export function getAgreementSummary({
   }
 
   const shiftLabel = compensationShiftType
-    ? SHIFT_TYPE_LABELS[compensationShiftType]
+    ? COMPENSATION_SHIFT_TYPE_LABELS[compensationShiftType]
     : "turno pendiente";
   const dateLabel =
     formatCompensationDateLabel(compensationShiftDate) ?? "fecha pendiente";
+  const compensationSummary =
+    compensationShiftType === "rest"
+      ? `descanso del ${dateLabel}`
+      : `turno de ${shiftLabel} del ${dateLabel}`;
 
-  return `${EXCHANGE_AGREEMENT_LABELS.shift_exchange}: compensacion acordada para el turno de ${shiftLabel} del ${dateLabel}.`;
+  return `${EXCHANGE_AGREEMENT_LABELS.shift_exchange}: compensacion acordada para el ${compensationSummary}.`;
+}
+
+export function getCompensationShiftTypeLabel(
+  value: ShiftType | "rest" | null | undefined
+): string {
+  if (!value) {
+    return "";
+  }
+
+  return COMPENSATION_SHIFT_TYPE_LABELS[value] ?? value;
 }
 
 export function getHoursBankDescription(

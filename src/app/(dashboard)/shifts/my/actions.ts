@@ -9,6 +9,7 @@ import {
   createNotification,
   resolveNotifications,
 } from "@/lib/notifications";
+import type { ShiftType } from "@/types";
 
 function revalidateShiftViews(shiftId: string) {
   revalidatePath("/shifts");
@@ -145,7 +146,10 @@ export async function acceptProposal(formData: FormData): Promise<void> {
       title: `${ownerName} ha aceptado la propuesta de ${requesterName}`,
       details: getAgreementSummary({
         agreementType: request.agreement_type as "hours_bank" | "shift_exchange",
-        compensationShiftType: request.compensation_shift_type as "morning" | "afternoon" | "night" | null,
+        compensationShiftType: request.compensation_shift_type as
+          | ShiftType
+          | "rest"
+          | null,
         compensationShiftDate: request.compensation_shift_date,
         ownerName,
         requesterName,

@@ -16,6 +16,7 @@ import { startConversation } from "@/app/(dashboard)/chat/actions";
 import { withdrawProposal } from "@/components/shifts/actions";
 import {
   EXCHANGE_AGREEMENT_LABELS,
+  COMPENSATION_SHIFT_TYPE_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_STYLES,
   SHIFT_STATUS_LABELS,
@@ -23,7 +24,12 @@ import {
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
-import { formatCompensationDateLabel } from "@/lib/exchange-compensation";
+import {
+  formatCompensationDateLabel,
+  getMinimumCompensationDate,
+} from "@/lib/exchange-compensation";
+import { formatDateISO } from "@/lib/calendar";
+import { getUserCalendar } from "@/lib/calendar-data";
 import { formatDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import type { AcceptedModality, ExchangeAgreementType, RequestStatus, ShiftType, ShiftWithUser } from "@/types";
@@ -121,6 +127,19 @@ export default async function ShiftDetailPage({ params }: PageProps) {
   const canPropose = !isOwner && shift.status === "open" && !myActiveProposal;
   const showChatButton = !isOwner;
   const acceptedModalities = (shift.accepted_modalities ?? ["hours_bank", "shift_exchange"]) as AcceptedModality[];
+  const shouldLoadProposalCalendar =
+    canPropose && acceptedModalities.includes("shift_exchange");
+  const minCompensationDate = getMinimumCompensationDate();
+  const compensationDateSeed = new Date(
+    Number(minCompensationDate.slice(0, 4)),
+    Number(minCompensationDate.slice(5, 7)) - 1,
+    Number(minCompensationDate.slice(8, 10))
+  );
+  compensationDateSeed.setDate(compensationDateSeed.getDate() + 180);
+  const maxCompensationDate = formatDateISO(compensationDateSeed);
+  const calendarDays = shouldLoadProposalCalendar
+    ? await getUserCalendar(authUser.id, minCompensationDate, maxCompensationDate)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -201,6 +220,7 @@ export default async function ShiftDetailPage({ params }: PageProps) {
                 <ProposeExchangeDialog
                   shiftId={shift.id}
                   acceptedModalities={acceptedModalities}
+                  calendarDays={calendarDays}
                 />
               )}
 
@@ -272,7 +292,11 @@ export default async function ShiftDetailPage({ params }: PageProps) {
                               request.compensation_shift_date && (
                                 <>
                                   {" — "}
-                                  {SHIFT_TYPE_LABELS[request.compensation_shift_type as ShiftType]}{" "}
+                                  {request.compensation_shift_type
+                                    ? COMPENSATION_SHIFT_TYPE_LABELS[
+                                        request.compensation_shift_type as ShiftType | "rest"
+                                      ]
+                                    : "Pendiente"}{" "}
                                   del {formatCompensationDateLabel(request.compensation_shift_date)}
                                 </>
                               )}

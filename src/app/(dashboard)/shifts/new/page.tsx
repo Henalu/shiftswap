@@ -67,10 +67,10 @@ export default async function NewShiftPage() {
         .maybeSingle()
     : { data: null };
 
-  // Load calendar for the next 60 days to enable client-side hints
+  // Load calendar for the next 180 days to enable client-side hints
   const today = todayISO();
   const futureDateSeed = new Date();
-  futureDateSeed.setDate(futureDateSeed.getDate() + 60);
+  futureDateSeed.setDate(futureDateSeed.getDate() + 180);
   const futureDate = formatDateISO(futureDateSeed);
   const calendarDays = await getUserCalendar(authUser.id, today, futureDate);
 

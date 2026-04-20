@@ -2,11 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isValidWorkDay } from "@/lib/calendar";
+import { isValidCompensationDay } from "@/lib/calendar";
 import { getUserCalendarInput } from "@/lib/calendar-data";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
-import { isExchangeAgreementType } from "@/lib/exchange-compensation";
-import { isShiftType } from "@/lib/shifts";
+import {
+  getMinimumCompensationDate,
+  isCompensationDateValid,
+  isExchangeAgreementType,
+} from "@/lib/exchange-compensation";
+import { isCompensationShiftType } from "@/lib/shifts";
 import { requireSignature } from "@/lib/user-profiles";
 import { formatShortDate } from "@/lib/utils";
 
@@ -96,12 +100,17 @@ export async function proposeExchange(
       return { error: "Indica la fecha del turno que ofreces a cambio." };
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    if (compensationShiftDate <= today) {
+    const minimumCompensationDate = getMinimumCompensationDate();
+    if (
+      !isCompensationDateValid(
+        compensationShiftDate,
+        minimumCompensationDate
+      )
+    ) {
       return { error: "La fecha del turno ofrecido debe ser futura." };
     }
 
-    if (!isShiftType(compensationShiftTypeValue)) {
+    if (!isCompensationShiftType(compensationShiftTypeValue)) {
       return { error: "Selecciona el tipo de turno que ofreces." };
     }
 
@@ -114,13 +123,15 @@ export async function proposeExchange(
       endDate: compensationShiftDate,
     });
 
-    const workDayCheck = isValidWorkDay(
+    const compensationDayCheck = isValidCompensationDay(
       compensationShiftDate,
       compensationShiftTypeValue,
       calendarConfig
     );
-    if (!workDayCheck.valid) {
-      return { error: `El turno que ofreces a cambio: ${workDayCheck.reason}` };
+    if (!compensationDayCheck.valid) {
+      return {
+        error: `El turno que ofreces a cambio: ${compensationDayCheck.reason}`,
+      };
     }
   }
 
