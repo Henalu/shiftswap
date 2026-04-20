@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Manrope } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${manrope.className} ${geistMono.variable} antialiased`}>
         {children}
+        <Analytics />
         <Toaster richColors position="top-right" />
       </body>
     </html>

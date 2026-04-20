@@ -156,6 +156,9 @@ Archivo vivo con estado real del proyecto, decisiones importantes y siguientes p
 ## Siguientes pasos recomendados
 
 1. Preparar staging separado y validar el smoke completo.
+   - Recordatorio de timing: no es estrictamente necesario abrir `staging` hoy mientras sigamos afinando producto dentro del repo.
+   - Momento recomendado para hacerlo: justo antes de arrancar el piloto real, o antes si vamos a tocar variables de entorno, deploy, observabilidad externa o credenciales E2E compartidas.
+   - Senal de activacion: cuando el siguiente trabajo ya no sea "seguir construyendo" sino "probar el sistema como si fuera real".
 2. Configurar observabilidad minima:
    - uptime check
    - alertas de build

@@ -97,6 +97,7 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 ### Fase 5.1 - Pilot readiness real
 
 - Staging separado y verificado
+- Momento recomendado: abrirlo cuando el siguiente bloque de trabajo ya sea piloto, deploy o validacion externa, no mientras el trabajo siga siendo mayoritariamente interno al repo
 - Smoke automatizado ejecutable
 - Smoke manual de punta a punta
 - Observabilidad minima:
