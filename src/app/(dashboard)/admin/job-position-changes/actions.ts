@@ -71,7 +71,7 @@ async function getJobPositionChangeTarget(
       `
       id, user_id, company_id, current_department_id, requested_job_position_id, status,
       user:user_profiles!user_id(id, full_name),
-      current_department:departments!current_department_id(name),
+      current_department:departments!job_position_change_requests_department_fk(name),
       requested_job_position:job_positions!requested_job_position_id(name)
     `
     )

@@ -101,7 +101,7 @@ export default async function AdminJobPositionChangesPage() {
       requested_job_position_id, request_reason, review_notes, status, created_at, reviewed_at,
       user:user_profiles!user_id(id, full_name, email),
       company:companies!company_id(id, name),
-      current_department:departments!current_department_id(id, name),
+      current_department:departments!job_position_change_requests_department_fk(id, name),
       current_job_position:job_positions!current_job_position_id(id, name),
       requested_job_position:job_positions!requested_job_position_id(id, name)
     `

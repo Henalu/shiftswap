@@ -71,8 +71,8 @@ async function getDepartmentChangeTarget(
       `
       id, user_id, company_id, current_department_id, requested_department_id, status,
       user:user_profiles!user_id(id, full_name),
-      current_department:departments!current_department_id(name),
-      requested_department:departments!requested_department_id(name)
+      current_department:departments!department_change_requests_current_department_fk(name),
+      requested_department:departments!department_change_requests_requested_department_fk(name)
     `
     )
     .eq("id", requestId)

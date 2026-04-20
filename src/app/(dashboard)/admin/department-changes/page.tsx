@@ -95,8 +95,8 @@ export default async function AdminDepartmentChangesPage() {
       request_reason, review_notes, status, created_at, reviewed_at,
       user:user_profiles!user_id(id, full_name, email),
       company:companies!company_id(id, name),
-      current_department:departments!current_department_id(id, name),
-      requested_department:departments!requested_department_id(id, name)
+      current_department:departments!department_change_requests_current_department_fk(id, name),
+      requested_department:departments!department_change_requests_requested_department_fk(id, name)
     `
     )
     .order("created_at", { ascending: false });
