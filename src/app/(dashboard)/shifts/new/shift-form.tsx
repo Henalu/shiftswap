@@ -57,6 +57,8 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
     calendarMap && selectedDate && !calendarHint
       ? "No hemos podido anticipar esa fecha con el calendario cargado."
       : null;
+  const isCalendarControlledDate = Boolean(calendarHint);
+  const isPublishBlockedByCalendar = Boolean(calendarHint && calendarWarning);
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
@@ -144,8 +146,8 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
               )}
               <select
                 id="shift_type"
-                name={calendarHint && !calendarWarning ? undefined : "shift_type"}
-                required={!(calendarHint && !calendarWarning)}
+                name={calendarHint && !calendarWarning ? undefined : isCalendarControlledDate ? undefined : "shift_type"}
+                required={!isCalendarControlledDate}
                 value={selectedShiftType}
                 onChange={(event) => {
                   const nextValue = event.target.value;
@@ -153,7 +155,7 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
                 }}
                 className={FORM_CONTROL_CLASSNAME}
                 aria-describedby="shift-schedule-help shift-schedule-current"
-                disabled={!!(calendarHint && !calendarWarning)}
+                disabled={isCalendarControlledDate}
               >
                 <option value="">Selecciona un tipo</option>
                 {(Object.entries(SHIFT_TYPE_LABELS) as [ShiftType, string][]).map(
@@ -269,7 +271,9 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
           <p className="text-sm text-muted-foreground">
             El turno se publicara listo para recibir propuestas.
           </p>
-          <Button type="submit">Publicar turno</Button>
+          <Button type="submit" disabled={isPublishBlockedByCalendar}>
+            Publicar turno
+          </Button>
         </CardFooter>
       </Card>
     </form>
