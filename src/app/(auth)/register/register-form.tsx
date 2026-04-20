@@ -159,7 +159,7 @@ export default function RegisterForm({
           </p>
           <p>
             Hasta entonces no podras acceder al dashboard. En cuanto se apruebe,
-            podras iniciar sesion con tu email y contrasena.
+            podras iniciar sesion con tu email y contraseña.
           </p>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">

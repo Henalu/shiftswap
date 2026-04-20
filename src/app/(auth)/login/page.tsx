@@ -82,7 +82,7 @@ export default function LoginPage() {
             href="/forgot-password"
             className="text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
-            He olvidado mi contrasena
+            He olvidado mi contraseña
           </Link>
           <p className="text-center text-sm text-muted-foreground">
             Aun no tienes cuenta?{" "}

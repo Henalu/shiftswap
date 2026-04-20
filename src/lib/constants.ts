@@ -4,15 +4,15 @@ import type {
   ExchangeAgreementType,
   ExchangeStatus,
   RequestStatus,
-  ShiftStatus,
   ShiftDebtTransactionStatus,
+  ShiftStatus,
   ShiftType,
 } from "@/types";
 
 // ShiftSwap - Application Constants
 
 export const SHIFT_TYPE_LABELS = {
-  morning: "Manana",
+  morning: "Ma\u00f1ana",
   afternoon: "Tarde",
   night: "Noche",
   normal_full: "Jornada completa",
@@ -157,7 +157,7 @@ export const DEPARTMENT_CHANGE_REQUEST_STATUS_STYLES = {
 } as const satisfies Record<DepartmentChangeRequestStatus, string>;
 
 export const CALENDAR_DAY_TYPE_LABELS = {
-  morning: "Manana",
+  morning: "Ma\u00f1ana",
   afternoon: "Tarde",
   night: "Noche",
   rest: "Descanso",
@@ -173,8 +173,7 @@ export const CALENDAR_DAY_TYPE_STYLES = {
     "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
   night:
     "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/20",
-  rest:
-    "bg-muted/50 text-muted-foreground border-muted",
+  rest: "bg-muted/50 text-muted-foreground border-muted",
   normal_full:
     "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/20",
   normal_short:

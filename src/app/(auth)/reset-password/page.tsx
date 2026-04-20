@@ -48,12 +48,12 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password.length < 8) {
-      setError("La nueva contrasena debe tener al menos 8 caracteres.");
+      setError("La nueva contraseña debe tener al menos 8 caracteres.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Las dos contrasenas deben coincidir.");
+      setError("Las dos contraseñas deben coincidir.");
       return;
     }
 
@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
 
     if (updateError) {
       setError(
-        "No se pudo actualizar la contrasena. " + updateError.message
+        "No se pudo actualizar la contraseña. " + updateError.message
       );
       return;
     }
@@ -82,9 +82,9 @@ export default function ResetPasswordPage() {
     <Card className="border-border/80">
       <CardHeader className="space-y-3">
         <div className="space-y-2">
-          <CardTitle>Definir nueva contrasena</CardTitle>
+          <CardTitle>Definir nueva contraseña</CardTitle>
           <CardDescription>
-            Crea una contrasena nueva para volver a entrar con seguridad.
+            Crea una contraseña nueva para volver a entrar con seguridad.
           </CardDescription>
         </div>
       </CardHeader>
@@ -111,7 +111,7 @@ export default function ResetPasswordPage() {
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="password">Nueva contrasena</Label>
+            <Label htmlFor="password">Nueva contraseña</Label>
             <Input
               id="password"
               type="password"
@@ -124,7 +124,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm_password">Repite la contrasena</Label>
+            <Label htmlFor="confirm_password">Repite la contraseña</Label>
             <Input
               id="confirm_password"
               type="password"
@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
             className="w-full"
             disabled={loading || success || !sessionReady}
           >
-            {loading ? "Guardando..." : "Actualizar contrasena"}
+            {loading ? "Guardando..." : "Actualizar contraseña"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Prefieres volver al acceso normal?{" "}

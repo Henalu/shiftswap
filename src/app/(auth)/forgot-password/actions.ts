@@ -50,7 +50,7 @@ export async function sendPasswordResetEmail(
   if (error) {
     return {
       error:
-        "No se pudo iniciar la recuperacion de contrasena. " + error.message,
+        "No se pudo iniciar la recuperacion de contraseña. " + error.message,
     };
   }
 

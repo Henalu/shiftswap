@@ -36,7 +36,7 @@ export function OnboardingModal() {
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             Todo lo que necesitas para gestionar cambios de turno con tus
-            companeros, en un solo lugar.
+            compañeros, en un solo lugar.
           </DialogDescription>
         </DialogHeader>
 
@@ -74,7 +74,7 @@ export function OnboardingModal() {
                 </p>
                 <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
                   Publica los turnos que quieras intercambiar o explora los de
-                  otros companeros en el Tablon.
+                  otros compañeros en el Tablon.
                 </p>
               </div>
             </div>

@@ -180,7 +180,7 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
               El horario se asigna automaticamente segun el tipo de turno.
             </p>
             <p className="mt-1 text-muted-foreground">
-              Manana 06:00-14:00, Tarde 14:00-22:00, Noche 22:00-06:00, J. completa 08:00-16:00, J. reducida 08:00-14:00.
+              Mañana 06:00-14:00, Tarde 14:00-22:00, Noche 22:00-06:00, J. completa 08:00-16:00, J. reducida 08:00-14:00.
             </p>
           </div>
 
@@ -255,11 +255,11 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
               id="description"
               name="description"
               rows={4}
-              placeholder="Anade solo el contexto que ayude a valorar el intercambio."
+              placeholder="Añade solo el contexto que ayude a valorar el intercambio."
               className={FORM_CONTROL_CLASSNAME + " min-h-28 py-3"}
             />
             <p className="text-sm text-muted-foreground">
-              Anade solo el contexto que ayude a valorar el intercambio, como una
+              Añade solo el contexto que ayude a valorar el intercambio, como una
               restriccion puntual o una preferencia de compensacion.
             </p>
           </div>

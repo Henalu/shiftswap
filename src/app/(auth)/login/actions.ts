@@ -26,7 +26,7 @@ export async function loginWithPassword(
   const password = (formData.get("password") as string | null) ?? "";
 
   if (!email || !password) {
-    return { error: "Introduce tu email y tu contrasena para continuar." };
+    return { error: "Introduce tu email y tu contraseña para continuar." };
   }
 
   const requestHeaders = await headers();
@@ -65,7 +65,7 @@ export async function loginWithPassword(
     return {
       error:
         error.message === "Invalid login credentials"
-          ? "Email o contrasena incorrectos."
+          ? "Email o contraseña incorrectos."
           : error.message,
     };
   }

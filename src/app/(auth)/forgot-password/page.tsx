@@ -39,10 +39,10 @@ export default function ForgotPasswordPage() {
     <Card className="border-border/80">
       <CardHeader className="space-y-3">
         <div className="space-y-2">
-          <CardTitle>Recuperar contrasena</CardTitle>
+          <CardTitle>Recuperar contraseña</CardTitle>
           <CardDescription>
             Te enviaremos un enlace seguro para que puedas definir una nueva
-            contrasena.
+            contraseña.
           </CardDescription>
         </div>
       </CardHeader>
@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
         <CardFooter className="flex flex-col gap-4">
           <SubmitButton />
           <p className="text-center text-sm text-muted-foreground">
-            Ya recuerdas tu contrasena?{" "}
+            Ya recuerdas tu contraseña?{" "}
             <Link
               href="/login"
               className="font-medium text-primary underline-offset-4 hover:underline"

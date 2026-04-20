@@ -97,7 +97,7 @@ export function ExchangeApprovalDecisionForm({
           id="exchange-review-notes"
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          placeholder="Anade contexto para la resolucion o explica el motivo del rechazo."
+          placeholder="Añade contexto para la resolucion o explica el motivo del rechazo."
           disabled={isSubmitting}
         />
       </div>

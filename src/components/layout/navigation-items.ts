@@ -49,7 +49,7 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
   {
     href: "/chat",
     label: "Chat",
-    description: "Habla con otros companeros sobre cada cambio.",
+    description: "Habla con otros compañeros sobre cada cambio.",
     icon: MessageSquare,
   },
   {

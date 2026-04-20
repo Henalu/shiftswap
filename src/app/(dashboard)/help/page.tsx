@@ -34,15 +34,15 @@ function getMemberSections(): HelpSection[] {
         {
           question: "Como publico un turno?",
           answer:
-            "Ve a Mis turnos y pulsa Publicar turno. Selecciona la fecha, el tipo de turno y las modalidades de compensacion que aceptas. El turno aparecera en el Tablon para que otros companeros puedan proponerte un cambio.",
+            "Ve a Mis turnos y pulsa Publicar turno. Selecciona la fecha, el tipo de turno y las modalidades de compensacion que aceptas. El turno aparecera en el Tablon para que otros compañeros puedan proponerte un cambio.",
         },
         {
           question: "Que son las modalidades de compensacion?",
           answer:
-            "Cuando publicas un turno, eliges que tipo de compensacion aceptas: intercambio de turno (el companero te devuelve un turno en otra fecha) o bolsa de horas (queda registrada una deuda de turno a tu favor).",
+            "Cuando publicas un turno, eliges que tipo de compensacion aceptas: intercambio de turno (el compañero te devuelve un turno en otra fecha) o bolsa de horas (queda registrada una deuda de turno a tu favor).",
         },
         {
-          question: "Como propongo un cambio a otro companero?",
+          question: "Como propongo un cambio a otro compañero?",
           answer:
             "Busca el turno en el Tablon, abre su detalle y pulsa Proponer cambio. Elige la modalidad de compensacion y, si es intercambio, indica la fecha y turno que ofreces a cambio.",
         },
@@ -74,7 +74,7 @@ function getMemberSections(): HelpSection[] {
         {
           question: "Para que sirve el chat?",
           answer:
-            "El chat te permite hablar directamente con el otro companero implicado en un cambio. Puedes coordinar detalles, resolver dudas o negociar condiciones antes de firmar.",
+            "El chat te permite hablar directamente con el otro compañero implicado en un cambio. Puedes coordinar detalles, resolver dudas o negociar condiciones antes de firmar.",
         },
         {
           question: "Cuando puedo usar el chat?",

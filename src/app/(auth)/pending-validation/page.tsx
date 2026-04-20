@@ -81,7 +81,7 @@ export default async function PendingValidationPage() {
             <p className="font-semibold">Motivo indicado por el administrador</p>
             <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
               {accountState.validation_notes?.trim() ||
-                "No se ha anadido ninguna observacion adicional."}
+                "No se ha añadido ninguna observación adicional."}
             </p>
           </div>
         )}
