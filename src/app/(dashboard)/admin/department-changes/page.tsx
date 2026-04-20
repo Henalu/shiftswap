@@ -102,7 +102,34 @@ export default async function AdminDepartmentChangesPage() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error("No se pudieron cargar las solicitudes de cambio de departamento.");
+    console.error(
+      "[admin/department-changes/page] Failed to load department change requests",
+      error.message
+    );
+
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Administracion"
+          title="Cambios de departamento"
+          description="No se ha podido cargar esta cola administrativa."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{USER_ROLE_LABELS[actor.role]}</Badge>
+              <Link href="/admin">
+                <Button variant="outline">Volver al panel</Button>
+              </Link>
+            </div>
+          }
+        />
+
+        <EmptyState
+          icon={<RefreshCw className="size-5" />}
+          title="No se pudieron cargar las solicitudes"
+          description="Puede faltar una migracion o haber un problema temporal con la base de datos. Revisa los logs del servidor y confirma que Supabase tenga aplicadas las migraciones hasta el bloque de cambios de departamento."
+        />
+      </div>
+    );
   }
 
   const normalizedRequests = ((requests ?? []) as unknown[]).map((request) => {
