@@ -118,9 +118,7 @@ async function signAsInterestedAction(formData: FormData): Promise<void> {
 }
 
 function renderStatusSummary(
-  exchange: ExchangeDetail,
-  viewerName: string,
-  otherUserName: string
+  exchange: ExchangeDetail
 ) {
   if (exchange.status === "accepted") {
     return (
@@ -345,11 +343,6 @@ export default async function ExchangeDetailPage({
   const showApprovalForm =
     isApproverReviewer && typed.status === "pending_validation";
   const timeRange = formatTimeRange(typed.shift.start_time, typed.shift.end_time);
-  const viewerDisplayName = isParticipant
-    ? isOwner
-      ? typed.owner.full_name
-      : typed.requester.full_name
-    : "las dos partes";
   const showExportButton = EXCHANGE_EXPORTABLE_STATUSES.includes(typed.status);
   const agreementSummary = getAgreementSummary({
     agreementType: typed.agreement_type,
@@ -469,9 +462,7 @@ export default async function ExchangeDetailPage({
           <CardContent className="space-y-6">
             <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4 text-sm leading-6 text-muted-foreground">
               {renderStatusSummary(
-                typed,
-                viewerDisplayName,
-                isParticipant ? otherUser.full_name : "las dos partes"
+                typed
               )}
             </div>
 

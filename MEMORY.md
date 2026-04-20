@@ -1,465 +1,169 @@
 # MEMORY.md - ShiftSwap Project State
 
-> Este archivo registra decisiones, progreso y contexto importante del proyecto.
-> Debe actualizarse despues de cada sesion relevante de desarrollo.
+Archivo vivo con estado real del proyecto, decisiones importantes y siguientes pasos.
 
 ---
 
 ## Estado actual
-- Fase: Fase 5 - Testing con usuarios / preparacion para piloto
-- Ultima actualizacion: 2026-03-26
-- Ultimo hito relevante: pilot readiness + billing foundation + auth hardening
-- Estado general: funcionalmente estable, lista para piloto y staging si la base de datos tiene aplicadas las migraciones hasta `00025`; el dominio de billing ya existe pero todavia no esta activado comercialmente en produccion
+
+- Fase: Fase 5 - testing con usuarios / preparacion real de piloto
+- Ultima actualizacion: 2026-04-20
+- Ultimo hito relevante: alineacion documental al flujo v2 + lint limpio + base automatizada de smoke con Playwright
+- Estado general: funcionalmente estable y mas avanzada que el MVP; lista para staging y piloto si la base tiene aplicadas las migraciones hasta `00030`
 
 ## Resumen ejecutivo
-- ShiftSwap es una app web interna para intercambio de turnos entre empleados.
-- El producto ya cubre autenticacion, validacion manual de empleados, publicacion de turnos, matching, chat, firma en app, aprobacion departamental, roles admin, notificaciones y exportacion PDF.
-- El flujo de intercambio ya no depende de descargar, firmar y re-subir un documento para que la logica de negocio funcione.
-- El expediente formal vive en la app: acuerdo, firmas, revision de departamento, resolucion y trazabilidad.
-- El PDF corporativo de Arcelor es una salida generada por el sistema, no el centro del proceso.
-- En smartphone, la navegacion principal ahora usa bottom nav para las 4 secciones de trabajo mas frecuentes y deja cuenta/admin en una capa secundaria.
-- `departments` ya soporta jerarquia via `parent_department_id` y ahora distingue nodos operativos elegibles mediante `is_assignable`.
-- El registro ya no muestra departamentos en plano: obliga a elegir `empresa -> area/taller -> departamento operativo`.
-- El tablon de turnos deja de comportarse como marketplace abierto entre toda la empresa: los usuarios normales solo ven turnos de su departamento exacto.
-- El perfil ya muestra area y departamento actual, y permite solicitar cambio de departamento con revision administrativa.
-- Existe nueva cola admin en `/admin/department-changes` para aprobar o rechazar traslados entre departamentos operativos.
-- El perfil ya muestra tambien el puesto de trabajo actual y permite solicitar cambios de puesto con aprobacion administrativa dentro del mismo departamento operativo.
-- Existe nueva cola admin en `/admin/job-position-changes` para aprobar o rechazar solicitudes de cambio de puesto.
-- El PDF oficial obligatorio ya usa la jerarquia organizativa correcta: `DPTO. O TALLER` toma el padre del departamento operativo, `Categoria` toma el departamento operativo real y `Puesto de trabajo` toma el puesto asignado del perfil cuando exista.
-- Los turnos quedan normalizados por `shift_type`: el horario se deriva de forma fija tanto en UI como en backend y SQL.
-- Ya existe recuperacion real de contrasena con `/forgot-password` y `/reset-password`.
-- Login y registro ya pasan por endurecimiento server-side con rate limiting persistido en base de datos.
-- El registro ya puede exigir CAPTCHA de Cloudflare Turnstile cuando las variables de entorno estan configuradas.
-- Existe ya una base de billing compatible con dos pagadores posibles (`user` y `company`) sin duplicar modelos.
-- El acceso comercial se resuelve con un helper centralizado y flags operativas (`BILLING_ENABLED`, `BILLING_MODE`, `BILLING_ENFORCEMENT`).
-- Ya existe pagina `/billing`, endpoints base de Stripe (`checkout`, `portal`, `webhook`) y sincronizacion inicial del estado de suscripcion.
-- Se han anadido un `health` endpoint, documentacion operativa minima y checklist manual de smoke para staging/produccion.
-- Ya existen paginas legales base y helpers de email transaccional via Resend para aprobacion y rechazo de cuenta.
-- `next.config.ts` aumenta el `bodySizeLimit` de Server Actions a `8mb` para que el registro soporte la subida del carne corporativo sin romperse.
-- `npm run build` pasa con el estado actual del repo; `lint` sigue siendo recomendable antes de cerrar el siguiente corte.
 
-## Direccion de producto y diseno
-- No es una web de marketing ni editorial.
-- Es una herramienta operativa donde los usuarios quieren completar tareas rapido y con baja carga cognitiva.
-- La direccion visual actual es:
-  - limpia
-  - eficiente
-  - fiable
-  - moderna
-  - minimalista sin resultar fria
-  - muy legible
-- Referencias mentales activas:
-  - Stripe por limpieza, sistema visual y sensacion de producto pulido
-  - Deputy por modelo de producto interno orientado a workforce/scheduling
-  - Awwwards solo como referencia de cuidado visual, no como estilo a replicar
-- Balance objetivo:
-  - 70% claridad funcional
-  - 20% pulido moderno
-  - 10% personalidad visual
-- Fuente persistida para futuras sesiones: `.impeccable.md`
+- ShiftSwap ya cubre auth, validacion manual, turnos, propuestas v2, chat, firma, aprobacion departamental, PDFs, roles admin y billing foundation.
+- El workflow activo ya no es el antiguo de `pending_confirmation` y `confirmed`; la semantica vigente es:
+  - propuesta directa
+  - aceptacion del publicador
+  - firma explicita del solicitante
+  - `pending_validation`
+- El calendario laboral ya existe en codigo y base:
+  - `3t5`
+  - `jornada_normal`
+  - grupos de rotacion
+  - vacaciones
+  - validacion de dia laborable
+- `npm run build` y `npm run lint` pasan.
+- Ya existe `npm run test:smoke` con Playwright para:
+  - `GET /api/health`
+  - login
+  - rutas clave de miembro
+  - colas admin
+  - PDF routes opcionales si se configura `E2E_EXCHANGE_ID`
 
-## Decisiones tomadas
+## Hitos consolidados
 
-### 2026-03-09 - Inicio del proyecto
-- Stack elegido: Next.js 16 + Supabase + Tailwind CSS + shadcn/ui
-- Razon: velocidad de desarrollo para MVP con auth, DB, realtime y storage resueltos
-- Scope base: login, publicar turno, ver turnos, marcar interes, chat, confirmar intercambio y generar documento final
-- Idioma del codigo: ingles
-- Idioma de la UI: espanol
+### 2026-03-26 - Pilot readiness y billing foundation
 
-### 2026-03-10 a 2026-03-18 - Base funcional
-- Se consolidan turnos, solicitudes, chat realtime con fallback, centro de notificaciones, validacion manual de empleados y panel admin con roles y alcance por empresa/departamento.
-- `user_profiles.role` pasa a ser la fuente de verdad para permisos.
-- Se evita recursion RLS en `user_profiles` usando helpers `SECURITY DEFINER`.
+- Rate limiting persistido en auth
+- Turnstile opcional
+- reset de contrasena
+- `/billing`
+- checkout, portal y webhook Stripe
+- `health` endpoint
+- runbook y smoke manual inicial
 
-### 2026-03-23 - Refresh UX/UI del producto interno
-- Se define y persiste una direccion visual explicita en `.impeccable.md`.
-- Se refresca el sistema visual para que la app se sienta como un producto interno moderno, claro y fiable.
-- Se rehacen tokens, color, tipografia, superficies y estados.
-- Se crean patrones reutilizables nuevos:
-  - `src/components/ui/page-header.tsx`
-  - `src/components/ui/empty-state.tsx`
-- Se centralizan labels y estilos de estados en `src/lib/constants.ts`.
-- Se mejora navegacion, jerarquia visual, forms, cards, empty states y acciones tactiles.
+### 2026-04-01 a 2026-04-02 - Hardening y fixes estructurales
 
-### 2026-03-23 - Workflow nativo de intercambio y aprobacion
-- `exchanges` pasa a comportarse como expediente formal del cambio.
-- El workflow principal queda asi:
-  - `pending_confirmation`
-  - `confirmed`
-  - `pending_department_approval`
-  - `approved` / `rejected`
-  - `completed` / `cancelled`
-- La negociacion informal entre empleados se mantiene, pero el acuerdo formal y la resolucion ya viven dentro de la app.
-- Las firmas de ambas personas se registran embebidas dentro de la aplicacion.
-- Se anade cola de aprobaciones en `/admin/exchanges` para `department_admin`, `hr_admin` y `super_admin`.
-- Se anade trazabilidad persistida con `exchange_events`.
-- Si el expediente se rechaza o se retira antes de resolverse, el turno vuelve a abrirse.
+- Correccion de redirects circulares
+- fallbacks para queries criticas
+- fix de column-level grants en `user_profiles`
+- lecciones registradas en `LESSONS.md`
 
-### 2026-03-23 - Documento corporativo y acuerdos de compensacion
-- La exportacion final se genera como PDF corporativo desde `src/app/api/exchanges/[id]/pdf/route.tsx`.
-- El layout del PDF se rediseña para ser claro, corporativo y consistente con ShiftSwap y Arcelor.
-- El propietario del turno sigue firmando sin pasos adicionales.
-- La persona interesada, antes de firmar, debe elegir el tipo de acuerdo:
-  - `hours_bank`
-  - `shift_exchange`
-- `hours_bank` crea una deuda de 1 turno de `user_a` hacia `user_b`.
-- `shift_exchange` guarda una fecha futura y un tipo de turno (`morning`, `afternoon`, `night`) sin exigir que exista un turno publicado.
-- Se crea la base de ledger `shift_debt_transactions` para soportar historial y saldo de deuda por bolsa de horas.
-- El PDF refleja el tipo de acuerdo sin rehacer su composicion general.
+### 2026-04-20 - Estado real congelado
 
-### 2026-03-23 - Robustez operativa
-- `src/lib/supabase/middleware.ts` se endurece para limpiar sesiones invalidas cuando Supabase devuelve errores de refresh token/JWT.
-- En Windows + OneDrive, si `next build` falla por `EPERM` en `.next`, limpiar la carpeta y relanzar el build resuelve el problema.
+- Documentacion central alineada con el flujo v2
+- `CLAUDE.md`, `README.md`, `docs/API.md` y `docs/ROADMAP.md` actualizados
+- `docs/OPERATIONS.md` y `docs/SMOKE_CHECKLIST.md` reorientados a readiness real
+- base automatizada de smoke anadida con Playwright
 
-### 2026-03-24 - Navegacion movil smartphone-first
-- La navegacion principal en movil deja de depender del menu hamburguesa para secciones frecuentes.
-- Se adopta bottom navigation fija para:
-  - `/shifts`
-  - `/shifts/my`
-  - `/chat`
-  - `/exchanges`
-- El avatar del header movil pasa a abrir una capa secundaria para:
-  - perfil
-  - accesos admin
-  - cierre de sesion
-- Desktop mantiene header + sidebar como patron principal.
-- La fuente de verdad de navegacion se centraliza en `src/components/layout/navigation-items.ts`.
-- El layout del dashboard reserva espacio inferior en movil para que la barra fija no tape contenido ni safe areas.
+## Estado funcional real por bloques
 
-### 2026-03-24 - Jerarquia organizativa de Arcelor en Supabase
-- `departments` deja de ser estrictamente plana y pasa a soportar jerarquia con `parent_department_id`.
-- Se anade `supabase/migrations/00020_department_hierarchy.sql` para soportar:
-  - departamentos raiz
-  - subdepartamentos
-  - consistencia de empresa entre padre e hijo
-  - unicidad por nombre entre hermanos
-- Se anade `supabase/seeds/02_arcelor_organization.sql` con estructura inicial de Arcelor:
-  - raiz: `Aceria LDG`, `Carril`, `Alambron`, `Otros`
-  - hijos bajo `Aceria LDG`: `Produccion`, `Maquinas`, `Mantenimiento mecanico`, `Mantenimiento electrico`
-- El seed es idempotente y puede ejecutarse varias veces sin duplicar nodos.
-- La app actual ya puede asignar usuarios y turnos a nodos concretos; el filtrado sigue siendo por `department_id` exacto y no expande automaticamente a descendientes.
+### Auth y acceso
 
-### 2026-03-24 - Alcance real por departamento y cambio de departamento
-- Se anade `supabase/migrations/00021_department_scope_and_change_requests.sql`.
-- El modelo organizativo deja de depender solo de la jerarquia y pasa a marcar departamentos operativos con `departments.is_assignable`.
-- `Aceria LDG` queda tratada como nodo contenedor no elegible; sus hijos operativos (`Produccion`, `Maquinas`, `Mantenimiento mecanico`, `Mantenimiento electrico`) quedan como destinos validos.
-- El registro en `src/app/(auth)/register/*` ahora obliga a seleccionar:
-  - empresa
-  - area/taller
-  - departamento operativo final
-- El tablon en `src/app/(dashboard)/shifts/page.tsx` y `src/components/shifts/shift-filters.tsx` restringe la visibilidad al departamento exacto del usuario; el filtro de departamento solo queda disponible para alcance amplio (`hr_admin`, `super_admin`).
-- La publicacion de turnos ya no confia en campos ocultos del formulario: el `department_id` sale del perfil autenticado en server action.
-- Se endurecen validaciones y RLS para evitar cruces inconsistentes en:
-  - `shifts`
-  - `shift_requests`
-  - `conversations`
-  - `exchanges`
-- El perfil muestra `area/taller` y `departamento` por separado y anade solicitud de cambio con estado.
-- Se crea la entidad `department_change_requests` y un flujo admin minimo en `/admin/department-changes`.
-- La aprobacion/rechazo del cambio de departamento se resuelve de forma atomica desde SQL con `resolve_department_change_request(...)`.
-- `supabase/seeds/02_arcelor_organization.sql` ahora marca `Aceria LDG` con `is_assignable = FALSE` y los departamentos operativos correspondientes con `TRUE`.
-- `next.config.ts` sube `experimental.serverActions.bodySizeLimit` a `8mb` para soportar la carga del carne corporativo en el registro.
+- login, registro, reset y pending validation operativos
+- validacion manual obligatoria antes del dashboard
+- role-based access operativa
 
-### 2026-03-25 - Puestos de trabajo, PDF oficial y perfil laboral
-- Se anade `supabase/migrations/00023_job_positions_and_profile_scope.sql` para introducir:
-  - `job_positions`
-  - `user_profiles.job_position_id`
-  - validacion de que cada puesto pertenece a un departamento operativo
-  - limpieza automatica de `job_position_id` cuando el perfil deja de pertenecer a ese ambito
-- Se anade `supabase/migrations/00024_job_position_change_requests.sql` para soportar solicitudes de cambio de puesto con:
-  - registro del puesto actual y solicitado
-  - estado `pending/approved/rejected/cancelled`
-  - aprobacion SQL atomica via `resolve_job_position_change_request(...)`
-  - cancelacion automatica de solicitudes pendientes si cambia el departamento del perfil
-- El perfil ahora muestra empresa, area/taller, ID, departamento y puesto de trabajo con layout responsive mas respirado en desktop.
-- Se anade `src/app/(dashboard)/profile/job-position-change-request-card.tsx` para que el empleado solicite cambios de puesto sin editar directamente su perfil.
-- Se anade la cola admin `/admin/job-position-changes` con acciones para aprobar o rechazar solicitudes.
-- El PDF oficial obligatorio se separa en `src/app/api/exchanges/[id]/official-pdf/route.tsx` y usa:
-  - `DPTO. O TALLER` = padre del departamento operativo
-  - `Categoria` = departamento operativo real
-  - `Puesto de trabajo` = puesto asignado del perfil
-- La plantilla `src/lib/exchange-official-pdf-document.tsx` se ajusta sin rehacer layout para:
-  - dar mas aire a los campos de `SOLICITAN`
-  - limpiar la zona de firmas y evitar nombres duplicados
-  - renderizar la firma de diligencia/taller con nombre corto en una sola linea
-  - usar estilos de fuente compatibles con `@react-pdf/renderer`
-- Se anade `supabase/migrations/00022_normalize_shift_schedule.sql` y utilidades en `src/lib/shifts.ts` para fijar horarios segun `shift_type` (`morning`, `afternoon`, `night`) y evitar mezclas inconsistentes.
-- El login client-side se endurece para limpiar sesiones locales corruptas si Supabase devuelve errores de refresh token/JWT antes de reintentar el acceso.
+### Turnos y propuestas
 
-### 2026-03-26 - Pilot readiness, seguridad operativa y billing foundation
-- Se anade `supabase/migrations/00025_pilot_readiness_and_billing_foundation.sql` con:
-  - `request_rate_limits`
-  - `billing_plans`
-  - `billing_accounts`
-  - `billing_subscriptions`
-  - `billing_invoices`
-  - `billing_webhook_events`
-- Se formaliza el roadmap comercial con una arquitectura de billing abstracta compatible con dos dueños posibles:
-  - `user`
-  - `company`
-- La monetizacion inicial prevista sigue siendo por usuario, pero sin bloquear la futura extension a suscripcion por empresa.
-- Se anaden helpers en `src/lib/app-config.ts` para centralizar flags y configuracion de:
-  - billing
-  - Stripe
-  - Turnstile
-  - Resend
-- Se anaden `src/lib/rate-limit.ts` y `src/lib/turnstile.ts` para endurecer login y registro sin depender del cliente.
-- Login deja de depender solo del cliente y pasa a usar server action con rate limiting persistido en base de datos.
-- El flujo de recuperacion de contrasena queda operativo con:
-  - `src/app/(auth)/forgot-password/*`
-  - `src/app/(auth)/reset-password/*`
-- Se anade `src/lib/billing.ts` como helper central para resolver acceso comercial y sincronizar cuentas de billing del usuario.
-- Se anade integracion base con Stripe en:
-  - `src/app/api/billing/checkout/route.ts`
-  - `src/app/api/billing/portal/route.ts`
-  - `src/app/api/billing/webhooks/stripe/route.ts`
-- Se anade pagina `/billing` para mostrar estado de acceso, plan y acciones de activacion/gestion.
-- Middleware y layout del dashboard ya consultan el estado de billing y pueden redirigir a `/billing` cuando `BILLING_ENFORCEMENT` lo exija.
-- Se anade `src/app/api/health/route.ts` para comprobacion minima de disponibilidad.
-- Se anaden emails transaccionales base via Resend para aprobacion y rechazo de cuenta desde admin.
-- Se anaden paginas legales base en `/legal/*` y documentacion operativa minima:
-  - `docs/OPERATIONS.md`
-  - `docs/SMOKE_CHECKLIST.md`
-- `npm run build` pasa con todo el corte actual.
+- tablon y filtros operativos
+- flujo v2 de propuestas directo desde detalle
+- `acceptProposal` y `rejectProposal` activos en `Mis turnos`
+- `cancelShift` disponible
+- turnos pasados pueden marcarse `expired`
 
-## Progreso por fase
+### Expedientes
 
-### Fase 1 - Prototipo
-- Completada
-- Incluye setup del proyecto, auth, CRUD base de turnos, listing, detalle, interes, mis turnos y navegacion responsive
+- `exchanges` ya es el expediente formal del cambio
+- firma del publicador implicita al aceptar
+- firma explicita del solicitante con `signAsInterested`
+- aprobacion/rechazo departamental
+- retirada reciproca previa a resolucion
 
-### Fase 2 - Matching
-- Completada
-- Incluye filtros en `/shifts`, contador de resultados, cancelar turno propio y campanita de notificaciones
+### Organizacion y perfil laboral
 
-### Fase 3 - Chat
-- Completada
-- Incluye lista de conversaciones, vista individual, realtime, optimistic update, polling fallback y notificaciones de nuevos mensajes
+- jerarquia empresa -> area -> departamento operativo -> puesto
+- cambios de departamento y puesto con colas admin
+- PDF oficial usando esa jerarquia
 
-### Fase 4 - Workflow de intercambio
-- Completada
-- Incluye `/exchanges`, confirmacion/cancelacion, firmas en app, solicitud formal, aprobacion departamental, PDF corporativo y trazabilidad del expediente
+### Calendario laboral
 
-### Fase 5 - Testing con usuarios
-- En curso
-- Estado real:
-  - base funcional cerrada
-  - admin y validacion manual disponibles
-  - refresh UX/UI aplicado
-  - navegacion smartphone-first refinada con bottom nav principal + menu secundario de cuenta
-- workflow de 3 actores operativo
-- acuerdos de compensacion y base de ledger disponibles
-- jerarquia organizativa y puestos de trabajo integrados en perfil, admin y PDF oficial
-- pendiente: piloto con usuarios reales y refinamiento sobre feedback
+- migracion `00030` activa el dominio de calendario
+- `/calendar` y `/calendar/vacations` operativos
+- `/admin/schedule-config` operativo
+- `createShift` y `proposeExchange` validan el calendario del usuario cuando aplica
 
-### Fase 5.1 - Pilot readiness y billing foundation
-- Implementada la base tecnica
-- Ya disponible:
-  - reset de contrasena
-  - rate limiting en login y registro
-  - CAPTCHA configurable en registro
-  - health endpoint
-  - runbook operativo y smoke checklist
-  - dominio de billing abstracto (`user` / `company`)
-  - gate comercial centralizado
-  - pagina `/billing`
-  - handlers base de Stripe
-  - emails transaccionales iniciales de validacion
-- Pendiente para cerrar la salida comercial real:
-  - staging separado y checklist operativo ejecutado en entorno real
-  - monitorizacion y alertas externas
-  - politica formal de retencion de documentos
-  - suite automatizada E2E/smoke
-  - activacion real de Stripe con claves productivas
+### Billing y readiness
+
+- dominio de billing ya existe
+- sigue pendiente la activacion comercial real
+- el flujo individual esta preparado; la UX de empresa aun no esta construida
 
 ## Problemas conocidos
-- El registro hace rollback del usuario auth si falla la escritura del perfil o la subida del carne, pero conviene seguir vigilando errores operativos del bucket `id-cards`.
-- Todavia no hay suite automatizada E2E/smoke; `package.json` no expone `npm run test`.
-- En Windows + OneDrive puede aparecer de forma intermitente un `EPERM` durante `next build` por locks del filesystem en `.next`; no es un fallo estable del codigo si el build vuelve a pasar al reintentar.
-- Para produccion, la base de datos debe tener aplicadas al menos `00017` hasta `00025`, incluyendo `00022`, `00023`, `00024` y `00025` para horarios normalizados, puestos, solicitudes de cambio de puesto y billing foundation.
-- El dominio de billing ya existe, pero todavia no estan construidos el backoffice real de onboarding de empresas, la importacion CSV de estructura ni la precedencia `company > user`.
-- Las paginas legales actuales son base funcional y todavia requieren revision legal real antes de cobro a terceros.
-- Solo estan implementados emails transaccionales de validacion de cuenta; faltan los de billing, invitaciones y ciclo de vida comercial.
+
+- El piloto real todavia no se ha ejecutado con usuarios finales.
+- No existe una suite completa de tests unitarios o integration; solo una base de smoke/E2E.
+- `npm run test:smoke` requiere entorno configurado y credenciales reales:
+  - `E2E_MEMBER_*`
+  - `E2E_ADMIN_*`
+  - opcionalmente `E2E_SUPER_ADMIN_*`
+  - opcionalmente `E2E_EXCHANGE_ID`
+- Staging, uptime checks y alertas externas no pueden provisionarse solo desde el repo.
+- El dominio de billing soporta `user` y `company`, pero faltan:
+  - backoffice de onboarding de empresa
+  - importacion CSV
+  - precedencia `company > user`
+- Los legales actuales siguen siendo base funcional y requieren revision real antes de cobro externo.
 
 ## Decisiones tecnicas importantes
-- Server Components por defecto; `"use client"` solo cuando es necesario.
-- `startConversation` es idempotente.
-- `ChatView` es Client Component con Realtime + polling fallback.
-- `messages` se filtra client-side en Realtime y se deduplica con `mergeIncomingMessage`.
-- Las Server Actions que mutan estado deben devolver `{ success: true }`.
-- Los turnos nocturnos son validos; no se impone `end_time > start_time`.
-- `createNotification` usa service role en `src/lib/supabase/admin.ts`.
-- `notification-utils.ts` centraliza `action_url` y fallbacks de navegacion.
-- `read` quita una notificacion del badge; `resolved_at` la saca del inbox activo.
-- `00010` es obligatoria para chat realtime.
-- `00014` es obligatoria para el centro de notificaciones.
-- `00018` modela workflow nativo, firmas embebidas, aprobacion y `exchange_events`.
-- `00019` modela acuerdos de compensacion y `shift_debt_transactions`.
-- `00020` anade jerarquia de departamentos con `parent_department_id`.
-- `00021` introduce `is_assignable`, visibilidad real por departamento, solicitudes de cambio de departamento y endurecimiento de RLS para alcance organizativo.
-- `00022` normaliza `start_time` y `end_time` a partir de `shift_type`.
-- `00023` introduce `job_positions` y `user_profiles.job_position_id`.
-- `00024` anade `job_position_change_requests` y la aprobacion SQL de cambios de puesto.
-- `00025` introduce rate limiting persistido, foundation de billing, planes, cuentas, suscripciones, facturas y eventos webhook.
-- Las flags de billing son:
-  - `BILLING_ENABLED`
-  - `BILLING_MODE`
-  - `BILLING_ENFORCEMENT`
-- El acceso comercial se resuelve desde `src/lib/billing.ts`; no dispersar reglas de suscripcion por pantallas sueltas.
-- `BILLING_MODE` puede ser `user` o `company`, aunque la UX actualmente solo cubre el flujo individual.
-- Cuando `BILLING_ENFORCEMENT = hard`, usuarios sin acceso comercial deben salir del dashboard y caer en `/billing`.
-- `/api/billing/webhooks/stripe` y `/api/health` deben mantenerse accesibles fuera del gate normal de dashboard/auth.
-- Turnstile y Resend son integraciones opcionales por entorno; si faltan claves, la app debe degradar sin romper el acceso en desarrollo.
-- `src/components/layout/navigation-items.ts` centraliza navegacion primaria/secundaria y el calculo de active state entre desktop y movil.
-- En movil, la navegacion primaria es la bottom nav; el menu del avatar queda reservado para cuenta y administracion.
-- `src/app/(dashboard)/layout.tsx` anade padding inferior especifico en movil para convivir con la bottom nav sin tapar contenido.
-- `next.config.ts` configura `experimental.serverActions.bodySizeLimit = "8mb"` por la subida de documentos en registro.
 
-## Sistema visual actual
-- Fuente principal: `Manrope`
-- El estilo visual prioriza contraste suave, claridad y ritmo por encima de decoracion.
-- Los colores se usan sobre todo para semantica:
-  - exito
-  - warning
-  - pending
-  - cancelacion
-  - estados activos
-- Los componentes nuevos deben seguir estos patrones:
-  - cabeceras con `PageHeader`
-  - estados vacios con `EmptyState`
-  - formularios con `FORM_CONTROL_CLASSNAME` cuando no exista componente shadcn equivalente
-  - paneles y superficies con `PANEL_CLASSNAME`
-  - badges de estado desde `src/lib/constants.ts`
+- Server Components por defecto; `"use client"` solo cuando es necesario.
+- `src/lib/billing.ts` es la fuente de verdad del acceso comercial.
+- `src/lib/calendar.ts` y `src/lib/calendar-data.ts` son la fuente de verdad del calendario laboral.
+- `createNotification` usa service role.
+- Los dos PDFs son salidas del sistema, no el centro del flujo.
+- `signatures`, `avatars`, `id-cards` y `exchange-documents` son buckets activos.
+- Para staging y piloto, Supabase debe tener aplicadas las migraciones hasta `00030`.
 
 ## Archivos clave
-- `src/app/(dashboard)/layout.tsx` - layout protegido del dashboard
-- `src/components/layout/header.tsx` - header compartido con logo, notificaciones y acceso secundario de cuenta en movil
-- `src/components/layout/sidebar-nav.tsx` - navegacion lateral agrupada en desktop
-- `src/components/layout/mobile-bottom-nav.tsx` - navegacion principal fija en smartphone
-- `src/components/layout/mobile-nav.tsx` - menu secundario de cuenta/admin para movil
-- `src/components/layout/navigation-items.ts` - fuente de verdad de secciones primarias/secundarias y active state
-- `src/components/layout/notification-bell.tsx` - centro de notificaciones con badge real
-- `src/components/ui/page-header.tsx` - patron reutilizable para cabeceras de pagina
-- `src/components/ui/empty-state.tsx` - patron reutilizable para estados vacios
-- `supabase/migrations/00020_department_hierarchy.sql` - soporte jerarquico para departamentos
-- `supabase/migrations/00021_department_scope_and_change_requests.sql` - elegibilidad operativa, visibilidad por departamento y solicitudes de cambio
-- `supabase/migrations/00022_normalize_shift_schedule.sql` - horarios fijos derivados de `shift_type`
-- `supabase/migrations/00023_job_positions_and_profile_scope.sql` - puestos de trabajo y relacion opcional con el perfil
-- `supabase/migrations/00024_job_position_change_requests.sql` - solicitudes y aprobacion de cambio de puesto
-- `supabase/migrations/00025_pilot_readiness_and_billing_foundation.sql` - rate limiting, billing foundation y eventos webhook
-- `supabase/seeds/02_arcelor_organization.sql` - estructura inicial de Arcelor para testing
-- `src/lib/departments.ts` - helpers de jerarquia y lectura de area/departamento operativo
-- `src/app/(dashboard)/profile/department-change-request-card.tsx` - solicitud de cambio desde perfil
-- `src/app/(dashboard)/profile/job-position-change-request-card.tsx` - solicitud de cambio de puesto desde perfil
-- `src/app/(dashboard)/admin/department-changes/page.tsx` - cola admin de cambios de departamento
-- `src/app/(dashboard)/admin/job-position-changes/page.tsx` - cola admin de cambios de puesto
-- `src/components/exchanges/exchange-workflow-progress.tsx` - resumen visual del workflow
-- `src/app/(dashboard)/exchanges/[id]/page.tsx` - expediente formal del cambio
-- `src/app/(dashboard)/exchanges/actions.ts` - confirmacion, firma, retirada y soporte del expediente
-- `src/app/(dashboard)/exchanges/exchange-requester-signature-form.tsx` - bifurcacion entre bolsa de horas e intercambio de turno
-- `src/app/(dashboard)/admin/exchanges/page.tsx` - cola de aprobaciones departamentales
-- `src/app/(dashboard)/admin/exchanges/actions.ts` - aprobar/rechazar solicitud
-- `src/lib/exchange-workflow.ts` - helpers de estados, alcance y trazabilidad
-- `src/lib/exchange-compensation.ts` - reglas de compensacion y ledger de deuda
-- `src/lib/exchange-official-pdf-document.tsx` - plantilla del PDF oficial obligatorio
-- `src/lib/exchange-pdf-document.tsx` - plantilla PDF corporativa
-- `src/app/api/exchanges/[id]/official-pdf/route.tsx` - exportacion del PDF oficial obligatorio
-- `src/app/api/exchanges/[id]/pdf/route.tsx` - exportacion PDF
-- `src/lib/constants.ts` - labels y estilos centralizados de estados y acuerdos
-- `src/lib/shifts.ts` - horarios oficiales por `shift_type`
-- `src/lib/app-config.ts` - flags operativas y variables de entorno centralizadas
-- `src/lib/billing.ts` - resolucion de acceso comercial y sincronizacion de cuentas
-- `src/lib/rate-limit.ts` - rate limiting server-side persistido en SQL
-- `src/lib/stripe.ts` - integracion base con Stripe sin acoplar la app al SDK
-- `src/lib/turnstile.ts` - verificacion anti-bot de Cloudflare Turnstile
-- `src/lib/transactional-email.ts` - emails transaccionales base via Resend
-- `src/app/billing/page.tsx` - estado de suscripcion y acciones comerciales del usuario
-- `src/app/api/billing/checkout/route.ts` - creacion de checkout Stripe
-- `src/app/api/billing/portal/route.ts` - acceso al customer portal
-- `src/app/api/billing/webhooks/stripe/route.ts` - sincronizacion de eventos de Stripe
-- `src/app/api/health/route.ts` - health check minimo
-- `src/app/(auth)/forgot-password/page.tsx` - solicitud de reset de contrasena
-- `src/app/(auth)/reset-password/page.tsx` - establecimiento de nueva contrasena
-- `src/components/auth/turnstile-field.tsx` - widget CAPTCHA reutilizable
-- `src/components/legal/legal-document.tsx` - layout base de documentos legales
-- `src/lib/utils.ts` - utilidades visuales y helpers compartidos
+
+- `CLAUDE.md` - brief maestro actualizado
+- `README.md` - vision general real del repo
+- `docs/API.md` - superficie tecnica vigente
+- `docs/ROADMAP.md` - roadmap alineado al estado real
+- `docs/OPERATIONS.md` - staging, observabilidad y rollback
+- `docs/SMOKE_CHECKLIST.md` - checklist manual y smoke automatizado
+- `src/app/(dashboard)/exchanges/actions.ts` - acciones del expediente v2
+- `src/app/(dashboard)/shifts/my/actions.ts` - aceptar/rechazar propuestas
+- `src/components/shifts/actions.ts` - proponer cambio y cancelar turno
+- `src/lib/calendar.ts` - motor de calendario
+- `src/lib/calendar-data.ts` - carga de configuracion de calendario
+- `playwright.smoke.config.ts` - configuracion del smoke automatizado
+- `tests/smoke/*` - suite Playwright
 
 ## Migraciones importantes
-- `00010_enable_realtime_for_messages.sql` - publica `messages` en Realtime
-- `00011_exchange_signatures_and_documents.sql` - soporte documental y firmas base
-- `00012_signed_exchange_cancellation_requests.sql` - base historica de retirada reciproca
-- `00013_notifications_center.sql` - notifications realtime + trigger `new_message`
-- `00014_notification_center_state_and_dedupe.sql` - dedupe, read/resolved state y nuevos tipos
-- `00015_employee_validation.sql` - validacion manual de empleados
-- `00016_roles_and_permissions.sql` - roles, alcance admin y helpers de permisos
-- `00017_allow_word_exchange_documents.sql` - soporte Word/PDF en `exchange-documents`
-- `00018_native_exchange_approval_workflow.sql` - workflow nativo, aprobacion departamental y `exchange_events`
-- `00019_exchange_compensation_terms_and_ledger.sql` - acuerdos de compensacion y ledger `shift_debt_transactions`
-- `00020_department_hierarchy.sql` - `parent_department_id`, jerarquia y unicidad entre hermanos
-- `00021_department_scope_and_change_requests.sql` - `is_assignable`, RLS de alcance real y `department_change_requests`
-- `00022_normalize_shift_schedule.sql` - trigger para imponer horarios oficiales por tipo de turno
-- `00023_job_positions_and_profile_scope.sql` - tabla `job_positions` y scope laboral del perfil
-- `00024_job_position_change_requests.sql` - solicitudes, RLS y aprobacion SQL de cambios de puesto
-- `00025_pilot_readiness_and_billing_foundation.sql` - rate limiting, billing abstraction y soporte inicial de Stripe
+
+- `00025_pilot_readiness_and_billing_foundation.sql`
+- `00026_shift_expired_status.sql`
+- `00027_v2_exchange_flow.sql`
+- `00028_phase3_signature_and_onboarding.sql`
+- `00029_fix_column_grants.sql`
+- `00030_calendar_rotation_and_vacations.sql`
 
 ## Siguientes pasos recomendados
-- Aplicar migraciones pendientes en Supabase antes de cualquier despliegue productivo, incluyendo `00025`.
-- Preparar staging real separado de produccion y ejecutar el smoke checklist completo.
-- Activar observabilidad minima externa: errores, uptime y alertas.
-- Definir y documentar politica de retencion de carnets y documentos de validacion.
-- Ejecutar piloto con usuarios reales y recoger friccion de bottom nav movil, estados y claridad del flujo de intercambio.
-- Introducir una base automatizada de tests smoke/E2E para:
-  - registro
-  - login
-  - reset de contrasena
-  - validacion admin
-  - intercambio
-  - PDF
-  - billing
-- Activar billing individual real con Stripe cuando existan claves y pricing definitivos.
-- Construir backoffice de onboarding asistido para:
-  - alta de empresa
-  - carga de departamentos
-  - carga de puestos
-  - importacion CSV
-- Extender despues el modelo a suscripcion por empresa reutilizando `billing_accounts`.
 
-## Roadmap priorizado persistido
-1. Cerrar pilot readiness de verdad:
-   - staging separado
-   - monitorizacion y alertas
-   - retencion documental
-   - smoke/E2E basicos
-2. Activar billing real v1 por usuario:
-   - Stripe en entorno real
-   - checkout
-   - portal
-   - webhook
-   - bloqueo comercial progresivo (`off` -> `soft` -> `hard`)
-3. Construir onboarding asistido de empresa:
-   - alta de company
-   - gestion de jerarquia organizativa
-   - carga de puestos
-   - importacion CSV
-   - invitaciones controladas
-4. Completar salida comercial:
-   - legales revisados
-   - emails transaccionales restantes
-   - criterios operativos de cobro
-5. Extender a suscripcion por empresa sin rehacer billing:
-   - `owner_type = company`
-   - precedencia `company > user`
-   - tooling admin comercial
-
-## Ideas futuras
-- PWA o app movil
-- Integracion con sistemas de RRHH
-- Notificaciones push
-- Analiticas para managers
-- i18n
-- modo oscuro
-
-## Contacto del proyecto
-- Developer: Henalu
-- Email: henaludebarros@hotmail.com
+1. Preparar staging separado y validar el smoke completo.
+2. Configurar observabilidad minima:
+   - uptime check
+   - alertas de build
+   - revisiones de logs
+3. Ejecutar piloto con usuarios reales y recoger friccion de:
+   - bottom nav
+   - propuestas y firma
+   - calendario
+   - colas admin
+4. Endurecer pruebas alrededor de acciones criticas.
+5. Decidir despues si el siguiente bloque es endurecimiento post-piloto o activacion comercial.

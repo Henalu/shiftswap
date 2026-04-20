@@ -190,6 +190,7 @@ export function SignaturePad({
     return (
       <div className="space-y-4">
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentSignatureUrl}
             alt="Tu firma digital"

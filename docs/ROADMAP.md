@@ -2,124 +2,151 @@
 
 ## Estado actual
 
-El producto ya supera el MVP inicial. La app cubre auth, turnos, matching, chat, workflow formal de intercambio, firmas en app, aprobacion departamental, PDF corporativo, validacion manual y roles admin. La prioridad ya no es "terminar el MVP", sino validar el producto con usuarios reales y endurecerlo para uso interno.
+El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, turnos, propuestas v2, chat, expediente formal, aprobacion departamental, PDFs, estructura organizativa real, calendario laboral y billing foundation. La prioridad ya no es "terminar el MVP", sino cerrar readiness real de piloto y validar el producto con usuarios.
 
-## Fases cerradas
+## Bloques cerrados
 
 ### Fase 1 - Prototipo
+
 - Setup de Next.js, Supabase, Tailwind y shadcn/ui
 - Auth
 - CRUD base de turnos
-- Listing y detalle
-- Flujo de interes
-- Mis turnos
+- Listing, detalle y mis turnos
 
 ### Fase 2 - Matching
+
 - Filtros por URL
 - Contador de resultados
 - Cancelacion de turno propio
-- Centro de notificaciones inicial
+- Centro de notificaciones
 
 ### Fase 3 - Chat
+
 - Lista de conversaciones
 - Conversacion individual
 - Realtime con fallback por polling
 - Notificaciones de nuevos mensajes
 
-### Fase 4 - Workflow de intercambio
-- Exchanges y detalle de expediente
-- Confirmacion de acuerdo entre empleados
-- Firmas embebidas dentro de la app
-- Aprobacion/rechazo por departamento
-- Historial de eventos del expediente
-- PDF corporativo generado por el sistema
+### Fase 4 - Workflow formal
+
+- Flujo v2 de propuestas y expediente
+- Firma digital en perfil
+- Firma del solicitante dentro del expediente
+- Aprobacion o rechazo departamental
+- Historial de eventos
+- PDFs corporativo y oficial
 - Soporte documental opcional
-- Perfil con avatar upload
-- Validacion manual de empleados
-- Roles y panel admin
 
 ### Fase 4.5 - Refresh UX/UI
-- Redefinicion visual del producto para orientarlo a un internal product moderno
-- Sistema visual mas claro y coherente
-- Mejor navegacion
+
+- Refresh visual para producto interno moderno
 - Mejor jerarquia visual
 - Mejor sistema de estados
-- Forms, empty states y cards mas legibles
-- Navegacion movil smartphone-first con bottom nav principal y menu secundario de cuenta
+- Bottom nav movil
+- Navegacion secundaria de cuenta/admin
 
-### Fase 4.6 - Compensacion y bolsa de horas
-- Seleccion de acuerdo en la firma del solicitante
-- `hours_bank` como compensacion con deuda registrada
-- `shift_exchange` con fecha futura y tipo de turno acordado
-- Base de ledger `shift_debt_transactions`
+### Fase 4.6 - Organizacion, compensacion y perfil laboral
+
+- Jerarquia empresa -> area -> departamento operativo -> puesto
+- Cambios de departamento y puesto con cola admin
+- `hours_bank` y `shift_exchange`
+- Ledger `shift_debt_transactions`
+
+### Fase 4.7 - Billing foundation y seguridad operativa
+
+- Reset de contrasena
+- Rate limiting en auth
+- Turnstile opcional
+- `/billing`
+- Checkout, portal y webhook de Stripe
+- `health` endpoint
+- Runbook operativo
+
+### Fase 4.8 - Calendario laboral
+
+- Turnos `normal_full` y `normal_short`
+- Rotaciones 3T5
+- Configuracion de jornada por area
+- Asignacion de grupos de rotacion
+- Vacaciones
+- Validacion del calendario al publicar y proponer
 
 ## Fase actual
 
 ### Fase 5 - Testing con usuarios
-- Ejecutar piloto con empleados reales
-- Preparar entornos de prueba con la estructura organizativa de Arcelor para validar filtros, permisos y recorridos por departamento
-- Medir si la navegacion y el flujo de intercambio se entienden sin explicacion
-- Validar si la bottom nav movil reduce tiempo y friccion para entrar en `Turnos`, `Mis turnos`, `Chat` e `Intercambios`
-- Validar la claridad de estados:
-  - turno disponible
-  - solicitud pendiente
-  - acuerdo pendiente de confirmacion
-  - pendiente de firmas
-  - pendiente de aprobacion
-  - aprobado / rechazado / cancelado
-- Validar la comprension de los acuerdos de compensacion:
-  - bolsa de horas
-  - intercambio de turno futuro
-- Recoger friccion en:
-  - bottom nav movil
-  - filtros
-  - chat
-  - firma y compensacion
-  - aprobacion departamental
-  - panel admin
 
-### Fase 5.1 - Pilot readiness y billing foundation
-- Reset de contrasena
-- Rate limiting basico en auth
-- CAPTCHA configurable en registro
-- Health endpoint
-- Runbook operativo y smoke checklist
-- Dominio de billing abstracto compatible con `user` y `company`
-- Gate comercial centralizado preparado en middleware y layout
-- Billing page y handlers base de Stripe listos para activacion
+- Ejecutar piloto con empleados reales
+- Preparar staging con migraciones hasta `00030`
+- Validar comprension del flujo v2:
+  - turno disponible
+  - propuesta pendiente
+  - propuesta aceptada
+  - pendiente de validacion
+  - aprobado / rechazado / cancelado
+- Validar claridad del calendario:
+  - jornada normal
+  - 3T5
+  - vacaciones
+- Medir friccion en:
+  - bottom nav
+  - filtros
+  - propuesta y firma
+  - colas admin
+  - calendario y vacaciones
+
+### Fase 5.1 - Pilot readiness real
+
+- Staging separado y verificado
+- Smoke automatizado ejecutable
+- Smoke manual de punta a punta
+- Observabilidad minima:
+  - uptime
+  - logs
+  - alertas de build
+- Politica operativa de documentos y rollback
 
 ## Siguientes bloques recomendados
 
 ### Bloque A - Endurecimiento funcional
-- Evitar usuarios parciales si falla el alta
+
 - Anadir tests para acciones criticas
-- Revisar estados edge case y copy de errores
-- Mejorar trazabilidad de errores operativos
-- Endurecer politicas y permisos a nivel de BD para transiciones sensibles
+- Revisar edge cases y copy de error
+- Mejorar trazabilidad operativa
+- Endurecer permisos y transiciones sensibles en BD
 
 ### Bloque B - Mejora basada en feedback real
-- Ajustar jerarquia y copy segun observacion de usuarios
-- Ajustar densidad, etiquetas o visibilidad contextual de la bottom nav si el piloto detecta solapes o sobrecarga
-- Refinar el paso de firma/compensacion si aparecen dudas en piloto
-- Mejorar onboarding para usuarios nuevos
-- Refinar pantallas admin si el volumen de aprobaciones y validaciones crece
 
-### Bloque C - Expansiones post-piloto
-- Vista dedicada de saldo e historial de bolsa de horas
-- Acciones de compensacion/cierre de deuda
+- Ajustar jerarquia y copy segun observacion
+- Refinar bottom nav si el piloto detecta sobrecarga
+- Refinar firma y compensacion si aparecen dudas
+- Mejorar onboarding
+- Refinar colas admin si crece el volumen
+
+### Bloque C - Salida comercial posterior al piloto
+
+- Activacion real de Stripe
+- Emails del ciclo comercial
+- Legales revisados
+- Onboarding asistido de empresa
+- Precedencia `company > user`
+
+### Bloque D - Expansiones post-piloto
+
+- Vista de saldo e historial de bolsa de horas
+- Acciones de compensacion
 - PWA o app movil
 - Integraciones con RRHH
-- Notificaciones push
+- Push notifications
 - Analiticas para managers
 - i18n
 - modo oscuro
 
-## Criterios para considerar el piloto exitoso
+## Criterios de exito del piloto
 
 - Los usuarios entienden por donde empezar sin ayuda.
-- En movil, las secciones principales se alcanzan rapidamente con una sola accion desde la bottom nav.
-- El flujo publicar -> interes -> chat -> firma -> aprobacion se completa sin confusion grave.
-- Los estados del sistema se entienden de un vistazo.
-- La diferencia entre `bolsa de horas` e `intercambio de turno` se entiende sin explicacion externa.
-- Los administradores pueden validar cuentas, gestionar roles y resolver expedientes sin ambiguedad.
-- No aparecen regresiones funcionales en lint/build ni errores frecuentes de UX bloqueante.
+- En movil, las secciones principales se alcanzan rapido desde la bottom nav.
+- El flujo publicar -> proponer -> aceptar -> firmar -> validar se entiende sin confusion grave.
+- Los estados del sistema se leen de un vistazo.
+- El calendario laboral se entiende sin explicacion externa.
+- Los administradores resuelven validaciones, expedientes y configuracion de jornada sin ambiguedad.
+- No aparecen regresiones funcionales en lint, build ni smoke automatizado.

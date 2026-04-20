@@ -1,17 +1,18 @@
 # Superficie tecnica - ShiftSwap
 
-> Este proyecto no expone una API REST amplia de negocio. La mayor parte de la logica vive en Server Components, Server Actions y queries a Supabase desde el servidor.
+La mayor parte de la logica de negocio vive en Server Components, Server Actions y Supabase. No existe una API REST amplia de dominio.
 
 ## Modelo real de interaccion
 
-- Paginas App Router para lectura y composicion de UI
+- Paginas App Router para lectura y composicion
 - Server Actions para mutaciones
-- Supabase como capa de datos, auth, realtime y storage
-- Route Handler puntual para generacion de PDF corporativo
+- Route Handlers puntuales para PDF, billing y health
+- Supabase como auth, datos, storage y realtime
 
 ## Paginas principales
 
-### Auth
+### Auth y acceso
+
 - `/login`
 - `/register`
 - `/forgot-password`
@@ -20,114 +21,134 @@
 - `/billing`
 
 ### Dashboard
+
 - `/shifts`
 - `/shifts/new`
 - `/shifts/[id]`
 - `/shifts/my`
+- `/calendar`
+- `/calendar/vacations`
 - `/chat`
 - `/chat/[id]`
 - `/exchanges`
 - `/exchanges/[id]`
 - `/profile`
+- `/help`
+
+### Admin
+
 - `/admin`
 - `/admin/exchanges`
 - `/admin/validations`
 - `/admin/validations/[id]`
+- `/admin/department-changes`
+- `/admin/job-position-changes`
+- `/admin/schedule-config`
 - `/admin/users`
 
 ## Route Handlers reales
 
-### PDF corporativo del expediente
-- Metodo: `GET`
-- Ruta: `/api/exchanges/[id]/pdf`
-- Uso: genera el PDF corporativo del cambio de turno en servidor
-- Archivo: `src/app/api/exchanges/[id]/pdf/route.tsx`
+### PDFs
 
-### PDF oficial obligatorio
-- Metodo: `GET`
-- Ruta: `/api/exchanges/[id]/official-pdf`
-- Uso: genera el PDF oficial obligatorio del cambio de turno
-- Archivo: `src/app/api/exchanges/[id]/official-pdf/route.tsx`
+- `GET /api/exchanges/[id]/pdf`
+- `GET /api/exchanges/[id]/official-pdf`
 
-### Billing checkout
-- Metodo: `POST`
-- Ruta: `/api/billing/checkout`
-- Uso: crea la sesion Stripe Checkout del plan individual
+### Billing
 
-### Billing portal
-- Metodo: `POST`
-- Ruta: `/api/billing/portal`
-- Uso: abre el customer portal de Stripe para la cuenta autenticada
+- `POST /api/billing/checkout`
+- `POST /api/billing/portal`
+- `POST /api/billing/webhooks/stripe`
 
-### Billing webhook
-- Metodo: `POST`
-- Ruta: `/api/billing/webhooks/stripe`
-- Uso: sincroniza eventos de Stripe con el dominio local de billing
+### Operacion
 
-### Health check
-- Metodo: `GET`
-- Ruta: `/api/health`
-- Uso: comprobar conectividad basica y readiness del entorno
+- `GET /api/health`
 
 ## Server Actions principales
 
-### Turnos
+### Auth
+
+- `src/app/(auth)/login/actions.ts`
+  - `loginWithPassword`
+- `src/app/(auth)/register/actions.ts`
+  - `registerEmployee`
+- `src/app/(auth)/forgot-password/actions.ts`
+  - `sendPasswordResetEmail`
+
+### Turnos y propuestas
+
 - `src/app/(dashboard)/shifts/new/actions.ts`
   - `createShift`
 - `src/app/(dashboard)/shifts/my/actions.ts`
-  - `acceptRequest`
-  - `rejectRequest`
-  - `cancelShift`
+  - `acceptProposal`
+  - `rejectProposal`
 - `src/components/shifts/actions.ts`
-  - `showInterest`
+  - `proposeExchange`
+  - `withdrawProposal`
+  - `cancelShift`
 
 ### Chat
+
 - `src/app/(dashboard)/chat/actions.ts`
   - `startConversation`
 
-### Exchanges
+### Expedientes
+
 - `src/app/(dashboard)/exchanges/actions.ts`
-  - `confirmExchange`
+  - `signAsInterested`
   - `attachExchangeDocument`
-  - `signExchange`
-  - `cancelExchange`
   - `requestSignedExchangeCancellation`
   - `confirmSignedExchangeCancellation`
   - `rejectSignedExchangeCancellation`
+  - `cancelExchange`
 
-### Aprobacion de exchanges
+### Aprobacion departamental
+
 - `src/app/(dashboard)/admin/exchanges/actions.ts`
   - `approveExchangeRequest`
   - `rejectExchangeRequest`
 
-### Perfil
+### Perfil y onboarding
+
 - `src/app/(dashboard)/profile/actions.ts`
+  - `updateSignatureUrl`
   - `updateProfile`
+  - `requestDepartmentChange`
+  - `requestJobPositionChange`
+- `src/app/(dashboard)/onboarding-actions.ts`
+  - `completeOnboarding`
 
-### Auth
-- `src/app/(auth)/login/actions.ts`
-  - `loginWithPassword`
-- `src/app/(auth)/forgot-password/actions.ts`
-  - `sendPasswordResetEmail`
+### Calendario
 
-### Admin
+- `src/app/(dashboard)/calendar/vacations/actions.ts`
+  - `createVacation`
+  - `deleteVacation`
+- `src/app/(dashboard)/admin/schedule-config/actions.ts`
+  - `setAreaScheduleType`
+  - `assignUserRotationGroup`
+
+### Admin adicional
+
 - `src/app/(dashboard)/admin/validations/actions.ts`
   - `approveUser`
   - `rejectUser`
 - `src/app/(dashboard)/admin/users/actions.ts`
   - `changeUserRole`
+- `src/app/(dashboard)/admin/department-changes/actions.ts`
+  - `approveDepartmentChangeRequest`
+  - `rejectDepartmentChangeRequest`
+- `src/app/(dashboard)/admin/job-position-changes/actions.ts`
+  - `approveJobPositionChangeRequest`
+  - `rejectJobPositionChangeRequest`
 
 ## Realtime
 
-### Tablas publicadas y usadas por cliente
+### Tablas publicadas
+
 - `messages`
 - `notifications`
-- `billing_accounts`
-- `billing_subscriptions`
-- `billing_invoices`
-- `billing_webhook_events`
 
-### Dependencias de migracion
+### Dependencias minimas
+
 - `00010_enable_realtime_for_messages.sql`
 - `00013_notifications_center.sql`
 - `00014_notification_center_state_and_dedupe.sql`
@@ -137,12 +158,14 @@
 - `avatars`
 - `exchange-documents`
 - `id-cards`
+- `signatures`
 
 ## Entidades principales
 
 - `user_profiles`
 - `companies`
 - `departments`
+- `job_positions`
 - `shifts`
 - `shift_requests`
 - `conversations`
@@ -150,49 +173,66 @@
 - `exchanges`
 - `exchange_events`
 - `shift_debt_transactions`
+- `department_change_requests`
+- `job_position_change_requests`
 - `notifications`
+- `billing_accounts`
+- `billing_subscriptions`
+- `rotation_patterns`
+- `rotation_groups`
+- `area_schedule_configs`
+- `user_rotation_assignments`
+- `vacations`
+- `schedule_overrides`
 
 ## Estados clave
 
 ### Shift
+
 - `open`
-- `pending`
-- `confirmed`
+- `negotiating`
 - `completed`
 - `cancelled`
+- `expired`
 
 ### Shift request
+
 - `pending`
 - `accepted`
 - `rejected`
 - `withdrawn`
 
 ### Exchange
-- `pending_confirmation`
-- `confirmed`
-- `pending_department_approval`
+
+- `accepted`
+- `pending_validation`
 - `approved`
 - `rejected`
 - `completed`
 - `cancelled`
+- `expired`
 
 ### Compensation agreement
+
 - `hours_bank`
 - `shift_exchange`
 
-### Shift debt transaction
-- `pending_approval`
-- `active`
-- `voided`
-- `settled`
+### Calendar day type
+
+- `morning`
+- `afternoon`
+- `night`
+- `rest`
+- `normal_full`
+- `normal_short`
+- `vacation`
 
 ## Notas tecnicas
 
-- La UI usa `searchParams` para filtros en listings, no endpoints REST separados.
-- La mayor parte de lecturas ocurren server-side con `createClient()` de Supabase.
-- Las mutaciones importantes deben devolver `{ success: true }` para que la UI reaccione sin esperar un rerender completo.
-- `createNotification` usa service role para poder insertar notificaciones de terceros sin depender de RLS del usuario autenticado.
-- La logica de negocio del workflow ya no depende de descargar/subir documentos manualmente.
-- El PDF es una salida generada por el sistema; el soporte documental externo es opcional.
-- Para produccion, Supabase debe tener aplicadas las migraciones hasta `00019`.
-- Para produccion, Supabase debe tener aplicadas las migraciones hasta `00025`.
+- El flujo vivo ya es v2: propuesta directa, aceptacion por el publicador y firma explicita solo del solicitante.
+- `createNotification` usa service role para insertar notificaciones de terceros sin depender de RLS del usuario autenticado.
+- `src/lib/billing.ts` centraliza el estado comercial efectivo.
+- `src/lib/calendar.ts` valida calendario base, overrides y vacaciones.
+- `src/lib/calendar-data.ts` usa admin client para evitar problemas con column-level grants.
+- Los PDFs son una salida generada por el sistema; el soporte documental externo es opcional.
+- Para staging y piloto la base debe tener aplicadas las migraciones hasta `00030`.

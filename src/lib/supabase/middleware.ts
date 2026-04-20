@@ -6,7 +6,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { resolveBillingGateState } from '@/lib/billing';
 import type { AccountGateState } from '@/lib/user-profiles';
 import { hasAdminPanelAccess } from '@/lib/user-roles';
-import type { UserRole, ValidationStatus } from '@/types';
 
 function clearSupabaseAuthCookies(
   request: NextRequest,

@@ -2,65 +2,113 @@
 
 ## Objetivo
 
-Esta guia deja una base minima para operar ShiftSwap en staging y produccion
-con menos riesgo durante el piloto y antes de activar billing real.
+Dejar una base operativa realista para staging, piloto y produccion sin depender solo de memoria tribal del equipo.
 
 ## Entornos recomendados
 
-- `local`: desarrollo y pruebas rapidas
-- `staging`: mismo flujo que produccion, pero con datos y claves separadas
-- `production`: entorno real para usuarios
+- `local`: desarrollo diario
+- `staging`: mismo flujo que produccion, con datos y claves separadas
+- `production`: usuarios reales
 
-## Variables de entorno nuevas
+## Minimo tecnico para staging y piloto
 
-- `BILLING_ENABLED`
-- `BILLING_MODE`
-- `BILLING_ENFORCEMENT`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_USER_MONTHLY_PRICE_ID`
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
-- `TURNSTILE_SECRET_KEY`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-
-## Checklist de despliegue
-
-1. Aplicar migraciones de Supabase hasta la ultima disponible.
-2. Confirmar que staging y production usan proyectos Supabase distintos.
+1. Aplicar migraciones de Supabase hasta `00030_calendar_rotation_and_vacations.sql`.
+2. Confirmar proyectos Supabase distintos para `staging` y `production`.
 3. Verificar buckets:
    - `avatars`
    - `exchange-documents`
    - `id-cards`
-4. Verificar ruta de health:
-   - `GET /api/health`
-5. Verificar auth:
-   - login
-   - register
-   - forgot password
-   - reset password
-6. Verificar flujo operativo:
-   - publicar turno
-   - interes
-   - chat
-   - confirmacion
-   - aprobacion
-   - PDFs
-7. Si billing esta activo:
-   - checkout
-   - portal
-   - webhook Stripe
+   - `signatures`
+4. Confirmar variables de entorno:
+   - Supabase
+   - billing
+   - Turnstile
+   - Resend
+5. Confirmar `npm run build`, `npm run lint` y `npm run test:smoke`.
+
+## Checklist de despliegue
+
+### Acceso y auth
+
+- login
+- register
+- forgot password
+- reset password
+- pending validation
+
+### Flujo operativo
+
+- publicar turno
+- proponer `hours_bank`
+- aceptar propuesta
+- firmar expediente
+- aprobar o rechazar desde admin
+- descargar PDF corporativo
+- descargar PDF oficial
+
+### Organizacion y calendario
+
+- perfil con empresa, area, departamento y puesto
+- cambios de departamento y puesto
+- `/calendar`
+- `/calendar/vacations`
+- `/admin/schedule-config`
+
+### Billing
+
+- `/billing`
+- checkout
+- portal
+- webhook Stripe
+
+### Operacion publica
+
+- `GET /api/health`
+
+## Smoke automatizado
+
+```bash
+npm run test:smoke
+```
+
+Variables utiles:
+
+- `E2E_MEMBER_EMAIL`
+- `E2E_MEMBER_PASSWORD`
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_SUPER_ADMIN_EMAIL`
+- `E2E_SUPER_ADMIN_PASSWORD`
+- `E2E_EXCHANGE_ID`
+
+Notas:
+
+- Si no se define `E2E_BASE_URL`, Playwright levanta la app localmente.
+- El smoke siempre valida `GET /api/health`.
+- Los bloques autenticados se saltan si faltan credenciales.
+
+## Observabilidad minima recomendada
+
+- Uptime check contra `GET /api/health`
+- Alertas de build fallido en Vercel
+- Revision periodica de logs de:
+  - auth
+  - billing
+  - webhooks Stripe
+  - errores de Supabase
+- Registro de incidencias del piloto con fecha, entorno y ruta afectada
 
 ## Backups y rollback
 
-- Supabase debe tener backups automáticos activados.
+- Mantener backups automaticos de Supabase activados.
 - Antes de cada despliegue sensible:
-  - exportar snapshot o confirmar backup reciente
-  - registrar numero de migracion objetivo
+  - verificar backup reciente
+  - registrar la ultima migracion objetivo
+  - guardar referencia del commit desplegado
 - Si una migracion rompe el entorno:
-  - bloquear despliegues nuevos
-  - restaurar backup o aplicar rollback SQL manual validado
-  - dejar constancia en el changelog operativo
+  - congelar despliegues
+  - restaurar backup o aplicar rollback SQL validado
+  - registrar el incidente en el changelog operativo
 
 ## Rotacion de claves
 
@@ -70,29 +118,13 @@ con menos riesgo durante el piloto y antes de activar billing real.
   - `TURNSTILE_SECRET_KEY`
   - `RESEND_API_KEY`
 - Tras cada rotacion:
-  - actualizar Vercel
-  - actualizar staging si procede
-  - comprobar `GET /api/health`
+  - actualizar el proveedor del entorno
+  - revalidar `GET /api/health`
+  - rerun de `npm run test:smoke` si el entorno es accesible
 
-## Monitorizacion minima
+## Pendientes fuera del repo
 
-- Uptime check contra `GET /api/health`
-- Alertas de build fallido en Vercel
-- Revisión de logs de:
-  - auth
-  - route handlers de billing
-  - webhooks Stripe
-  - errores de Supabase
-
-## Smoke manual sugerido
-
-- Registro valido
-- Registro bloqueado por validacion/captcha cuando proceda
-- Login correcto e incorrecto
-- Password reset
-- Validacion admin
-- Publicacion de turno
-- Flujo completo de exchange
-- Descarga de PDF normal y oficial
-- Billing page
-- Checkout/portal/webhook cuando billing se active
+- Provisionar staging real si aun no existe
+- Conectar checks de uptime externos
+- Definir politica formal de retencion de documentos
+- Revisar legales antes de activar cobro a terceros
