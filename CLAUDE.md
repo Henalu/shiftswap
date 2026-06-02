@@ -427,9 +427,13 @@ tests/
 
 ```bash
 npm run dev
+npm run typecheck
 npm run lint
 npm run build
 npm run test:smoke
+npm run supabase:start
+npm run supabase:status
+npm run supabase:reset
 npx supabase db push
 ```
 
@@ -461,6 +465,8 @@ TURNSTILE_SECRET_KEY=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 E2E_BASE_URL=
+E2E_PORT=
+E2E_START_SERVER=
 E2E_MEMBER_EMAIL=
 E2E_MEMBER_PASSWORD=
 E2E_ADMIN_EMAIL=

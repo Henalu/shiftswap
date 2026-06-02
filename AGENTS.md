@@ -6,6 +6,12 @@ Read `CLAUDE.md` before starting any task in this project. It is the authoritati
 
 This file only adapts that brief to Codex.
 
+## Shared Workspace Context
+
+- Workspace guidance: `../../_workspace/AGENTS.md`
+- For UI, visual design, layout, component, token, or frontend polish tasks, consult `../../_systems/0.design-system/CLAUDE.md` and `../../_systems/0.design-system/docs/playbook.md` before creating new patterns.
+- Prefer reusing or adapting shared design-system references when they fit this project.
+
 ## Codex Skill Routing
 
 - Treat the `Comandos Impeccable — Cuándo Ejecutar` section in `CLAUDE.md` as active for Codex too. Use the matching installed Codex skills proactively when their trigger condition is met.

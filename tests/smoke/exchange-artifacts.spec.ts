@@ -19,17 +19,17 @@ test.describe("exchange artifacts smoke", () => {
 
     await openAndExpectHeading(page, `/exchanges/${exchangeId}`, /Cambio|Expediente/i);
 
-    const pdfResponse = await page.goto(`/api/exchanges/${exchangeId}/pdf`);
-    expect(pdfResponse).not.toBeNull();
-    expect(pdfResponse?.ok()).toBeTruthy();
-    expect(pdfResponse?.headers()["content-type"]).toContain("application/pdf");
+    const pdfResponse = await page.request.get(
+      `/api/exchanges/${exchangeId}/pdf`
+    );
+    expect(pdfResponse.ok()).toBeTruthy();
+    expect(pdfResponse.headers()["content-type"]).toContain("application/pdf");
 
-    const officialPdfResponse = await page.goto(
+    const officialPdfResponse = await page.request.get(
       `/api/exchanges/${exchangeId}/official-pdf`
     );
-    expect(officialPdfResponse).not.toBeNull();
-    expect(officialPdfResponse?.ok()).toBeTruthy();
-    expect(officialPdfResponse?.headers()["content-type"]).toContain(
+    expect(officialPdfResponse.ok()).toBeTruthy();
+    expect(officialPdfResponse.headers()["content-type"]).toContain(
       "application/pdf"
     );
   });

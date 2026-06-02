@@ -16,7 +16,12 @@ import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 export const runtime = "nodejs";
 
-const ARCELOR_LOGO_ASSET_PATH = ["public", "brand", "arcelormittal-logo.png"];
+const ARCELOR_LOGO_ASSET_PATH = path.join(
+  process.cwd(),
+  "public",
+  "brand",
+  "arcelormittal-logo.png"
+);
 
 interface ExchangeDocumentDetail {
   id: string;
@@ -70,7 +75,7 @@ interface ExchangeDocumentDetail {
 }
 
 async function loadArcelorLogoDataUri(): Promise<string> {
-  const logoBuffer = await readFile(path.join(process.cwd(), ...ARCELOR_LOGO_ASSET_PATH));
+  const logoBuffer = await readFile(ARCELOR_LOGO_ASSET_PATH);
   return `data:image/png;base64,${logoBuffer.toString("base64")}`;
 }
 

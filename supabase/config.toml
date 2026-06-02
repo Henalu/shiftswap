@@ -1,0 +1,73 @@
+project_id = "shiftswap"
+
+[api]
+enabled = true
+port = 56321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port = 56322
+shadow_port = 56320
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seeds/01_demo_data.sql", "./seeds/02_arcelor_organization.sql"]
+
+[db.pooler]
+enabled = false
+port = 56329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 56323
+api_url = "http://127.0.0.1:56321"
+
+[inbucket]
+enabled = true
+port = 56324
+smtp_port = 56325
+pop3_port = 56326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000", "http://127.0.0.1:3001"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[analytics]
+enabled = true
+port = 56327
+vector_port = 56328
+backend = "postgres"
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8084

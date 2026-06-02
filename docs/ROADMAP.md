@@ -76,7 +76,7 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 ### Fase 5 - Testing con usuarios
 
 - Ejecutar piloto con empleados reales
-- Preparar staging con migraciones hasta `00030`
+- Preparar staging con migraciones hasta la ultima de `supabase/migrations/`
 - Validar comprension del flujo v2:
   - turno disponible
   - propuesta pendiente
@@ -98,8 +98,9 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 
 - Staging separado y verificado
 - Momento recomendado: abrirlo cuando el siguiente bloque de trabajo ya sea piloto, deploy o validacion externa, no mientras el trabajo siga siendo mayoritariamente interno al repo
-- Smoke automatizado ejecutable
+- Smoke automatizado ejecutable; en local, 9/9 tests pasan con Supabase local y fixture E2E reparado a 2026-06-02
 - Smoke manual de punta a punta
+- Cierre local de permisos internos de billing/rate limit aplicado en migracion `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`
 - Observabilidad minima:
   - uptime
   - logs

@@ -7,8 +7,8 @@ Archivo vivo con estado real del proyecto, decisiones importantes y siguientes p
 ## Estado actual
 
 - Fase: Fase 5 - testing con usuarios / preparacion real de piloto
-- Ultima actualizacion: 2026-04-20
-- Ultimo hito relevante: alineacion documental al flujo v2 + lint limpio + base automatizada de smoke con Playwright
+- Ultima actualizacion: 2026-06-01
+- Ultimo hito relevante: transferencia selectiva de aprendizajes de BoxOps a tooling local, seguridad y contexto
 - Estado general: funcionalmente estable y mas avanzada que el MVP; lista para staging y piloto si la base tiene aplicadas las migraciones hasta `00030`
 
 ## Resumen ejecutivo
@@ -34,6 +34,18 @@ Archivo vivo con estado real del proyecto, decisiones importantes y siguientes p
   - PDF routes opcionales si se configura `E2E_EXCHANGE_ID`
 
 ## Hitos consolidados
+
+### 2026-06-01 - Transferencia selectiva desde BoxOps
+
+- Analisis comparativo registrado en `docs/BOXOPS_TRANSFER_AUDIT.md`.
+- Gate de seguridad operativo registrado en `docs/SECURITY_BASELINE.md`.
+- Tooling local endurecido:
+  - `npm run typecheck`
+  - Supabase local con `supabase/config.toml`
+  - reset local bloqueado por defecto
+  - smokes leyendo `.env.local`
+  - cache `no-store` en middleware para superficies protegidas.
+- `next` y `eslint-config-next` actualizados a `16.2.6`; `npm audit --omit=dev --audit-level=high` queda sin high.
 
 ### 2026-03-26 - Pilot readiness y billing foundation
 

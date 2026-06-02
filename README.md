@@ -5,7 +5,7 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 ## Estado del proyecto
 
 - Fase actual: Fase 5, testing con usuarios y preparacion real de piloto
-- Estado tecnico: `npm run build` y `npm run lint` pasan con el corte actual
+- Estado tecnico: `npm run typecheck`, `npm run lint`, `npm run build` y `npm run test:smoke` pasan en local con el corte 2026-06-02
 - Estado funcional: flujo v2 de propuestas activo, calendario laboral operativo y billing foundation lista para activacion
 
 ## Que incluye hoy
@@ -52,11 +52,25 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 ```bash
 npm install
 cp .env.example .env.local
-npx supabase db push
+npm run supabase:start
+npm run supabase:status
 npm run dev
 ```
 
-Para staging, piloto y calendario laboral real, la base debe tener aplicadas las migraciones hasta `00030_calendar_rotation_and_vacations.sql`.
+Completa `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` con los valores que muestra `npm run supabase:status`.
+La configuracion local del repo espera Supabase en `http://127.0.0.1:56321` y Postgres en `127.0.0.1:56322`.
+
+Para staging, piloto y calendario laboral real, la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-02 la ultima es `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`.
+Para aplicar a un proyecto remoto/staging, usa `npx supabase db push` con el proyecto correcto enlazado.
+
+Para preparar usuarios E2E locales, rellena las variables `E2E_*` en `.env.local` y ejecuta primero el dry-run:
+
+```bash
+npm run supabase:setup:e2e-auth
+npm run supabase:setup:e2e-auth:commit
+```
+
+El primer comando es `ROLLBACK` por defecto y no persiste cambios. El segundo exige Supabase local (`NEXT_PUBLIC_SUPABASE_URL` en localhost/127.0.0.1) y crea o repara Auth + `user_profiles`.
 
 ## Variables de entorno
 
@@ -81,12 +95,20 @@ RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 
 E2E_BASE_URL=
+E2E_PORT=3001
+E2E_START_SERVER=
 E2E_MEMBER_EMAIL=
 E2E_MEMBER_PASSWORD=
+E2E_DEPARTMENT_ADMIN_EMAIL=
+E2E_DEPARTMENT_ADMIN_PASSWORD=
+E2E_HR_ADMIN_EMAIL=
+E2E_HR_ADMIN_PASSWORD=
 E2E_ADMIN_EMAIL=
 E2E_ADMIN_PASSWORD=
 E2E_SUPER_ADMIN_EMAIL=
 E2E_SUPER_ADMIN_PASSWORD=
+E2E_UNRELATED_EMAIL=
+E2E_UNRELATED_PASSWORD=
 E2E_EXCHANGE_ID=
 ```
 
@@ -94,9 +116,16 @@ E2E_EXCHANGE_ID=
 
 ```bash
 npm run dev
+npm run typecheck
 npm run lint
 npm run build
 npm run test:smoke
+npm run supabase:start
+npm run supabase:status
+npm run supabase:setup:e2e-auth
+npm run supabase:setup:e2e-auth:commit
+npm run supabase:reset
+npx supabase migration up --local
 npx supabase db push
 ```
 
@@ -125,6 +154,8 @@ npx supabase db push
 - `docs/API.md`: superficie tecnica vigente
 - `docs/OPERATIONS.md`: staging, despliegue, observabilidad y rollback
 - `docs/SMOKE_CHECKLIST.md`: checklist manual y alcance del smoke automatizado
+- `docs/SECURITY_BASELINE.md`: gates de seguridad antes de piloto
+- `docs/BOXOPS_TRANSFER_AUDIT.md`: aprendizajes de BoxOps aplicables a ShiftSwap
 
 ## Datos de prueba organizativos
 

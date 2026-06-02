@@ -235,4 +235,4 @@ La mayor parte de la logica de negocio vive en Server Components, Server Actions
 - `src/lib/calendar.ts` valida calendario base, overrides y vacaciones.
 - `src/lib/calendar-data.ts` usa admin client para evitar problemas con column-level grants.
 - Los PDFs son una salida generada por el sistema; el soporte documental externo es opcional.
-- Para staging y piloto la base debe tener aplicadas las migraciones hasta `00030`.
+- Para staging y piloto la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-01 la ultima es `00034_repair_active_exchange_slot_indexes.sql`.

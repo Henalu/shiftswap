@@ -7,7 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:smoke": "playwright test --config=playwright.smoke.config.ts"
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "playwright test --config=playwright.smoke.config.ts",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:status": "npx supabase status",
+    "supabase:setup:e2e-auth": "node scripts/setup-local-e2e-auth.mjs",
+    "supabase:setup:e2e-auth:commit": "node scripts/setup-local-e2e-auth.mjs --commit",
+    "supabase:reset": "node scripts/supabase-reset-guard.mjs",
+    "supabase:reset:danger": "node scripts/supabase-reset-guard.mjs --yes"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -25,7 +33,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.577.0",
-    "next": "16.1.6",
+    "next": "16.2.6",
     "next-themes": "^0.4.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -42,7 +50,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

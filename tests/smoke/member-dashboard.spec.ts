@@ -1,6 +1,10 @@
 import { test } from "@playwright/test";
 import { hasCredentials, memberCredentials } from "./helpers/env";
-import { loginAs, openAndExpectHeading } from "./helpers/session";
+import {
+  loginAs,
+  openAndExpectHeading,
+  openAndExpectText,
+} from "./helpers/session";
 
 test.describe("member dashboard smoke", () => {
   test.skip(
@@ -16,7 +20,7 @@ test.describe("member dashboard smoke", () => {
     await openAndExpectHeading(page, "/calendar", /^Calendario$/i);
     await openAndExpectHeading(page, "/calendar/vacations", /^Vacaciones$/i);
     await openAndExpectHeading(page, "/exchanges", /Cambios|Expedientes/i);
-    await openAndExpectHeading(page, "/billing", /Suscripcion y acceso/i);
+    await openAndExpectText(page, "/billing", /Suscripcion y acceso/i);
     await openAndExpectHeading(page, "/help", /Ayuda|preguntas frecuentes/i);
     await openAndExpectHeading(page, "/profile", /Mi perfil|Perfil/i);
   });

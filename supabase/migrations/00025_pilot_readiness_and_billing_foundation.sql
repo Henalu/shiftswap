@@ -40,7 +40,7 @@ SET search_path = ''
 AS $$
 DECLARE
   current_row public.request_rate_limits%ROWTYPE;
-  current_time TIMESTAMPTZ := NOW();
+  current_instant TIMESTAMPTZ := NOW();
   reset_time TIMESTAMPTZ;
 BEGIN
   IF max_hits <= 0 OR window_seconds <= 0 THEN
@@ -66,8 +66,8 @@ BEGIN
       target_scope,
       target_bucket_key,
       1,
-      current_time,
-      current_time
+      current_instant,
+      current_instant
     );
 
     RETURN QUERY SELECT TRUE, 1, 0;
@@ -76,12 +76,12 @@ BEGIN
 
   reset_time := current_row.window_started_at + make_interval(secs => window_seconds);
 
-  IF current_time >= reset_time THEN
+  IF current_instant >= reset_time THEN
     UPDATE public.request_rate_limits
     SET
       hits = 1,
-      window_started_at = current_time,
-      last_hit_at = current_time
+      window_started_at = current_instant,
+      last_hit_at = current_instant
     WHERE scope = target_scope
       AND bucket_key = target_bucket_key;
 
@@ -94,14 +94,14 @@ BEGIN
     SELECT
       FALSE,
       current_row.hits,
-      GREATEST(1, CEIL(EXTRACT(EPOCH FROM (reset_time - current_time)))::INTEGER);
+      GREATEST(1, CEIL(EXTRACT(EPOCH FROM (reset_time - current_instant)))::INTEGER);
     RETURN;
   END IF;
 
   UPDATE public.request_rate_limits
   SET
     hits = current_row.hits + 1,
-    last_hit_at = current_time
+    last_hit_at = current_instant
   WHERE scope = target_scope
     AND bucket_key = target_bucket_key;
 

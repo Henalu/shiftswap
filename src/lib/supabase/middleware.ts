@@ -4,8 +4,16 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { resolveBillingGateState } from '@/lib/billing';
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import type { AccountGateState } from '@/lib/user-profiles';
 import { hasAdminPanelAccess } from '@/lib/user-roles';
+
+function withPrivateAppCacheHeaders(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Pragma", "no-cache");
+
+  return response;
+}
 
 function clearSupabaseAuthCookies(
   request: NextRequest,
@@ -20,11 +28,12 @@ function clearSupabaseAuthCookies(
 }
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const { supabaseUrl, supabaseAnonKey } = getSupabasePublicEnv();
+  let supabaseResponse = withPrivateAppCacheHeaders(NextResponse.next({ request }));
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -34,7 +43,9 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = withPrivateAppCacheHeaders(
+            NextResponse.next({ request })
+          );
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -73,7 +84,7 @@ export async function updateSession(request: NextRequest) {
     if (!isAuthPage && !isAuthApiRoute && !isHealthRoute && !isBillingWebhookRoute) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
-      return NextResponse.redirect(url);
+      return withPrivateAppCacheHeaders(NextResponse.redirect(url));
     }
 
     return supabaseResponse;
@@ -82,7 +93,7 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isAuthPage && !isAuthApiRoute && !isHealthRoute && !isBillingWebhookRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   if (!user) {
@@ -107,25 +118,25 @@ export async function updateSession(request: NextRequest) {
   if (isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = isBlockedByValidation ? '/pending-validation' : '/shifts';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   if (isBlockedByValidation && !isPendingValidationPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/pending-validation';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   if (!isBlockedByValidation && isPendingValidationPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/shifts';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   if (pathname.startsWith('/admin') && !hasAdminPanelAccess(role)) {
     const url = request.nextUrl.clone();
     url.pathname = '/shifts';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   const billingState = await resolveBillingGateState(user.id, accountState);
@@ -133,7 +144,7 @@ export async function updateSession(request: NextRequest) {
   if (billingState.accessBlocked && !isBillingPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/billing';
-    return NextResponse.redirect(url);
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   return supabaseResponse;

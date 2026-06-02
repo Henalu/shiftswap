@@ -9,7 +9,7 @@ import { loginAs, openAndExpectHeading } from "./helpers/session";
 test.describe("admin dashboard smoke", () => {
   test.skip(
     !hasCredentials(adminCredentials),
-    "Configura E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD para ejecutar el smoke admin."
+    "Configura E2E_DEPARTMENT_ADMIN_* o E2E_HR_ADMIN_* para ejecutar el smoke admin. E2E_ADMIN_* sigue soportado como alias local."
   );
 
   test("admin can reach operational review queues", async ({ page }) => {
