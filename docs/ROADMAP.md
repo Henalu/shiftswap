@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, turnos, propuestas v2, chat, expediente formal, aprobacion departamental, PDFs, estructura organizativa real, calendario laboral y billing foundation. La prioridad ya no es "terminar el MVP", sino cerrar readiness real de piloto y validar el producto con usuarios.
+El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, turnos, propuestas v2, chat, expediente formal, aprobacion departamental, PDFs, estructura organizativa real, calendario laboral, billing B2C early adopter y panel platform admin MVP. La prioridad ya no es "terminar el MVP", sino cerrar salida real a produccion y validar el producto con usuarios.
 
 ## Bloques cerrados
 
@@ -58,6 +58,8 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 - Rate limiting en auth
 - Turnstile opcional
 - `/billing`
+- Programa B2C early adopter por cohortes
+- Plan mensual/anual
 - Checkout, portal y webhook de Stripe
 - `health` endpoint
 - Runbook operativo
@@ -98,9 +100,11 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 
 - Staging separado y verificado
 - Momento recomendado: abrirlo cuando el siguiente bloque de trabajo ya sea piloto, deploy o validacion externa, no mientras el trabajo siga siendo mayoritariamente interno al repo
-- Smoke automatizado ejecutable; en local, 9/9 tests pasan con Supabase local y fixture E2E reparado a 2026-06-02
+- Smoke automatizado ejecutable; en local, 10/10 tests pasan con Supabase local y fixture E2E reparado a 2026-06-03
 - Smoke manual de punta a punta
 - Cierre local de permisos internos de billing/rate limit aplicado en migracion `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`
+- Pricing early adopter y panel platform admin MVP aplicado en migracion `20260602112401_billing_early_adopter_pricing.sql`
+- Importes B2C de lanzamiento aplicados en migracion `20260602130533_set_b2c_launch_pricing.sql`
 - Observabilidad minima:
   - uptime
   - logs
@@ -126,11 +130,19 @@ El producto ya supera el MVP. La app cubre auth endurecida, validacion manual, t
 
 ### Bloque C - Salida comercial posterior al piloto
 
-- Activacion real de Stripe
+- Activacion real de Stripe con Price IDs B2C por cohorte
 - Emails del ciclo comercial
 - Legales revisados
-- Onboarding asistido de empresa
-- Precedencia `company > user`
+- Validacion de conversion mensual vs anual
+
+### Bloque C.1 - B2B planificado, fuera del lanzamiento inicial
+
+- Mantener planes B2B ocultos hasta tener flujo completo.
+- Comprador B2B previsto: `hr_admin` con alcance de empresa.
+- Modelo: compra de X plazas, generacion de invitaciones y consumo de plazas por usuarios invitados.
+- Los usuarios cubiertos por empresa no ven planes B2C.
+- Precedencia futura de acceso: `company > user`.
+- Onboarding asistido de empresa.
 
 ### Bloque D - Expansiones post-piloto
 

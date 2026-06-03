@@ -2,9 +2,9 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
+  getStripePriceIdFromEnv,
   getStripeSecretKey,
   getStripeWebhookSecret,
-  getStripeUserMonthlyPriceId,
   isStripeConfigured,
 } from "@/lib/app-config";
 
@@ -31,12 +31,19 @@ export interface StripePortalSessionResponse {
   url: string;
 }
 
-export function getDefaultStripeUserMonthlyPriceId() {
-  return getStripeUserMonthlyPriceId();
-}
-
 export function stripeReady() {
   return isStripeConfigured();
+}
+
+export function resolveStripePriceId(input: {
+  stripe_price_id?: string | null;
+  stripe_price_env_var?: string | null;
+}) {
+  return (
+    input.stripe_price_id?.trim() ||
+    getStripePriceIdFromEnv(input.stripe_price_env_var) ||
+    ""
+  );
 }
 
 async function stripeRequest<TResponse>(
@@ -90,8 +97,11 @@ export async function createStripeCustomer(input: {
 
 export async function createStripeCheckoutSession(input: {
   customerId: string;
+  priceId: string;
   successUrl: string;
   cancelUrl: string;
+  clientReferenceId?: string | null;
+  trialDays?: number;
   metadata?: Record<string, string>;
 }) {
   const body = new URLSearchParams();
@@ -99,9 +109,17 @@ export async function createStripeCheckoutSession(input: {
   body.set("customer", input.customerId);
   body.set("success_url", input.successUrl);
   body.set("cancel_url", input.cancelUrl);
-  body.set("line_items[0][price]", getDefaultStripeUserMonthlyPriceId());
+  body.set("line_items[0][price]", input.priceId);
   body.set("line_items[0][quantity]", "1");
   body.set("allow_promotion_codes", "true");
+
+  if (input.clientReferenceId) {
+    body.set("client_reference_id", input.clientReferenceId);
+  }
+
+  if (input.trialDays && input.trialDays > 0) {
+    body.set("subscription_data[trial_period_days]", String(input.trialDays));
+  }
 
   if (input.metadata) {
     Object.entries(input.metadata).forEach(([key, value]) => {

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncBillingAccountState } from "@/lib/billing";
-import { verifyStripeWebhookSignature } from "@/lib/stripe";
+import {
+  resolveStripePriceId,
+  verifyStripeWebhookSignature,
+} from "@/lib/stripe";
 import type { BillingSubscriptionStatus } from "@/types";
 
 interface StripeEvent {
@@ -62,7 +65,26 @@ async function resolveBillingPlanId(priceId: string | null) {
     .eq("stripe_price_id", priceId)
     .maybeSingle();
 
-  return data?.id ?? null;
+  if (data?.id) {
+    return data.id as string;
+  }
+
+  const { data: plans } = await supabase
+    .from("billing_plans")
+    .select("id, stripe_price_id, stripe_price_env_var")
+    .eq("owner_type", "user")
+    .eq("active", true)
+    .eq("is_public", true);
+
+  const match = (plans ?? []).find(
+    (plan) =>
+      resolveStripePriceId({
+        stripe_price_id: plan.stripe_price_id,
+        stripe_price_env_var: plan.stripe_price_env_var,
+      }) === priceId
+  );
+
+  return match?.id ?? null;
 }
 
 async function upsertSubscriptionFromStripeObject(
@@ -96,7 +118,13 @@ async function upsertSubscriptionFromStripeObject(
       ? (firstItem.price as Record<string, unknown>)
       : null;
   const priceId = price && typeof price.id === "string" ? price.id : null;
-  const planId = await resolveBillingPlanId(priceId);
+  const metadata =
+    stripeObject.metadata && typeof stripeObject.metadata === "object"
+      ? (stripeObject.metadata as Record<string, unknown>)
+      : {};
+  const metadataPlanId =
+    typeof metadata.billing_plan_id === "string" ? metadata.billing_plan_id : null;
+  const planId = (await resolveBillingPlanId(priceId)) ?? metadataPlanId;
   const status = toSubscriptionStatus(stripeObject.status);
   const supabase = createAdminClient();
 
@@ -116,10 +144,7 @@ async function upsertSubscriptionFromStripeObject(
         canceled_at: toIsoTimestamp(stripeObject.canceled_at),
         trial_start: toIsoTimestamp(stripeObject.trial_start),
         trial_end: toIsoTimestamp(stripeObject.trial_end),
-        metadata:
-          stripeObject.metadata && typeof stripeObject.metadata === "object"
-            ? stripeObject.metadata
-            : {},
+        metadata,
       },
       { onConflict: "provider_subscription_id" }
     );
@@ -286,14 +311,48 @@ export async function POST(request: Request) {
             ? ((stripeObject.metadata as Record<string, unknown>)
                 .billing_account_id as string)
             : null;
+        const metadata =
+          stripeObject.metadata && typeof stripeObject.metadata === "object"
+            ? (stripeObject.metadata as Record<string, unknown>)
+            : {};
+        const billingPlanId =
+          typeof metadata.billing_plan_id === "string" ? metadata.billing_plan_id : null;
+        const pricingCohortCode =
+          typeof metadata.pricing_cohort_code === "string"
+            ? metadata.pricing_cohort_code
+            : null;
+        const billingInterval =
+          metadata.billing_interval === "year" ? "year" : metadata.billing_interval === "month" ? "month" : null;
+        const earlyAccessPosition =
+          typeof metadata.early_access_position === "string"
+            ? Number.parseInt(metadata.early_access_position, 10)
+            : null;
 
         if (customerId && billingAccountId) {
           const supabase = createAdminClient();
+          const updatePayload: Record<string, unknown> = {
+            provider_customer_id: customerId,
+          };
+
+          if (billingPlanId) {
+            updatePayload.billing_plan_id = billingPlanId;
+          }
+
+          if (pricingCohortCode) {
+            updatePayload.pricing_cohort_code = pricingCohortCode;
+          }
+
+          if (billingInterval) {
+            updatePayload.billing_interval = billingInterval;
+          }
+
+          if (earlyAccessPosition && Number.isFinite(earlyAccessPosition)) {
+            updatePayload.early_access_position = earlyAccessPosition;
+          }
+
           await supabase
             .from("billing_accounts")
-            .update({
-              provider_customer_id: customerId,
-            })
+            .update(updatePayload)
             .eq("id", billingAccountId);
         }
         break;
@@ -308,6 +367,18 @@ export async function POST(request: Request) {
       case "invoice.paid":
       case "invoice.payment_failed":
         await upsertInvoiceFromStripeObject(stripeObject);
+        if (event.type === "invoice.payment_failed") {
+          const customerId =
+            typeof stripeObject.customer === "string" ? stripeObject.customer : null;
+          const billingAccountId = await loadBillingAccountIdByCustomer(customerId);
+
+          if (billingAccountId) {
+            await syncBillingAccountState({
+              accountId: billingAccountId,
+              subscriptionStatus: "past_due",
+            });
+          }
+        }
         break;
       default:
         break;

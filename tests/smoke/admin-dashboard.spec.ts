@@ -43,6 +43,7 @@ test.describe("super admin smoke", () => {
 
   test("super admin can reach user role management", async ({ page }) => {
     await loginAs(page, superAdminCredentials!);
+    await openAndExpectHeading(page, "/admin/platform", /Panel de plataforma/i);
     await openAndExpectHeading(page, "/admin/users", /Roles de usuario/i);
   });
 });

@@ -6,6 +6,7 @@ import {
   CreditCard,
   ShieldCheck,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,10 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getBillingMode, isBillingEnabled } from "@/lib/app-config";
-import { resolveBillingGateState } from "@/lib/billing";
+import {
+  getPublicBillingPlans,
+  resolveBillingGateState,
+  type PublicBillingPlanOption,
+} from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
-import { stripeReady } from "@/lib/stripe";
+import { resolveStripePriceId, stripeReady } from "@/lib/stripe";
 
 const BILLING_STATE_LABELS = {
   inactive: "Sin suscripcion activa",
@@ -29,7 +34,87 @@ const BILLING_STATE_LABELS = {
   blocked: "Bloqueada",
 } as const;
 
-export default async function BillingPage() {
+interface BillingPageProps {
+  searchParams: Promise<{
+    checkout?: string;
+    interval?: string;
+    mode?: string;
+    price?: string;
+    stripe?: string;
+  }>;
+}
+
+function formatPlanPrice(plan: PublicBillingPlanOption) {
+  if (plan.amount_cents <= 0) {
+    return "Precio por definir";
+  }
+
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: plan.currency.toUpperCase(),
+  }).format(plan.amount_cents / 100);
+}
+
+function intervalLabel(interval: string) {
+  return interval === "year" ? "Anual" : "Mensual";
+}
+
+function PlanOption({
+  interval,
+  plans,
+  stripeConfigured,
+}: {
+  interval: "month" | "year";
+  plans: PublicBillingPlanOption[];
+  stripeConfigured: boolean;
+}) {
+  const plan = plans.find((candidate) => candidate.billing_interval === interval);
+  const stripePriceId = plan ? resolveStripePriceId(plan) : "";
+  const disabled = !stripeConfigured || !plan || !stripePriceId;
+
+  return (
+    <form
+      action="/api/billing/checkout"
+      method="post"
+      className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-background/85 p-4"
+    >
+      <input type="hidden" name="billing_interval" value={interval} />
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-semibold text-foreground">{intervalLabel(interval)}</p>
+          {plan?.marketing_badge ? (
+            <Badge variant="outline">{plan.marketing_badge}</Badge>
+          ) : null}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {plan?.price_label ?? "Plan pendiente de configurar"}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-2xl font-semibold tracking-tight text-foreground">
+          {plan ? formatPlanPrice(plan) : "No disponible"}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {plan?.cohort?.discount_label ?? "Sin cohorte activa"}
+        </p>
+      </div>
+
+      {plan?.trial_days ? (
+        <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800">
+          Incluye {plan.trial_days} dias de prueba para las primeras plazas.
+        </p>
+      ) : null}
+
+      <Button type="submit" className="w-full" disabled={disabled}>
+        {interval === "year" ? "Activar anual" : "Activar mensual"}
+      </Button>
+    </form>
+  );
+}
+
+export default async function BillingPage({ searchParams }: BillingPageProps) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,9 +134,21 @@ export default async function BillingPage() {
   }
 
   const billingState = await resolveBillingGateState(user.id, accountState);
+  const publicPlans = await getPublicBillingPlans();
   const billingEnabled = isBillingEnabled();
   const mode = getBillingMode();
   const stripeConfigured = stripeReady();
+  const selectedCohortPlans = billingState.pricingCohortCode
+    ? publicPlans.filter((plan) => plan.cohort_code === billingState.pricingCohortCode)
+    : publicPlans.filter(
+        (plan) =>
+          plan.cohort?.min_position ===
+          Math.min(...publicPlans.map((candidate) => candidate.cohort?.min_position ?? 9999))
+      );
+  const visiblePlans = selectedCohortPlans.length > 0 ? selectedCohortPlans : publicPlans;
+  const hasConfiguredStripePrice = visiblePlans.some((plan) =>
+    Boolean(resolveStripePriceId(plan))
+  );
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-10">
@@ -78,7 +175,35 @@ export default async function BillingPage() {
               {billingState.reason ??
                 "Tu acceso esta listo para el piloto actual y quedara controlado desde aqui cuando actives billing."}
             </p>
+            {billingState.earlyAccessPosition ? (
+              <p className="mt-3 text-xs font-medium text-muted-foreground">
+                Plaza early adopter #{billingState.earlyAccessPosition}
+                {billingState.priceLockEndsAt
+                  ? ` - precio bloqueado hasta ${new Date(
+                      billingState.priceLockEndsAt
+                    ).toLocaleDateString("es-ES")}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
+
+          {params.checkout === "success" ? (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
+              Checkout completado. Stripe confirmara la suscripcion por webhook.
+            </div>
+          ) : null}
+
+          {params.checkout === "cancelled" ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+              Checkout cancelado. Puedes elegir mensual o anual cuando quieras.
+            </div>
+          ) : null}
+
+          {params.price === "missing" ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+              Falta configurar el Price ID de Stripe para el plan seleccionado.
+            </div>
+          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-border/70 bg-background/80 p-4 text-sm">
@@ -105,7 +230,7 @@ export default async function BillingPage() {
               <div className="space-y-1 text-sm">
                 <p className="font-semibold text-foreground">Detalle comercial</p>
                 <p className="text-muted-foreground">
-                  Plan: {billingState.planName ?? "Plan individual base"}
+                  Plan: {billingState.planName ?? "Pendiente de elegir"}
                 </p>
                 <p className="text-muted-foreground">
                   Estado de suscripcion:{" "}
@@ -126,6 +251,12 @@ export default async function BillingPage() {
                 </div>
               ) : null}
 
+              {stripeConfigured && !hasConfiguredStripePrice ? (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+                  Stripe esta activo, pero faltan los Price IDs de los planes.
+                </div>
+              ) : null}
+
               {billingState.state === "active" || billingState.state === "trialing" || billingState.state === "past_due" ? (
                 <form action="/api/billing/portal" method="post">
                   <Button type="submit" className="w-full" disabled={!stripeConfigured}>
@@ -133,11 +264,18 @@ export default async function BillingPage() {
                   </Button>
                 </form>
               ) : (
-                <form action="/api/billing/checkout" method="post">
-                  <Button type="submit" className="w-full" disabled={!stripeConfigured}>
-                    Activar suscripcion
-                  </Button>
-                </form>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <PlanOption
+                    interval="month"
+                    plans={visiblePlans}
+                    stripeConfigured={stripeConfigured}
+                  />
+                  <PlanOption
+                    interval="year"
+                    plans={visiblePlans}
+                    stripeConfigured={stripeConfigured}
+                  />
+                </div>
               )}
             </div>
           ) : (

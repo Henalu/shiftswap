@@ -40,6 +40,10 @@ Cobertura base:
   - `/billing`
   - `/help`
   - `/profile`
+- catalogo billing B2C:
+  - importes early adopter
+  - solo planes publicos `owner_type = user`
+  - ningun plan publico `owner_type = company`
 - colas admin:
   - `/admin/exchanges`
   - `/admin/validations`
@@ -47,6 +51,7 @@ Cobertura base:
   - `/admin/job-position-changes`
   - `/admin/schedule-config`
 - `/admin/users` si existe credencial de super admin
+- `/admin/platform` si existe credencial de super admin
 - detalle y PDFs de un expediente si se define `E2E_EXCHANGE_ID`
 - negativos de permisos:
   - miembro autenticado redirige fuera de `/admin/exchanges`
@@ -73,11 +78,14 @@ Variables opcionales:
 - `E2E_BASE_URL`
 - `E2E_PORT`
 - `E2E_START_SERVER`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 Notas:
 
 - Las credenciales y `E2E_EXCHANGE_ID` pueden leerse desde `.env.local`; `E2E_BASE_URL` y `E2E_START_SERVER` deben estar disponibles en el entorno del proceso que lanza Playwright.
 - Si `E2E_BASE_URL` esta vacio, Playwright conserva el comportamiento historico de levantar Next en `E2E_PORT` o `3001`.
+- El smoke de catalogo billing usa `NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`. En staging deben apuntar al proyecto staging; si `E2E_BASE_URL` es remoto pero Supabase apunta a local, ese bloque se salta para evitar un falso verde.
 - Usa `E2E_START_SERVER=0` cuando ya tengas `npm run dev` abierto y quieras evitar que Playwright arranque otro servidor.
 - Para crear o reparar usuarios E2E locales, ejecuta `npm run supabase:setup:e2e-auth` primero. Es dry-run/`ROLLBACK` por defecto.
 - Persiste el fixture solo con `npm run supabase:setup:e2e-auth:commit`. El script se bloquea si Supabase no apunta a local.
@@ -114,12 +122,12 @@ Guardrails:
 - Si falta una credencial de rol, el bloque correspondiente puede saltarse; para readiness de piloto real, documentar ese skip como pendiente.
 - Guardar evidencia redacted fuera del repo si contiene datos personales, emails reales o documentos.
 
-## Estado local de readiness - 2026-06-02
+## Estado local de readiness - 2026-06-03
 
-- Supabase local verificado: migraciones aplicadas hasta `20260602103814_lock_internal_billing_and_rate_limit_tables.sql` y `/api/health` responde `database: "up"`.
+- Supabase local verificado: migraciones aplicadas hasta `20260602130533_set_b2c_launch_pricing.sql` y `/api/health` responde `database: "up"`.
 - Fixture E2E local listo: dry-run y commit ejecutados contra Supabase local; usuarios E2E reparados sin cambios pendientes de perfil y buckets de rate limit de login reseteados.
 - Expediente exportable listo: `E2E_EXCHANGE_ID=3e778f9b-7f6b-49ba-a2de-010a5d5e2434` abre el detalle y responde con PDF ShiftSwap y PDF oficial.
-- Smoke local ejecutado: 9/9 tests pasan. Cubre rutas de miembro, colas admin, gestion de usuarios super admin, expediente/PDFs, negativos de permisos y health.
+- Smoke local ejecutado: 10/10 tests pasan. Cubre rutas de miembro, catalogo billing B2C, colas admin, gestion de usuarios super admin, expediente/PDFs, negativos de permisos y health.
 - Skips restantes: ninguno en la pasada local con credenciales completas.
 - Warning no bloqueante: Next sigue avisando sobre `scroll-behavior: smooth` en `<html>` durante el smoke. No afecta a readiness funcional; resolver con `data-scroll-behavior="smooth"` solo si se toca el layout global.
 
@@ -189,6 +197,7 @@ Guardrails:
 ### Billing
 
 - `/billing` visible para usuario autenticado
+- `/admin/platform` visible solo para super admin
 - Checkout Stripe redirige correctamente
 - Portal Stripe abre si existe customer
 - Webhook actualiza suscripcion

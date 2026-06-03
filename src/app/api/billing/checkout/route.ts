@@ -6,15 +6,22 @@ import {
   getBillingMode,
   isBillingEnabled,
 } from "@/lib/app-config";
-import { ensureBillingAccountForUser } from "@/lib/billing";
+import {
+  assignBillingPlanForCheckout,
+  ensureBillingAccountForUser,
+} from "@/lib/billing";
 import {
   createStripeCheckoutSession,
   createStripeCustomer,
+  resolveStripePriceId,
   stripeReady,
 } from "@/lib/stripe";
 import { getAccountGateState } from "@/lib/user-profiles";
 
 export async function POST(request: Request) {
+  const formData = await request.formData();
+  const billingInterval =
+    formData.get("billing_interval") === "year" ? "year" : "month";
   const supabase = await createClient();
   const {
     data: { user },
@@ -53,6 +60,20 @@ export async function POST(request: Request) {
     userId: user.id,
     email: profile?.email ?? user.email ?? "",
   });
+  const planAssignment = await assignBillingPlanForCheckout({
+    billingAccountId: billingAccount.id,
+    billingInterval,
+  });
+  const priceId = resolveStripePriceId({
+    stripe_price_id: planAssignment.stripePriceId,
+    stripe_price_env_var: planAssignment.stripePriceEnvVar,
+  });
+
+  if (!priceId) {
+    return NextResponse.redirect(
+      new URL(`/billing?price=missing&interval=${billingInterval}`, request.url)
+    );
+  }
 
   let customerId = billingAccount.provider_customer_id;
 
@@ -81,10 +102,18 @@ export async function POST(request: Request) {
   const appUrl = getAppUrl();
   const session = await createStripeCheckoutSession({
     customerId,
+    priceId,
     successUrl: `${appUrl}/billing?checkout=success`,
     cancelUrl: `${appUrl}/billing?checkout=cancelled`,
+    clientReferenceId: billingAccount.id,
+    trialDays: planAssignment.trialDays,
     metadata: {
       billing_account_id: billingAccount.id,
+      billing_plan_id: planAssignment.billingPlanId,
+      plan_code: planAssignment.planCode,
+      pricing_cohort_code: planAssignment.pricingCohortCode,
+      early_access_position: String(planAssignment.earlyAccessPosition),
+      billing_interval: billingInterval,
       owner_type: "user",
       owner_user_id: user.id,
     },

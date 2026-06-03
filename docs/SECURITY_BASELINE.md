@@ -58,7 +58,7 @@ Antes de invitar usuarios no tecnicos:
 Checklist especifico para pasar de readiness local a staging operativo:
 
 - Supabase staging separado de produccion, con proyecto, claves, Auth y Storage propios.
-- Migraciones aplicadas hasta la ultima de `supabase/migrations/`; a 2026-06-02, `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`.
+- Migraciones aplicadas hasta la ultima de `supabase/migrations/`; a 2026-06-02, `20260602130533_set_b2c_launch_pricing.sql`.
 - Supabase Auth revisado: `Site URL`, Redirect URLs y reset password apuntan a staging.
 - Variables server-side configuradas en el proveedor sin imprimir valores:
   - service role
@@ -82,7 +82,7 @@ Estado 2026-06-02:
 - Gate no superado: smoke staging bloqueado por falta de `E2E_BASE_URL` en la configuracion disponible.
 - `E2E_START_SERVER` debe forzarse a `0` al ejecutar contra staging para no arrancar fixture local.
 - Credenciales E2E de miembro, admin, super admin y `E2E_EXCHANGE_ID` aparecen presentes, sin imprimir valores; antes de ejecutar staging hay que confirmar que pertenecen a staging.
-- Local verificado: tablas internas de billing/rate limit con RLS activo, sin grants directos para `anon`/`authenticated`, y smoke 9/9 pasando.
+- Local verificado: tablas internas de billing/rate limit con RLS activo, sin grants directos para `anon`/`authenticated`, y smoke 10/10 pasando.
 - `npm audit --omit=dev --audit-level=high` pasa sin vulnerabilidades high/critical. Quedan 2 moderadas de `postcss` transitivo en Next; `npm audit fix --force` propone un downgrade rompedor, asi que se deja para seguimiento upstream.
 - Advisor local pendiente no bloqueante para piloto interno: `update_updated_at` y `apply_shift_schedule` tienen `search_path` mutable. Revisar antes de produccion o de ampliar superficie publica.
 - No abrir piloto con datos reales sin decision explicita sobre buckets: `id-cards` privado; `avatars`, `exchange-documents` y `signatures` publicos en el estado actual.

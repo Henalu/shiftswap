@@ -34,8 +34,14 @@ ShiftSwap es una aplicacion web interna para intercambio de turnos entre emplead
 - Navegacion smartphone-first con bottom nav
 - Billing foundation:
   - `/billing`
+  - programa B2C early adopter por cohortes
+  - mensual y anual con IVA incluido
   - checkout, portal y webhook de Stripe
   - gate comercial centralizado
+  - B2B oculto hasta definir plazas e invitaciones de empresa
+- Panel super admin:
+  - `/admin/platform`
+  - organizaciones, usuarios, planes y metricas operativas
 - Base automatizada de smoke con Playwright para health, auth y navegacion clave
 
 ## Stack
@@ -60,7 +66,7 @@ npm run dev
 Completa `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` con los valores que muestra `npm run supabase:status`.
 La configuracion local del repo espera Supabase en `http://127.0.0.1:56321` y Postgres en `127.0.0.1:56322`.
 
-Para staging, piloto y calendario laboral real, la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-02 la ultima es `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`.
+Para staging, piloto y calendario laboral real, la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-02 la ultima es `20260602130533_set_b2c_launch_pricing.sql`.
 Para aplicar a un proyecto remoto/staging, usa `npx supabase db push` con el proyecto correcto enlazado.
 
 Para preparar usuarios E2E locales, rellena las variables `E2E_*` en `.env.local` y ejecuta primero el dry-run:
@@ -86,7 +92,16 @@ BILLING_MODE=user
 BILLING_ENFORCEMENT=off
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
-STRIPE_USER_MONTHLY_PRICE_ID=
+STRIPE_PRICE_FOUNDER_20_MONTHLY=
+STRIPE_PRICE_FOUNDER_20_ANNUAL=
+STRIPE_PRICE_EARLY_70_MONTHLY=
+STRIPE_PRICE_EARLY_70_ANNUAL=
+STRIPE_PRICE_GROWTH_170_MONTHLY=
+STRIPE_PRICE_GROWTH_170_ANNUAL=
+STRIPE_PRICE_LAUNCH_200_MONTHLY=
+STRIPE_PRICE_LAUNCH_200_ANNUAL=
+STRIPE_PRICE_STANDARD_MONTHLY=
+STRIPE_PRICE_STANDARD_ANNUAL=
 
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
@@ -145,6 +160,20 @@ npx supabase db push
 8. El intercambio pasa a `pending_validation`.
 9. El departamento aprueba o rechaza.
 10. Los PDFs se generan como salida del expediente, no como centro del flujo.
+
+## Modelo comercial actual
+
+El lanzamiento comercial inicial es B2C: cada usuario final paga su propia suscripcion. Los planes publicos cargados por `/billing` son solo `owner_type = user`, activos y publicos.
+
+| Cohorte | Plazas | Mensual | Anual |
+|---|---:|---:|---:|
+| Fundadores | 1-20 | 1,49 EUR | 14,99 EUR |
+| Early adopters | 21-70 | 1,99 EUR | 19,99 EUR |
+| Crecimiento | 71-170 | 2,39 EUR | 23,99 EUR |
+| Lanzamiento | 171-200 | 2,69 EUR | 26,99 EUR |
+| Precio final | 201+ | 2,99 EUR | 29,99 EUR |
+
+B2B queda planificado pero no activo: los planes `owner_type = company` no son publicos. El modelo previsto es que un `hr_admin` compre plazas de empresa, genere invitaciones y los usuarios invitados queden cubiertos por esa suscripcion.
 
 ## Documentacion principal
 

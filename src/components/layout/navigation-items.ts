@@ -9,6 +9,7 @@ import {
   CircleHelp,
   ClipboardCheck,
   CreditCard,
+  Gauge,
   MessageSquare,
   Repeat,
   ShieldCheck,
@@ -128,12 +129,20 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
   ];
 
   if (isSuperAdmin(role)) {
-    adminItems.push({
-      href: "/admin/users",
-      label: "Usuarios y roles",
-      description: "Gestiona permisos y alcance de cada cuenta.",
-      icon: Users,
-    });
+    adminItems.push(
+      {
+        href: "/admin/platform",
+        label: "Plataforma",
+        description: "Consulta organizaciones, billing y metricas globales.",
+        icon: Gauge,
+      },
+      {
+        href: "/admin/users",
+        label: "Usuarios y roles",
+        description: "Gestiona permisos y alcance de cada cuenta.",
+        icon: Users,
+      }
+    );
   }
 
   return adminItems;
@@ -172,6 +181,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname.startsWith("/admin/job-position-changes");
     case "/admin/users":
       return pathname.startsWith("/admin/users");
+    case "/admin/platform":
+      return pathname.startsWith("/admin/platform");
     case "/admin/schedule-config":
       return pathname.startsWith("/admin/schedule-config");
     default:

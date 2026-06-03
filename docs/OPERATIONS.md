@@ -13,7 +13,7 @@ Dejar una base operativa realista para staging, piloto y produccion sin depender
 ## Minimo tecnico para staging y piloto
 
 1. Confirmar que `staging` y `production` usan proyectos Supabase distintos, con claves, usuarios, Storage y Auth separados.
-2. Aplicar migraciones de Supabase hasta la ultima migracion del repo. A 2026-06-02 la ultima es `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`.
+2. Aplicar migraciones de Supabase hasta la ultima migracion del repo. A 2026-06-02 la ultima es `20260602130533_set_b2c_launch_pricing.sql`.
 3. Revisar Supabase Auth en staging:
    - `Site URL` apunta al dominio de staging.
    - Redirect URLs incluyen el dominio de staging y los callbacks usados por login, reset password y email.
@@ -74,6 +74,14 @@ Dejar una base operativa realista para staging, piloto y produccion sin depender
 - checkout
 - portal
 - webhook Stripe
+- `/admin/platform`
+- programa B2C early adopter:
+  - 1-20: 1,49 EUR/mes o 14,99 EUR/ano, primer mes gratis
+  - 21-70: 1,99 EUR/mes o 19,99 EUR/ano
+  - 71-170: 2,39 EUR/mes o 23,99 EUR/ano
+  - 171-200: 2,69 EUR/mes o 26,99 EUR/ano
+  - 201+: 2,99 EUR/mes o 29,99 EUR/ano
+- B2B no activo: planes `company` ocultos hasta definir plazas e invitaciones
 
 ### Operacion publica
 
@@ -121,6 +129,9 @@ Antes de invitar usuarios de piloto real, completar y guardar evidencia redacted
 - [ ] Migraciones aplicadas hasta la ultima de `supabase/migrations/`.
 - [ ] Supabase Auth `Site URL` y Redirect URLs revisadas para staging.
 - [ ] Tablas internas de billing/rate limit con RLS activo y sin grants para `anon`/`authenticated`.
+- [ ] Price IDs de Stripe configurados para planes B2C mensual/anual de cada cohorte.
+- [ ] Confirmado que ningun plan B2B/company queda publico en `/billing`.
+- [ ] `/admin/platform` revisado por super admin con datos de staging.
 - [ ] Buckets y politicas de Storage revisados, con decision explicita sobre buckets publicos actuales.
 - [ ] Variables server-side configuradas sin imprimir secretos en logs, capturas ni documentos.
 - [ ] `GET /api/health` responde en staging.
@@ -132,10 +143,10 @@ Antes de invitar usuarios de piloto real, completar y guardar evidencia redacted
 ### Estado operativo revisado - 2026-06-02
 
 - Supabase local arranca con la configuracion del repo: API `127.0.0.1:56321`, DB `127.0.0.1:56322`.
-- Migraciones locales aplicadas hasta `20260602103814_lock_internal_billing_and_rate_limit_tables.sql`.
+- Migraciones locales aplicadas hasta `20260602130533_set_b2c_launch_pricing.sql`.
 - `GET /api/health` responde `database: "up"` en local.
 - Fixture E2E local ejecutado en modo commit; usuarios Auth reparados y rate limits de login reseteados.
-- Smoke local ejecutado: 9/9 tests pasan sin skips.
+- Smoke local ejecutado: 10/10 tests pasan sin skips, incluido catalogo billing B2C.
 - Smoke staging no ejecutado: falta `E2E_BASE_URL` en la configuracion disponible y `E2E_START_SERVER` no esta predefinido.
 - Variables E2E de roles y `E2E_EXCHANGE_ID` aparecen presentes, sin exponer valores.
 - Proximo paso: configurar `E2E_BASE_URL` para el dominio real de staging, ejecutar `npm run test:smoke` con `E2E_START_SERVER=0` y confirmar que las credenciales presentes son de staging, no del fixture local.
@@ -157,6 +168,46 @@ Guardrails:
 - Usa una company/departamento ya presentes en seeds (`arcelor` o `empresa-demo`).
 - No imprime passwords ni claves.
 - No debe ejecutarse contra staging ni produccion.
+
+## Activacion comercial
+
+Flags:
+
+- `BILLING_ENABLED=false`: billing visible pero sin bloqueo comercial.
+- `BILLING_ENABLED=true` + `BILLING_ENFORCEMENT=soft`: muestra estados y permite probar checkout sin bloquear operativa.
+- `BILLING_ENABLED=true` + `BILLING_ENFORCEMENT=hard`: cuentas `blocked` solo acceden a `/billing`.
+
+Stripe:
+
+- Crear un Price mensual y uno anual por cohorte B2C early adopter en Stripe.
+- Configurar `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` server-side.
+- Configurar los Price IDs en variables `STRIPE_PRICE_*` o en `billing_plans.stripe_price_id`.
+- Webhook recomendado: `POST /api/billing/webhooks/stripe`.
+- Eventos minimos:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.created`
+  - `invoice.finalized`
+  - `invoice.paid`
+  - `invoice.payment_failed`
+
+Operacion:
+
+- Revisar `/admin/platform` para plazas early adopter, usuarios bloqueados, trial/active y actividad mensual.
+- Mantener los importes reales en `billing_plans.amount_cents` para que el MRR estimado tenga sentido.
+- Probar primero en `soft`; pasar a `hard` solo cuando webhook y portal esten verificados.
+
+### B2B planificado, no activo
+
+El B2B no debe mezclarse con la pantalla B2C de usuario final. Hasta que se implemente el modelo de plazas e invitaciones:
+
+- Los planes `owner_type = company` deben permanecer `is_public = false`.
+- El comprador natural sera `hr_admin`, porque ya tiene alcance de empresa.
+- `department_admin` no debe gestionar billing B2B salvo decision posterior.
+- El flujo previsto es: `hr_admin` compra X plazas, genera invitaciones, los usuarios entran por invitacion y quedan cubiertos por la suscripcion de empresa.
+- Cuando exista B2B, la precedencia de acceso sera `company > user`: si el usuario esta cubierto por empresa, no se le muestra venta B2C.
 
 ## Observabilidad minima recomendada
 

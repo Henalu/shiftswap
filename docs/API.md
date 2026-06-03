@@ -44,6 +44,7 @@ La mayor parte de la logica de negocio vive en Server Components, Server Actions
 - `/admin/department-changes`
 - `/admin/job-position-changes`
 - `/admin/schedule-config`
+- `/admin/platform`
 - `/admin/users`
 
 ## Route Handlers reales
@@ -177,7 +178,11 @@ La mayor parte de la logica de negocio vive en Server Components, Server Actions
 - `job_position_change_requests`
 - `notifications`
 - `billing_accounts`
+- `billing_pricing_cohorts`
+- `billing_plans`
 - `billing_subscriptions`
+- `billing_invoices`
+- `billing_webhook_events`
 - `rotation_patterns`
 - `rotation_groups`
 - `area_schedule_configs`
@@ -232,7 +237,11 @@ La mayor parte de la logica de negocio vive en Server Components, Server Actions
 - El flujo vivo ya es v2: propuesta directa, aceptacion por el publicador y firma explicita solo del solicitante.
 - `createNotification` usa service role para insertar notificaciones de terceros sin depender de RLS del usuario autenticado.
 - `src/lib/billing.ts` centraliza el estado comercial efectivo.
+- `BILLING_ENFORCEMENT=soft` muestra estado comercial sin bloquear; `hard` bloquea cuentas `blocked` y deja acceso solo a `/billing`.
+- `/billing` es B2C en el lanzamiento inicial: carga solo `billing_plans.owner_type = user`, `active = true` e `is_public = true`.
+- Los planes `owner_type = company` quedan ocultos hasta implementar plazas e invitaciones B2B.
+- `/admin/platform` es el panel MVP de super admin para organizaciones, usuarios, planes y metricas mensuales.
 - `src/lib/calendar.ts` valida calendario base, overrides y vacaciones.
 - `src/lib/calendar-data.ts` usa admin client para evitar problemas con column-level grants.
 - Los PDFs son una salida generada por el sistema; el soporte documental externo es opcional.
-- Para staging y piloto la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-01 la ultima es `00034_repair_active_exchange_slot_indexes.sql`.
+- Para staging y piloto la base debe tener aplicadas las migraciones hasta la ultima de `supabase/migrations/`. A 2026-06-02 la ultima es `20260602130533_set_b2c_launch_pricing.sql`.

@@ -60,12 +60,16 @@ export function getStripeWebhookSecret() {
   return process.env.STRIPE_WEBHOOK_SECRET?.trim() || "";
 }
 
-export function getStripeUserMonthlyPriceId() {
-  return process.env.STRIPE_USER_MONTHLY_PRICE_ID?.trim() || "";
+export function getStripePriceIdFromEnv(envVarName: string | null | undefined) {
+  if (!envVarName) {
+    return "";
+  }
+
+  return process.env[envVarName]?.trim() || "";
 }
 
 export function isStripeConfigured() {
-  return Boolean(getStripeSecretKey() && getStripeUserMonthlyPriceId());
+  return Boolean(getStripeSecretKey());
 }
 
 export function getResendApiKey() {

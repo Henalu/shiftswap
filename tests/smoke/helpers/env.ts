@@ -53,7 +53,7 @@ function readEnvFile() {
 
 const envFileValues = readEnvFile();
 
-function readEnv(name: string): string | null {
+export function readEnv(name: string): string | null {
   const value = process.env[name]?.trim() || envFileValues.get(name)?.trim();
 
   return value ? value : null;

@@ -200,6 +200,28 @@ export interface BillingPlan {
   amount_cents: number;
   active: boolean;
   stripe_price_id?: string | null;
+  cohort_code?: string | null;
+  price_label?: string | null;
+  stripe_price_env_var?: string | null;
+  marketing_badge?: string | null;
+  trial_days?: number;
+  price_lock_months?: number;
+  is_public?: boolean;
+  sort_order?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingPricingCohort {
+  code: string;
+  label: string;
+  description?: string | null;
+  min_position: number;
+  max_position?: number | null;
+  trial_days: number;
+  price_lock_months: number;
+  discount_label: string;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -209,11 +231,16 @@ export interface BillingAccount {
   owner_type: BillingOwnerType;
   owner_user_id?: string | null;
   owner_company_id?: string | null;
+  billing_plan_id?: string | null;
+  pricing_cohort_code?: string | null;
+  billing_interval?: BillingInterval | null;
+  early_access_position?: number | null;
   provider: string;
   provider_customer_id?: string | null;
   billing_email?: string | null;
   current_billing_state: BillingAccessState;
   trial_ends_at?: string | null;
+  price_lock_ends_at?: string | null;
   created_at: string;
   updated_at: string;
 }

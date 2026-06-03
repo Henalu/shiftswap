@@ -61,6 +61,7 @@ src/
       profile/
       help/
       admin/
+        platform/
         exchanges/
         validations/
         department-changes/
@@ -193,11 +194,21 @@ tests/
   - `BILLING_ENABLED`
   - `BILLING_MODE`
   - `BILLING_ENFORCEMENT`
-- Con enforcement duro, usuarios bloqueados deben caer en `/billing`.
+- `BILLING_ENFORCEMENT=soft` muestra estado comercial sin bloquear operativa.
+- `BILLING_ENFORCEMENT=hard` bloquea cuentas `blocked`; solo pueden acceder a `/billing`.
+- Pricing B2C early adopter activo para monetizacion inicial por usuario final:
+  - `founder_20`: primeras 20 cuentas, 30 dias de trial, 1,49 EUR/mes o 14,99 EUR/ano
+  - `early_70`: cuentas 21-70, 1,99 EUR/mes o 19,99 EUR/ano
+  - `growth_170`: cuentas 71-170, 2,39 EUR/mes o 23,99 EUR/ano
+  - `launch_200`: cuentas 171-200, 2,69 EUR/mes o 26,99 EUR/ano
+  - `standard`: desde 201, 2,99 EUR/mes o 29,99 EUR/ano
+- Los planes publicos de `/billing` deben ser solo `owner_type = user`, `active = true` e `is_public = true`.
+- B2B queda planificado pero no activo: planes `owner_type = company` ocultos hasta implementar comprador `hr_admin`, plazas e invitaciones.
+- `/admin/platform` es el panel MVP de super admin para organizaciones, usuarios, planes, cohortes y metricas mensuales.
 - Rutas publicas operativas:
   - `/api/health`
   - `/api/billing/webhooks/stripe`
-- La primera monetizacion prevista sigue siendo por usuario, aunque el modelo soporte `user` y `company`.
+- La primera monetizacion prevista sigue siendo B2C por usuario final. Cuando exista B2B, la precedencia sera `company > user`.
 
 ### Firma digital - patrones clave
 
@@ -459,7 +470,16 @@ BILLING_MODE=user
 BILLING_ENFORCEMENT=off
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
-STRIPE_USER_MONTHLY_PRICE_ID=
+STRIPE_PRICE_FOUNDER_20_MONTHLY=
+STRIPE_PRICE_FOUNDER_20_ANNUAL=
+STRIPE_PRICE_EARLY_70_MONTHLY=
+STRIPE_PRICE_EARLY_70_ANNUAL=
+STRIPE_PRICE_GROWTH_170_MONTHLY=
+STRIPE_PRICE_GROWTH_170_ANNUAL=
+STRIPE_PRICE_LAUNCH_200_MONTHLY=
+STRIPE_PRICE_LAUNCH_200_ANNUAL=
+STRIPE_PRICE_STANDARD_MONTHLY=
+STRIPE_PRICE_STANDARD_ANNUAL=
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 RESEND_API_KEY=
@@ -495,3 +515,4 @@ E2E_EXCHANGE_ID=
 - `hr_admin` ve su empresa
 - `super_admin` ve todo y gestiona roles
 - `/admin/*` reutiliza el layout del dashboard
+- `/admin/platform` queda reservado a `super_admin`
