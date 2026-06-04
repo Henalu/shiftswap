@@ -87,7 +87,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/88">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/shifts" className="flex min-w-0 items-center gap-3">
+        <Link href="/home" className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Repeat className="size-4" />
           </div>

@@ -342,7 +342,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
         <CardFooter className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild variant="outline">
-            <Link href="/shifts">
+            <Link href="/home">
               <ArrowLeft className="size-4" />
               Volver al dashboard
             </Link>

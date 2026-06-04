@@ -183,7 +183,7 @@ function AccessDeniedState({ message }: { message: string }) {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/shifts">Volver a la app</Link>
+            <Link href="/home">Volver a la app</Link>
           </Button>
         </CardContent>
       </Card>

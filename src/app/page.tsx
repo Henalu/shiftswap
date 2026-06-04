@@ -8,7 +8,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/shifts");
+    redirect("/home");
   } else {
     redirect("/login");
   }

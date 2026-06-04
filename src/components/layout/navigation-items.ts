@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   CreditCard,
   Gauge,
+  House,
   MessageSquare,
   Repeat,
   ShieldCheck,
@@ -29,6 +30,12 @@ export interface NavigationItem {
 }
 
 export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
+  {
+    href: "/home",
+    label: "Inicio",
+    description: "Resumen rapido de tu dia y acciones pendientes.",
+    icon: House,
+  },
   {
     href: "/shifts",
     label: "Tablon",
@@ -61,12 +68,13 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
   },
 ];
 
-/** Mobile bottom nav: replaces "Mis turnos" with "Calendario" to keep 4 columns. */
+/** Mobile bottom nav: keeps the five most-used destinations one tap away. */
 export const MOBILE_NAVIGATION_ITEMS: NavigationItem[] = [
-  PRIMARY_NAVIGATION_ITEMS[0], // Tablon
-  PRIMARY_NAVIGATION_ITEMS[2], // Calendario
-  PRIMARY_NAVIGATION_ITEMS[3], // Chat
-  PRIMARY_NAVIGATION_ITEMS[4], // Cambios
+  PRIMARY_NAVIGATION_ITEMS[0], // Inicio
+  PRIMARY_NAVIGATION_ITEMS[1], // Tablon
+  PRIMARY_NAVIGATION_ITEMS[3], // Calendario
+  PRIMARY_NAVIGATION_ITEMS[4], // Chat
+  PRIMARY_NAVIGATION_ITEMS[5], // Cambios
 ];
 
 export const ACCOUNT_NAVIGATION_ITEMS: NavigationItem[] = [
@@ -150,6 +158,8 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
 
 export function isNavigationItemActive(pathname: string, href: string) {
   switch (href) {
+    case "/home":
+      return pathname === "/home";
     case "/shifts":
       return (
         pathname === "/shifts" ||

@@ -78,5 +78,5 @@ export async function loginWithPassword(
     redirect(getRequiredPasswordChangePath());
   }
 
-  redirect("/shifts");
+  redirect("/home");
 }

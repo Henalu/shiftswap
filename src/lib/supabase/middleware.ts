@@ -135,7 +135,7 @@ export async function updateSession(request: NextRequest) {
 
   if (isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = isBlockedByValidation ? '/pending-validation' : '/shifts';
+    url.pathname = isBlockedByValidation ? '/pending-validation' : '/home';
     return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
@@ -147,13 +147,13 @@ export async function updateSession(request: NextRequest) {
 
   if (!isBlockedByValidation && isPendingValidationPage) {
     const url = request.nextUrl.clone();
-    url.pathname = '/shifts';
+    url.pathname = '/home';
     return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 
   if (pathname.startsWith('/admin') && !hasAdminPanelAccess(role)) {
     const url = request.nextUrl.clone();
-    url.pathname = '/shifts';
+    url.pathname = '/home';
     return withPrivateAppCacheHeaders(NextResponse.redirect(url));
   }
 

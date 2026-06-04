@@ -40,7 +40,7 @@ export default function ConsoleLayout({
 
           <div className="flex min-w-0 items-center gap-2">
             <Button asChild size="sm" variant="outline">
-              <Link href="/shifts">
+              <Link href="/home">
                 <ArrowLeft className="size-4" />
                 App
               </Link>

@@ -21,7 +21,7 @@ export function MobileBottomNav() {
       <div className="relative mx-auto w-full max-w-7xl px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)]">
         <nav
           aria-label="Navegacion principal"
-          className="pointer-events-auto grid grid-cols-4 gap-1 rounded-[1.75rem] border border-border/70 bg-background/94 p-2 shadow-[0_-10px_30px_-24px_rgba(15,23,42,0.28),0_18px_38px_-28px_rgba(15,23,42,0.24)] backdrop-blur supports-[backdrop-filter]:bg-background/88"
+          className="pointer-events-auto grid grid-cols-5 gap-1 rounded-[1.75rem] border border-border/70 bg-background/94 p-2 shadow-[0_-10px_30px_-24px_rgba(15,23,42,0.28),0_18px_38px_-28px_rgba(15,23,42,0.24)] backdrop-blur supports-[backdrop-filter]:bg-background/88"
         >
           {MOBILE_NAVIGATION_ITEMS.map((item) => {
             const isActive = isNavigationItemActive(pathname, item.href);
