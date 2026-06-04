@@ -24,13 +24,13 @@ export function UserRotationForm({
   const [state, formAction, isPending] = useActionState(assignUserRotationGroup, initial);
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="user_id" value={userId} />
       <select
         name="rotation_group_id"
         defaultValue={currentGroupId ?? ""}
         aria-label="Grupo de rotacion"
-        className={FORM_CONTROL_CLASSNAME + " w-auto min-w-[140px]"}
+        className={FORM_CONTROL_CLASSNAME + " min-w-[160px]"}
         disabled={isPending}
       >
         <option value="">Sin grupo</option>
@@ -41,11 +41,14 @@ export function UserRotationForm({
         ))}
       </select>
       <Button type="submit" size="sm" disabled={isPending}>
-        {isPending ? "Guardando..." : "Asignar"}
+        {isPending ? "Guardando..." : "Guardar"}
       </Button>
       {state.error && (
         <span className="text-xs text-destructive">{state.error}</span>
       )}
+      {state.success && !state.error ? (
+        <span className="text-xs text-emerald-700">Guardado</span>
+      ) : null}
     </form>
   );
 }

@@ -12,10 +12,12 @@ import {
   BriefcaseBusiness,
   Building2,
   Camera,
+  CalendarCog,
   IdCard,
   Loader2,
   Mail,
   Phone,
+  Repeat,
   ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,6 +47,10 @@ interface ProfileFormProps {
   areaName: string;
   departmentName: string;
   jobPositionName: string;
+  scheduleTypeName: string;
+  rotationGroupName: string;
+  rotationPatternName: string;
+  rotationSequenceName: string;
   userId: string;
 }
 
@@ -83,6 +89,10 @@ export function ProfileForm({
   areaName,
   departmentName,
   jobPositionName,
+  scheduleTypeName,
+  rotationGroupName,
+  rotationPatternName,
+  rotationSequenceName,
   userId,
 }: ProfileFormProps) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
@@ -353,6 +363,28 @@ export function ProfileForm({
             label="Puesto de trabajo"
             value={jobPositionName}
             className="xl:col-span-3"
+          />
+          <ReadonlyField
+            icon={<CalendarCog className="size-4" />}
+            label="Tipo de jornada"
+            value={scheduleTypeName}
+            className="xl:col-span-3"
+          />
+          <ReadonlyField
+            icon={<Repeat className="size-4" />}
+            label="Grupo de turno"
+            value={
+              rotationPatternName !== "No aplica"
+                ? `${rotationGroupName} - ${rotationPatternName}`
+                : rotationGroupName
+            }
+            className="xl:col-span-3"
+          />
+          <ReadonlyField
+            icon={<Repeat className="size-4" />}
+            label="Orden de turnos"
+            value={rotationSequenceName}
+            className="xl:col-span-6"
           />
         </CardContent>
       </Card>

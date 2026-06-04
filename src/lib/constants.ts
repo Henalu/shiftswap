@@ -5,6 +5,7 @@ import type {
   ExchangeAgreementType,
   ExchangeStatus,
   RequestStatus,
+  ScheduleTypeCode,
   ShiftDebtTransactionStatus,
   ShiftStatus,
   ShiftType,
@@ -214,12 +215,24 @@ export const CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS = {
   same_day_swap: "bg-fuchsia-500",
 } as const satisfies Record<CalendarExchangeOverlayKind, string>;
 
+export const SCHEDULE_TYPE_LABELS = {
+  "3t5": "3T5 (turnos rotativos)",
+  jornada_normal: "Jornada normal",
+} as const satisfies Record<ScheduleTypeCode, string>;
+
 export const ROTATION_GROUP_LABELS: Record<string, string> = {
   A: "Grupo A",
   B: "Grupo B",
   C: "Grupo C",
   D: "Grupo D",
   E: "Grupo E",
+};
+
+export const ROTATION_SEQUENCE_LABELS: Record<string, string> = {
+  M: "Ma\u00f1ana",
+  T: "Tarde",
+  N: "Noche",
+  D: "Descanso",
 };
 
 export const DEFAULT_PAGE_SIZE = 10;

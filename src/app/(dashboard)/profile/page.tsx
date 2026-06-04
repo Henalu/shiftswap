@@ -9,15 +9,22 @@ import {
   type ProfileJobPositionChangeRequestSummary,
 } from "./job-position-change-request-card";
 import { getDepartmentArea, getDepartmentById } from "@/lib/departments";
+import {
+  ROTATION_SEQUENCE_LABELS,
+  SCHEDULE_TYPE_LABELS,
+} from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
+import { SuperAdminLaborScopeCard } from "./super-admin-labor-scope-card";
 import type {
+  Company,
   Department,
   DepartmentChangeRequest,
   JobPosition,
   JobPositionChangeRequestStatus,
+  ScheduleTypeCode,
   UserProfile,
 } from "@/types";
 
@@ -33,6 +40,7 @@ type ProfilePageProfile = Pick<
   | "company_id"
   | "department_id"
   | "job_position_id"
+  | "role"
 >;
 
 interface ProfileJobPositionChangeRequestRow {
@@ -58,6 +66,33 @@ interface ProfileJobPositionChangeRequestRow {
   } | null;
 }
 
+interface AreaScheduleConfigRow {
+  schedule_type: ScheduleTypeCode;
+}
+
+interface RotationGroupRow {
+  id: string;
+  code: string;
+  label: string;
+  rotation_pattern_id: string;
+  reference_date: string;
+}
+
+interface RotationPatternRow {
+  label: string;
+  sequence: string[];
+}
+
+function formatRotationSequence(sequence: string[] | null | undefined) {
+  if (!sequence?.length) {
+    return "Sin secuencia configurada";
+  }
+
+  return sequence
+    .map((letter) => ROTATION_SEQUENCE_LABELS[letter] ?? letter)
+    .join(", ");
+}
+
 export default async function ProfilePage() {
   const supabase = await createClient();
   const {
@@ -75,7 +110,7 @@ export default async function ProfilePage() {
   const { data: profileData, error: profileError } = await adminClient
     .from("user_profiles")
     .select(
-      "id, full_name, email, phone, avatar_url, signature_url, employee_id, company_id, department_id, job_position_id"
+      "id, full_name, email, phone, avatar_url, signature_url, employee_id, company_id, department_id, job_position_id, role"
     )
     .eq("id", authUser.id)
     .maybeSingle();
@@ -85,7 +120,7 @@ export default async function ProfilePage() {
     // Fallback: try a minimal query without potentially-missing columns
     const { data: fallback } = await adminClient
       .from("user_profiles")
-      .select("id, full_name, email, phone, avatar_url, employee_id, company_id, department_id, job_position_id")
+      .select("id, full_name, email, phone, avatar_url, employee_id, company_id, department_id, job_position_id, role")
       .eq("id", authUser.id)
       .maybeSingle();
 
@@ -118,13 +153,22 @@ export default async function ProfilePage() {
     );
   }
 
+  const isSuperAdminProfile = profile.role === "super_admin";
+
   const [
+    { data: companies },
     { data: company },
     { data: companyDepartments },
     { data: departmentChangeRequests },
     { data: departmentJobPositions },
     { data: jobPositionChangeRequests },
   ] = await Promise.all([
+      isSuperAdminProfile
+        ? adminClient
+            .from("companies")
+            .select("id, name")
+            .order("name", { ascending: true })
+        : Promise.resolve({ data: null, error: null }),
       profile.company_id
         ? adminClient
             .from("companies")
@@ -132,7 +176,14 @@ export default async function ProfilePage() {
             .eq("id", profile.company_id)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
-      profile.company_id
+      isSuperAdminProfile
+        ? adminClient
+            .from("departments")
+            .select(
+              "id, name, company_id, parent_department_id, is_assignable, created_at"
+            )
+            .order("name", { ascending: true })
+        : profile.company_id
         ? adminClient
             .from("departments")
             .select(
@@ -175,6 +226,7 @@ export default async function ProfilePage() {
         : Promise.resolve({ data: null, error: null }),
     ]);
 
+  const typedCompanies = (companies ?? []) as Pick<Company, "id" | "name">[];
   const typedDepartments = (companyDepartments ?? []) as Department[];
   const typedDepartmentJobPositions = (departmentJobPositions ?? []) as JobPosition[];
   const currentDepartment =
@@ -185,6 +237,68 @@ export default async function ProfilePage() {
     typedDepartmentJobPositions.find(
       (jobPosition) => jobPosition.id === profile.job_position_id
     ) ?? null;
+
+  let scheduleTypeName = "Sin calendario configurado";
+  let rotationGroupName = "Sin grupo asignado";
+  let rotationPatternName = "No aplica";
+  let rotationSequenceName =
+    "El administrador debe configurar el calendario del area.";
+
+  if (currentArea?.id) {
+    const { data: areaScheduleConfig } = await adminClient
+      .from("area_schedule_configs")
+      .select("schedule_type")
+      .eq("department_id", currentArea.id)
+      .maybeSingle();
+    const typedAreaScheduleConfig =
+      areaScheduleConfig as AreaScheduleConfigRow | null;
+
+    if (typedAreaScheduleConfig?.schedule_type) {
+      scheduleTypeName =
+        SCHEDULE_TYPE_LABELS[typedAreaScheduleConfig.schedule_type];
+
+      if (typedAreaScheduleConfig.schedule_type === "jornada_normal") {
+        rotationGroupName = "No aplica";
+        rotationSequenceName =
+          "Lun-Jue jornada completa, viernes jornada reducida";
+      } else {
+        const { data: assignment } = await adminClient
+          .from("user_rotation_assignments")
+          .select("rotation_group_id")
+          .eq("user_id", profile.id)
+          .maybeSingle();
+
+        if (assignment?.rotation_group_id) {
+          const { data: rotationGroup } = await adminClient
+            .from("rotation_groups")
+            .select("id, code, label, rotation_pattern_id, reference_date")
+            .eq("id", assignment.rotation_group_id)
+            .maybeSingle();
+          const typedRotationGroup = rotationGroup as RotationGroupRow | null;
+
+          if (typedRotationGroup) {
+            rotationGroupName = typedRotationGroup.label;
+
+            const { data: rotationPattern } = await adminClient
+              .from("rotation_patterns")
+              .select("label, sequence")
+              .eq("id", typedRotationGroup.rotation_pattern_id)
+              .maybeSingle();
+            const typedRotationPattern =
+              rotationPattern as RotationPatternRow | null;
+
+            if (typedRotationPattern) {
+              rotationPatternName = typedRotationPattern.label;
+              rotationSequenceName = formatRotationSequence(
+                typedRotationPattern.sequence
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
   const typedDepartmentRequests = (
     (departmentChangeRequests ?? []) as DepartmentChangeRequest[]
   ).map((request) => {
@@ -256,10 +370,28 @@ export default async function ProfilePage() {
         areaName={currentArea?.name ?? "Sin area"}
         departmentName={currentDepartment?.name ?? "Sin departamento"}
         jobPositionName={currentJobPosition?.name ?? "Sin puesto asignado"}
+        scheduleTypeName={scheduleTypeName}
+        rotationGroupName={rotationGroupName}
+        rotationPatternName={rotationPatternName}
+        rotationSequenceName={rotationSequenceName}
         userId={authUser.id}
       />
 
-      {profile.company_id && profile.department_id ? (
+      {isSuperAdminProfile ? (
+        <SuperAdminLaborScopeCard
+          companies={typedCompanies}
+          departments={typedDepartments}
+          currentCompanyId={profile.company_id}
+          currentDepartmentId={profile.department_id}
+          currentCompanyName={company?.name ?? "Sin empresa asignada"}
+          currentAreaName={currentArea?.name ?? "Sin area asignada"}
+          currentDepartmentName={
+            currentDepartment?.name ?? "Sin departamento asignado"
+          }
+        />
+      ) : null}
+
+      {!isSuperAdminProfile && profile.company_id && profile.department_id ? (
         <DepartmentChangeRequestCard
           companyName={company?.name ?? "Sin empresa"}
           currentDepartmentId={profile.department_id}
@@ -270,7 +402,7 @@ export default async function ProfilePage() {
         />
       ) : null}
 
-      {profile.company_id && profile.department_id ? (
+      {!isSuperAdminProfile && profile.company_id && profile.department_id ? (
         <JobPositionChangeRequestCard
           companyName={company?.name ?? "Sin empresa"}
           currentAreaName={currentArea?.name ?? "Sin area"}

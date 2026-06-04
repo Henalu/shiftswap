@@ -19,7 +19,7 @@ export function AreaConfigForm({ departmentId, currentType }: AreaConfigFormProp
   const [state, formAction, isPending] = useActionState(setAreaScheduleType, initial);
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="department_id" value={departmentId} />
       <select
         name="schedule_type"
@@ -38,6 +38,9 @@ export function AreaConfigForm({ departmentId, currentType }: AreaConfigFormProp
       {state.error && (
         <span className="text-xs text-destructive">{state.error}</span>
       )}
+      {state.success && !state.error ? (
+        <span className="text-xs text-emerald-700">Guardado</span>
+      ) : null}
     </form>
   );
 }
