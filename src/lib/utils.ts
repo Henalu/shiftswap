@@ -4,10 +4,10 @@ import { twMerge } from "tailwind-merge";
 const SPANISH_LOCALE = "es-ES";
 
 export const FORM_CONTROL_CLASSNAME =
-  "flex h-11 w-full rounded-xl border border-border bg-background/90 px-3.5 text-sm text-foreground shadow-sm transition-[border-color,box-shadow,background-color] outline-none placeholder:text-muted-foreground/85 focus-visible:border-primary/45 focus-visible:bg-background focus-visible:ring-4 focus-visible:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60";
+  "flex h-11 min-w-0 w-full rounded-xl border border-border bg-background/90 px-3.5 text-sm text-foreground shadow-sm transition-[border-color,box-shadow,background-color] outline-none placeholder:text-muted-foreground/85 focus-visible:border-primary/45 focus-visible:bg-background focus-visible:ring-4 focus-visible:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 export const PANEL_CLASSNAME =
-  "rounded-2xl border border-border/80 bg-card/96 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_18px_36px_-24px_rgba(15,23,42,0.18)]";
+  "min-w-0 max-w-full rounded-2xl border border-border/80 bg-card/96 shadow-[0_1px_2px_rgba(15,23,42,0.05),0_18px_36px_-24px_rgba(15,23,42,0.18)]";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

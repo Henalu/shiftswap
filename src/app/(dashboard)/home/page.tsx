@@ -647,8 +647,8 @@ export default async function HomePage() {
         />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-6">
           <Card data-tour="home-priorities">
             <CardHeader>
               <SectionTitle
@@ -735,7 +735,7 @@ export default async function HomePage() {
                 description="Publicaciones propias, solicitudes enviadas y expedientes activos."
               />
             </CardHeader>
-            <CardContent className="grid gap-4 lg:grid-cols-3">
+            <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-3 rounded-2xl border border-border/70 p-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
@@ -858,7 +858,7 @@ export default async function HomePage() {
           </Card>
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <Card data-tour="home-agenda">
             <CardHeader>
               <CardTitle>Agenda proxima</CardTitle>

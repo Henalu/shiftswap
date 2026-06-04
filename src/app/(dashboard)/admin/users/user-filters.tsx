@@ -73,8 +73,8 @@ export function UserFilters({ companies, departments }: UserFiltersProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <div className="col-span-2 space-y-2 xl:col-span-1">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="space-y-2 sm:col-span-2 xl:col-span-1">
           <label
             htmlFor="filter-q"
             className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
@@ -161,7 +161,7 @@ export function UserFilters({ companies, departments }: UserFiltersProps) {
           </select>
         </div>
 
-        <div className="col-span-2 flex items-end xl:col-span-1">
+        <div className="flex items-end sm:col-span-2 xl:col-span-1">
           <Button type="submit" variant="outline" className="w-full">
             Buscar
           </Button>

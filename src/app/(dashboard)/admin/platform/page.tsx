@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  AlertCircle,
   Building2,
   CalendarDays,
-  CheckCircle2,
   Palette,
   Repeat,
   TrendingUp,
@@ -20,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ColorPaletteField } from "@/components/ui/color-palette-field";
+import { FeedbackToast } from "@/components/ui/feedback-toast";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCompanyThemeAccentColor } from "@/lib/company-theme";
 import {
@@ -31,7 +30,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import { isSuperAdmin, USER_ROLE_LABELS } from "@/lib/user-roles";
-import { cn } from "@/lib/utils";
 import type {
   BillingAccessState,
   BillingInterval,
@@ -134,41 +132,6 @@ const successCopy: Record<string, string> = {
   "company-theme-updated": "Color corporativo actualizado.",
 };
 
-function Feedback({
-  error,
-  status,
-}: {
-  error?: string;
-  status?: string;
-}) {
-  const errorMessage = error ? errorCopy[error] ?? errorCopy.forbidden : null;
-  const successMessage = status ? successCopy[status] : null;
-
-  if (!errorMessage && !successMessage) {
-    return null;
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border px-4 py-3 text-sm",
-        errorMessage
-          ? "border-destructive/20 bg-destructive/10 text-destructive"
-          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-800"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {errorMessage ? (
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-        ) : (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-        )}
-        <p>{errorMessage ?? successMessage}</p>
-      </div>
-    </div>
-  );
-}
-
 function monthKey(date: Date | string) {
   const value = typeof date === "string" ? new Date(date) : date;
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
@@ -265,6 +228,12 @@ export default async function PlatformAdminPage({
   searchParams,
 }: PlatformAdminPageProps) {
   const params = await searchParams;
+  const feedbackErrorMessage = params.error
+    ? errorCopy[params.error] ?? errorCopy.forbidden
+    : null;
+  const feedbackSuccessMessage = params.status
+    ? successCopy[params.status]
+    : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -383,7 +352,10 @@ export default async function PlatformAdminPage({
         }
       />
 
-      <Feedback error={params.error} status={params.status} />
+      <FeedbackToast
+        errorMessage={feedbackErrorMessage}
+        successMessage={feedbackSuccessMessage}
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
