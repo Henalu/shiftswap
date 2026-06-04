@@ -335,6 +335,45 @@ export default async function PlatformAdminPage({
   const mrrEstimate = estimateMonthlyRevenue(billingRows);
   const shiftMonthCounts = countByMonth(shiftRows, buckets);
   const exchangeMonthCounts = countByMonth(exchangeRows, buckets);
+  const companySummaries = companyRows.map((company) => {
+    const companyUsers = userRows.filter(
+      (profile) => profile.company_id === company.id
+    );
+    const companyUserIds = new Set(companyUsers.map((profile) => profile.id));
+    const companyBilling = billingRows.filter((account) => {
+      if (account.owner_company_id === company.id) return true;
+      if (!account.owner_user_id) return false;
+      return companyUserIds.has(account.owner_user_id);
+    });
+    const companyShifts = currentMonthShifts.filter((shift) =>
+      companyUserIds.has(shift.user_id)
+    ).length;
+    const companyExchanges = currentMonthExchanges.filter(
+      (exchange) =>
+        companyUserIds.has(exchange.user_a_id) ||
+        companyUserIds.has(exchange.user_b_id)
+    ).length;
+    const commercialState =
+      companyBilling.find((account) => account.current_billing_state === "active")
+        ?.current_billing_state ??
+      companyBilling.find((account) => account.current_billing_state === "trialing")
+        ?.current_billing_state ??
+      companyBilling[0]?.current_billing_state ??
+      "inactive";
+    const accentColor = getCompanyThemeAccentColor(company.theme_config);
+
+    return {
+      accentColor,
+      commercialState,
+      company,
+      exchanges: companyExchanges,
+      pendingUsers: companyUsers.filter(
+        (profile) => profile.validation_status === "pending"
+      ).length,
+      shifts: companyShifts,
+      users: companyUsers.length,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -506,88 +545,130 @@ export default async function PlatformAdminPage({
             Usuarios, actividad mensual y estado comercial por empresa.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-border/70 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-              <tr>
-                <th className="py-3 pr-4 font-semibold">Empresa</th>
-                <th className="py-3 pr-4 font-semibold">Usuarios</th>
-                <th className="py-3 pr-4 font-semibold">Pendientes</th>
-                <th className="py-3 pr-4 font-semibold">Turnos mes</th>
-                <th className="py-3 pr-4 font-semibold">Cambios mes</th>
-                <th className="py-3 pr-4 font-semibold">Color</th>
-                <th className="py-3 font-semibold">Billing</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {companyRows.map((company) => {
-                const companyUsers = userRows.filter(
-                  (profile) => profile.company_id === company.id
-                );
-                const companyUserIds = new Set(companyUsers.map((profile) => profile.id));
-                const companyBilling = billingRows.filter((account) => {
-                  if (account.owner_company_id === company.id) return true;
-                  if (!account.owner_user_id) return false;
-                  return companyUserIds.has(account.owner_user_id);
-                });
-                const companyShifts = currentMonthShifts.filter((shift) =>
-                  companyUserIds.has(shift.user_id)
-                ).length;
-                const companyExchanges = currentMonthExchanges.filter(
-                  (exchange) =>
-                    companyUserIds.has(exchange.user_a_id) ||
-                    companyUserIds.has(exchange.user_b_id)
-                ).length;
-                const commercialState =
-                  companyBilling.find((account) => account.current_billing_state === "active")
-                    ?.current_billing_state ??
-                  companyBilling.find((account) => account.current_billing_state === "trialing")
-                    ?.current_billing_state ??
-                  companyBilling[0]?.current_billing_state ??
-                  "inactive";
-                const accentColor = getCompanyThemeAccentColor(
-                  company.theme_config
-                );
+        <CardContent>
+          <div className="space-y-3 md:hidden">
+            {companySummaries.map((summary) => (
+              <div
+                className="rounded-2xl border border-border/70 bg-background/80 p-4"
+                key={summary.company.id}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-foreground">
+                      {summary.company.name}
+                    </p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {summary.company.slug}
+                    </p>
+                  </div>
+                  <Badge className="shrink-0" variant="outline">
+                    {summary.commercialState}
+                  </Badge>
+                </div>
 
-                return (
-                  <tr key={company.id}>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-secondary/45 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Usuarios
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {summary.users}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-secondary/45 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Pendientes
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {summary.pendingUsers}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-secondary/45 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Turnos mes
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {summary.shifts}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-secondary/45 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Cambios mes
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {summary.exchanges}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                  <span
+                    className="size-4 shrink-0 rounded-full border border-border"
+                    style={
+                      summary.accentColor
+                        ? { backgroundColor: summary.accentColor }
+                        : undefined
+                    }
+                  />
+                  <span className="truncate font-mono text-xs">
+                    {summary.accentColor ?? "color por defecto"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-border/70 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                <tr>
+                  <th className="py-3 pr-4 font-semibold">Empresa</th>
+                  <th className="py-3 pr-4 font-semibold">Usuarios</th>
+                  <th className="py-3 pr-4 font-semibold">Pendientes</th>
+                  <th className="py-3 pr-4 font-semibold">Turnos mes</th>
+                  <th className="py-3 pr-4 font-semibold">Cambios mes</th>
+                  <th className="py-3 pr-4 font-semibold">Color</th>
+                  <th className="py-3 font-semibold">Billing</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {companySummaries.map((summary) => (
+                  <tr key={summary.company.id}>
                     <td className="py-4 pr-4">
-                      <p className="font-medium text-foreground">{company.name}</p>
-                      <p className="text-muted-foreground">{company.slug}</p>
+                      <p className="font-medium text-foreground">
+                        {summary.company.name}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {summary.company.slug}
+                      </p>
                     </td>
-                    <td className="py-4 pr-4">{companyUsers.length}</td>
-                    <td className="py-4 pr-4">
-                      {
-                        companyUsers.filter(
-                          (profile) => profile.validation_status === "pending"
-                        ).length
-                      }
-                    </td>
-                    <td className="py-4 pr-4">{companyShifts}</td>
-                    <td className="py-4 pr-4">{companyExchanges}</td>
+                    <td className="py-4 pr-4">{summary.users}</td>
+                    <td className="py-4 pr-4">{summary.pendingUsers}</td>
+                    <td className="py-4 pr-4">{summary.shifts}</td>
+                    <td className="py-4 pr-4">{summary.exchanges}</td>
                     <td className="py-4 pr-4">
                       <span className="flex items-center gap-2">
                         <span
                           className="size-4 rounded-full border border-border"
                           style={
-                            accentColor
-                              ? { backgroundColor: accentColor }
+                            summary.accentColor
+                              ? { backgroundColor: summary.accentColor }
                               : undefined
                           }
                         />
                         <span className="font-mono text-xs text-muted-foreground">
-                          {accentColor ?? "por defecto"}
+                          {summary.accentColor ?? "por defecto"}
                         </span>
                       </span>
                     </td>
                     <td className="py-4">
-                      <Badge variant="outline">{commercialState}</Badge>
+                      <Badge variant="outline">{summary.commercialState}</Badge>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {canManageCompanyTheme ? (
             <div className="mt-5 grid gap-3">
@@ -603,7 +684,7 @@ export default async function PlatformAdminPage({
               {companyRows.map((company) => (
                 <form
                   action={updatePlatformCompanyThemeAction}
-                  className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
+                  className="grid min-w-0 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
                   key={`platform-company-theme-${company.id}`}
                 >
                   <input name="companyId" type="hidden" value={company.id} />
@@ -624,7 +705,7 @@ export default async function PlatformAdminPage({
                     name="accentColor"
                     paletteLabel={`Paleta de ${company.name}`}
                   />
-                  <Button type="submit" variant="outline">
+                  <Button className="w-full md:w-auto" type="submit" variant="outline">
                     <Palette className="size-4" />
                     Guardar color
                   </Button>

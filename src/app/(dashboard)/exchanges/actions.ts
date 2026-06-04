@@ -76,6 +76,7 @@ async function resolveExchangeInbox(
       "exchange_signed",
       "exchange_document_added",
       "exchange_cancellation_requested",
+      "exchange_accepted_by_both",
       "exchange_pending_validation",
       "exchange_department_approved",
       "exchange_department_rejected",
@@ -227,8 +228,15 @@ export async function signAsInterested(
     .update({
       signed_by_user_b_at: now,
       signed_by_user_b_name: signerName,
-      status: "pending_validation",
-      submitted_for_approval_at: now,
+      status: "approved",
+      submitted_for_approval_at: null,
+      department_approver_id: null,
+      department_reviewed_at: null,
+      department_decision_notes: null,
+      approved_at: now,
+      rejected_at: null,
+      cancellation_requested_by: null,
+      cancellation_requested_at: null,
     })
     .eq("id", exchangeId)
     .eq("status", "accepted");
@@ -256,11 +264,11 @@ export async function signAsInterested(
   await recordExchangeEvent({
     exchangeId,
     actorId: user.id,
-    eventType: "submitted_for_validation",
-    title: "Solicitud enviada a validacion",
+    eventType: "accepted_by_both",
+    title: "Intercambio aceptado por ambas partes",
     details: agreementSummary,
     fromStatus: "accepted",
-    toStatus: "pending_validation",
+    toStatus: "approved",
   });
 
   if (exchange.agreement_type === "hours_bank") {
@@ -272,7 +280,7 @@ export async function signAsInterested(
 
     await upsertHoursBankDebtTransaction({
       exchangeId,
-      exchangeStatus: "pending_validation",
+      exchangeStatus: "approved",
       debtorUserId: exchange.user_a_id,
       creditorUserId: exchange.user_b_id,
       debtorName: ownerName,
@@ -285,10 +293,10 @@ export async function signAsInterested(
   for (const participantId of participantIds) {
     await createNotification({
       userId: participantId,
-      type: "exchange_pending_validation",
-      title: "Solicitud enviada a validacion",
-      body: "La solicitud esta firmada y queda pendiente de revision del departamento.",
-      dedupeKey: `exchange_pending_validation:${exchangeId}`,
+      type: "exchange_accepted_by_both",
+      title: "Intercambio aceptado por ambas partes",
+      body: "Las dos firmas estan registradas y el cambio queda cerrado dentro de la app.",
+      dedupeKey: `exchange_accepted_by_both:${exchangeId}`,
       data: {
         exchange_id: exchangeId,
         shift_id: exchange.shift_id,
@@ -305,21 +313,21 @@ export async function signAsInterested(
 
     await createNotification({
       userId: approverId,
-      type: "exchange_pending_validation",
-      title: "Solicitud pendiente de validacion",
-      body: "Hay un cambio de turno listo para revisar y resolver.",
-      dedupeKey: `exchange_pending_validation:${exchangeId}`,
+      type: "exchange_accepted_by_both",
+      title: "Intercambio aceptado por el equipo",
+      body: `${ownerName} y ${signerName} han aceptado un cambio de turno. No requiere aprobacion, solo queda informado.`,
+      dedupeKey: `exchange_responsible_informed:${exchangeId}`,
       data: {
         exchange_id: exchangeId,
         shift_id: exchange.shift_id,
-        action_url: `/admin/exchanges`,
+        action_url: `/exchanges/${exchangeId}`,
       },
     });
   }
 
   await resolveNotifications({
     userIds: participantIds,
-    types: ["proposal_accepted", "exchange_document_added"],
+    types: ["proposal_accepted", "exchange_document_added", "exchange_pending_validation"],
     dataContains: { exchange_id: exchangeId },
     unresolvedOnly: true,
   });
@@ -362,7 +370,7 @@ export async function attachExchangeDocument(
     .select("id, shift_id, user_a_id, user_b_id, status")
     .eq("id", exchangeId)
     .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-    .in("status", ["accepted", "pending_validation"])
+    .in("status", ["accepted", "pending_validation", "approved"])
     .single();
 
   if (!exchange) {
@@ -726,7 +734,7 @@ export async function rejectSignedExchangeCancellation(
     actorId: user.id,
     eventType: "cancellation_rejected",
     title: "Retirada rechazada",
-    details: "La solicitud continua activa y sigue pendiente de validacion.",
+    details: "La solicitud continua activa y sigue aceptada por ambas partes.",
   });
 
   revalidateExchangeViews(exchangeId, typedExchange.shift_id);

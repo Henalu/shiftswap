@@ -52,11 +52,11 @@ export function ColorPaletteField({
   const nativePickerValue = safeColor ?? DEFAULT_COLOR_PALETTE[0].value;
 
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 max-w-full gap-2">
       <span className="text-sm font-medium">{label}</span>
 
-      <div className="grid gap-2">
-        <div className="flex flex-wrap gap-2" aria-label={paletteLabel}>
+      <div className="grid min-w-0 gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2" aria-label={paletteLabel}>
           {DEFAULT_COLOR_PALETTE.map((color) => {
             const selected = safeColor === color.value;
 
@@ -87,7 +87,7 @@ export function ColorPaletteField({
           </button>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-border px-2.5">
             <span
               aria-hidden="true"

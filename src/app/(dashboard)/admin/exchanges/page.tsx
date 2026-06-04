@@ -34,6 +34,7 @@ interface ApprovalExchangeRow {
   shift_id: string;
   status: ExchangeStatus;
   submitted_for_approval_at: string | null;
+  approved_at: string | null;
   department_reviewed_at: string | null;
   department_decision_notes: string | null;
   signed_by_user_a_at: string | null;
@@ -76,7 +77,7 @@ export default async function AdminExchangesPage() {
     .from("exchanges")
     .select(
       `
-      id, shift_id, status, submitted_for_approval_at, department_reviewed_at,
+      id, shift_id, status, submitted_for_approval_at, approved_at, department_reviewed_at,
       department_decision_notes, signed_by_user_a_at, signed_by_user_b_at,
       user_a_id, user_b_id,
       owner:user_profiles!user_a_id(id, full_name),
@@ -92,10 +93,11 @@ export default async function AdminExchangesPage() {
     `
     )
     .in("status", ["pending_validation", "approved", "rejected"])
-    .order("submitted_for_approval_at", { ascending: false });
+    .order("approved_at", { ascending: false, nullsFirst: false })
+    .order("submitted_for_approval_at", { ascending: false, nullsFirst: false });
 
   if (error) {
-    throw new Error("No se pudieron cargar las aprobaciones de cambios.");
+    throw new Error("No se pudieron cargar los cambios informados.");
   }
 
   const normalizedExchanges = ((exchanges ?? []) as unknown[]).map((exchange) => {
@@ -144,13 +146,13 @@ export default async function AdminExchangesPage() {
       })
   );
 
-  const pendingExchanges = scopedExchanges.filter(
-    (exchange) => exchange.status === "pending_validation"
+  const informedExchanges = scopedExchanges.filter(
+    (exchange) => exchange.status === "approved"
   );
   const resolvedExchanges = scopedExchanges
     .filter(
       (exchange) =>
-        exchange.status === "approved" || exchange.status === "rejected"
+        exchange.status === "pending_validation" || exchange.status === "rejected"
     )
     .slice(0, 8);
 
@@ -158,8 +160,8 @@ export default async function AdminExchangesPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Administracion"
-        title="Aprobaciones de cambios"
-        description="Resuelve desde aqui las solicitudes que ya han sido firmadas por ambas partes y esperan una decision del departamento."
+        title="Cambios informados"
+        description="Consulta los intercambios aceptados por ambas partes dentro de tu alcance. No requieren aprobacion adicional."
         action={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{USER_ROLE_LABELS[actor.role]}</Badge>
@@ -173,23 +175,23 @@ export default async function AdminExchangesPage() {
       <section className="space-y-4">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-            Pendientes de decision
+            Cambios aceptados por ambas partes
           </h2>
           <p className="text-sm text-muted-foreground">
-            Revisa rapido las firmas, el contexto del turno y entra al expediente
-            para aprobar o rechazar con observaciones.
+            Revisa rapidamente los cambios que el equipo ya ha aceptado y que
+            quedan informados para seguimiento.
           </p>
         </div>
 
-        {pendingExchanges.length === 0 ? (
+        {informedExchanges.length === 0 ? (
           <EmptyState
             icon={<ClipboardCheck className="size-5" />}
-            title="No hay aprobaciones pendientes"
-            description="Cuando una solicitud quede firmada por ambas partes aparecera aqui lista para revision."
+            title="No hay cambios informados"
+            description="Cuando dos usuarios firmen un intercambio, aparecera aqui como aceptado por ambas partes."
           />
         ) : (
           <div className="space-y-4">
-            {pendingExchanges.map((exchange) => {
+            {informedExchanges.map((exchange) => {
               const timeRange = formatTimeRange(
                 exchange.shift.start_time,
                 exchange.shift.end_time
@@ -230,15 +232,15 @@ export default async function AdminExchangesPage() {
                         <Badge variant="outline">
                           Firmas completas
                         </Badge>
-                        {exchange.submitted_for_approval_at && (
+                        {exchange.approved_at && (
                           <Badge variant="outline">
-                            Desde {formatShortDate(exchange.submitted_for_approval_at)}
+                            Aceptado {formatShortDate(exchange.approved_at)}
                           </Badge>
                         )}
                         <Link href={`/exchanges/${exchange.id}`}>
                           <Button>
                             <FileSearch className="size-4" />
-                            Revisar solicitud
+                            Ver expediente
                           </Button>
                         </Link>
                       </div>
@@ -294,10 +296,10 @@ export default async function AdminExchangesPage() {
         <section className="space-y-4">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-              Resueltas recientemente
+              Expedientes anteriores
             </h2>
             <p className="text-sm text-muted-foreground">
-              Un vistazo rapido a las ultimas decisiones dentro de tu alcance.
+              Estados heredados del flujo anterior o expedientes rechazados.
             </p>
           </div>
 
@@ -329,15 +331,19 @@ export default async function AdminExchangesPage() {
 
                     <div
                       className={
-                        exchange.status === "approved"
+                        exchange.status === "rejected"
+                          ? "rounded-xl bg-rose-500/10 p-2 text-rose-700"
+                          : exchange.status === "approved"
                           ? "rounded-xl bg-emerald-500/10 p-2 text-emerald-700"
-                          : "rounded-xl bg-rose-500/10 p-2 text-rose-700"
+                          : "rounded-xl bg-amber-500/10 p-2 text-amber-700"
                       }
                     >
-                      {exchange.status === "approved" ? (
+                      {exchange.status === "rejected" ? (
+                        <XCircle className="size-4" />
+                      ) : exchange.status === "approved" ? (
                         <CheckCircle2 className="size-4" />
                       ) : (
-                        <XCircle className="size-4" />
+                        <ClipboardCheck className="size-4" />
                       )}
                     </div>
                   </div>

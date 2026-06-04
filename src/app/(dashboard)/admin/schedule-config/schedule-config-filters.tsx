@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCHEDULE_TYPE_LABELS } from "@/lib/constants";
 import { FORM_CONTROL_CLASSNAME, PANEL_CLASSNAME, cn } from "@/lib/utils";
@@ -48,7 +48,20 @@ export function ScheduleConfigFilters({
     );
   }
 
+  function clearSearch() {
+    const form = formRef.current;
+    if (!form) return;
+
+    const searchInput = form.elements.namedItem("q") as HTMLInputElement | null;
+    if (searchInput) {
+      searchInput.value = "";
+    }
+
+    submit();
+  }
+
   const hasFilters = searchParams.has("q") || searchParams.has("schedule_type");
+  const hasSearch = Boolean(searchParams.get("q"));
 
   return (
     <form
@@ -85,17 +98,36 @@ export function ScheduleConfigFilters({
             className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
             htmlFor="schedule-filter-q"
           >
-            Nombre
+            Buscar
           </label>
-          <input
-            autoComplete="off"
-            className={FORM_CONTROL_CLASSNAME}
-            defaultValue={searchParams.get("q") ?? ""}
-            id="schedule-filter-q"
-            name="q"
-            placeholder="Buscar area o empleado..."
-            type="search"
-          />
+          <div className="relative">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              autoComplete="off"
+              className={cn(
+                FORM_CONTROL_CLASSNAME,
+                hasSearch ? "pl-10 pr-11" : "pl-10"
+              )}
+              defaultValue={searchParams.get("q") ?? ""}
+              id="schedule-filter-q"
+              name="q"
+              placeholder="Area, empleado, departamento o grupo"
+              type="search"
+            />
+            {hasSearch ? (
+              <button
+                aria-label="Limpiar busqueda"
+                className="absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-4 focus-visible:ring-primary/10"
+                onClick={clearSearch}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="space-y-2">

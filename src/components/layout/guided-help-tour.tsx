@@ -83,7 +83,7 @@ const steps = [
     target: '[data-tour="nav-exchanges"]',
     title: "Cambios",
     description:
-      "Aqui viven los expedientes: firmas, validacion y estado formal de cada acuerdo.",
+      "Aqui viven los expedientes: firmas, documentos y estado formal de cada acuerdo.",
     preferredPlacement: "right",
   },
   {
@@ -102,7 +102,7 @@ const steps = [
     fallbackTarget: '[data-tour="nav-help"]',
     title: "Administracion",
     description:
-      "Si tienes permisos, aqui revisas validaciones, calendarios, usuarios y aprobaciones del equipo.",
+      "Si tienes permisos, aqui revisas validaciones, calendarios, usuarios y cambios informados del equipo.",
     preferredPlacement: "right",
   },
   {

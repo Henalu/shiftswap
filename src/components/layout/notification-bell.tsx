@@ -78,10 +78,11 @@ function getNotificationAppearance(type: NotificationType): NotificationAppearan
           "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
       };
     case "exchange_department_approved":
+    case "exchange_accepted_by_both":
     case "proposal_accepted":
     case "account_approved":
       return {
-        label: "Aprobado",
+        label: type === "exchange_accepted_by_both" ? "Informado" : "Aprobado",
         icon: CheckCircle2,
         iconClassName:
           "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",

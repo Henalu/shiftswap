@@ -21,6 +21,7 @@ import {
   SHIFT_TYPE_LABELS,
 } from "@/lib/constants";
 import {
+  calendarDayTypeToCompensationShiftType,
   calendarDayTypeToShiftType,
   getCalendarDayBlockedShiftReason,
   type CalendarDay,
@@ -39,6 +40,7 @@ interface DirectProposalDialogProps {
   recipientId: string;
   recipientName: string;
   calendarDays?: CalendarDay[] | null;
+  recipientCalendarDays?: CalendarDay[] | null;
 }
 
 export function DirectProposalDialog({
@@ -46,6 +48,7 @@ export function DirectProposalDialog({
   recipientId,
   recipientName,
   calendarDays,
+  recipientCalendarDays,
 }: DirectProposalDialogProps) {
   const [state, formAction, isPending] = useActionState(
     sendDirectProposal,
@@ -54,8 +57,12 @@ export function DirectProposalDialog({
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">("");
+  const [compensationDate, setCompensationDate] = useState("");
+  const [compensationShiftType, setCompensationShiftType] =
+    useState<ShiftType | "">("");
   const [agreementType, setAgreementType] =
     useState<ExchangeAgreementType>("hours_bank");
+  const minimumCompensationDate = useMemo(() => getMinimumCompensationDate(), []);
 
   const calendarMap = useMemo(() => {
     if (!calendarDays) return null;
@@ -65,6 +72,15 @@ export function DirectProposalDialog({
     }
     return map;
   }, [calendarDays]);
+
+  const recipientCalendarMap = useMemo(() => {
+    if (!recipientCalendarDays) return null;
+    const map = new Map<string, CalendarDay>();
+    for (const day of recipientCalendarDays) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [recipientCalendarDays]);
 
   const calendarHint = calendarMap?.get(selectedDate) ?? null;
   const calendarWarning = calendarHint
@@ -92,10 +108,48 @@ export function DirectProposalDialog({
     ? getShiftSchedule(selectedShiftType)
     : null;
   const isCalendarControlledDate = Boolean(calendarHint);
+  const compensationCalendarHint =
+    recipientCalendarMap?.get(compensationDate) ?? null;
+  const compensationCalendarWarning = compensationCalendarHint
+    ? compensationCalendarHint.dayType === "rest"
+      ? `${recipientName} descansa ese dia segun su calendario.`
+      : compensationCalendarHint.isVacation
+        ? `${recipientName} tiene vacaciones registradas para ese dia.`
+        : null
+    : null;
+  const compensationOutOfRangeWarning =
+    recipientCalendarMap && compensationDate && !compensationCalendarHint
+      ? `No hemos podido anticipar esa fecha con el calendario de ${recipientName}.`
+      : null;
+  const compensationExchangeLockReason =
+    compensationCalendarHint && compensationShiftType
+      ? getCalendarDayBlockedShiftReason(
+          compensationCalendarHint,
+          compensationShiftType,
+        )
+      : null;
+  const compensationExchangeLockWarning =
+    compensationExchangeLockReason === "received"
+      ? `${recipientName} ya recibe ese turno mediante un intercambio activo.`
+      : compensationExchangeLockReason === "delivered"
+        ? `${recipientName} ya ha cedido ese turno en un intercambio activo.`
+        : null;
+  const selectedCompensationSchedule = compensationShiftType
+    ? getShiftSchedule(compensationShiftType)
+    : null;
+  const isCompensationCalendarControlledDate = Boolean(
+    compensationCalendarHint,
+  );
+  const canSubmitCompensation =
+    agreementType === "hours_bank" ||
+    (Boolean(compensationDate && compensationShiftType) &&
+      !compensationCalendarWarning &&
+      !compensationExchangeLockWarning);
   const canSubmit =
     Boolean(selectedDate && selectedShiftType) &&
     !calendarWarning &&
-    !exchangeLockWarning;
+    !exchangeLockWarning &&
+    canSubmitCompensation;
 
   useEffect(() => {
     if (!state?.success) return;
@@ -104,6 +158,8 @@ export function DirectProposalDialog({
       setOpen(false);
       setSelectedDate("");
       setSelectedShiftType("");
+      setCompensationDate("");
+      setCompensationShiftType("");
       setAgreementType("hours_bank");
     }, 0);
 
@@ -118,6 +174,8 @@ export function DirectProposalDialog({
         if (!nextOpen) {
           setSelectedDate("");
           setSelectedShiftType("");
+          setCompensationDate("");
+          setCompensationShiftType("");
           setAgreementType("hours_bank");
         }
       }}
@@ -151,7 +209,7 @@ export function DirectProposalDialog({
               <ShieldCheck className="mt-0.5 size-4 text-primary" />
               <p>
                 La propuesta queda dirigida a {recipientName}. Si acepta, se
-                crea el intercambio y pasara a firma/validacion como el resto.
+                crea el intercambio y quedara pendiente de tu firma final.
               </p>
             </div>
           </div>
@@ -271,7 +329,13 @@ export function DirectProposalDialog({
                     name="agreement_type"
                     value={value}
                     checked={agreementType === value}
-                    onChange={() => setAgreementType(value)}
+                    onChange={() => {
+                      setAgreementType(value);
+                      if (value === "hours_bank") {
+                        setCompensationDate("");
+                        setCompensationShiftType("");
+                      }
+                    }}
                     className="mt-1 size-4"
                   />
                   <span>
@@ -293,23 +357,56 @@ export function DirectProposalDialog({
                 <Label htmlFor="direct-compensation-date">
                   Fecha del turno que pides
                 </Label>
-                <input
+                <ShiftDatePicker
                   id="direct-compensation-date"
                   name="compensation_shift_date"
-                  type="date"
-                  min={getMinimumCompensationDate()}
-                  required
-                  className={FORM_CONTROL_CLASSNAME}
+                  value={compensationDate}
+                  minDate={minimumCompensationDate}
+                  calendarDays={recipientCalendarDays}
+                  dialogLabel={`Seleccionar fecha del turno de ${recipientName}`}
+                  onChange={(date) => {
+                    setCompensationDate(date);
+                    if (!recipientCalendarMap) {
+                      return;
+                    }
+
+                    const day = recipientCalendarMap.get(date);
+                    const nextShiftType = day
+                      ? calendarDayTypeToCompensationShiftType(day.dayType)
+                      : null;
+                    setCompensationShiftType(nextShiftType ?? "");
+                  }}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="direct-compensation-type">
                   Turno que pides
                 </Label>
+                {compensationCalendarHint &&
+                  !compensationCalendarWarning &&
+                  compensationShiftType && (
+                    <input
+                      type="hidden"
+                      name="compensation_shift_type"
+                      value={compensationShiftType}
+                    />
+                  )}
                 <select
                   id="direct-compensation-type"
-                  name="compensation_shift_type"
-                  required
+                  name={
+                    compensationCalendarHint && !compensationCalendarWarning
+                      ? undefined
+                      : "compensation_shift_type"
+                  }
+                  required={!isCompensationCalendarControlledDate}
+                  value={compensationShiftType}
+                  disabled={isCompensationCalendarControlledDate}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setCompensationShiftType(
+                      isShiftType(nextValue) ? nextValue : "",
+                    );
+                  }}
                   className={FORM_CONTROL_CLASSNAME}
                 >
                   <option value="">Selecciona</option>
@@ -321,10 +418,53 @@ export function DirectProposalDialog({
                     ),
                   )}
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  {selectedCompensationSchedule
+                    ? `Horario: ${formatTimeRange(
+                        selectedCompensationSchedule.startTime,
+                        selectedCompensationSchedule.endTime,
+                      )}.`
+                    : "El horario se calcula automaticamente."}
+                </p>
               </div>
+              {compensationCalendarHint && compensationCalendarWarning && (
+                <CalendarDateContext
+                  day={compensationCalendarHint}
+                  title="Fecha no disponible"
+                  description={compensationCalendarWarning}
+                  className="md:col-span-2"
+                />
+              )}
+              {compensationCalendarHint &&
+                !compensationCalendarWarning &&
+                compensationExchangeLockWarning && (
+                  <CalendarDateContext
+                    day={compensationCalendarHint}
+                    title="Turno ya comprometido"
+                    description={compensationExchangeLockWarning}
+                    className="md:col-span-2"
+                  />
+                )}
+              {compensationCalendarHint &&
+                !compensationCalendarWarning &&
+                !compensationExchangeLockWarning && (
+                  <CalendarDateContext
+                    day={compensationCalendarHint}
+                    title="Turno detectado"
+                    description={`El calendario de ${recipientName} marca ${CALENDAR_DAY_TYPE_LABELS[
+                      compensationCalendarHint.dayType
+                    ].toLowerCase()} para ese dia.`}
+                    className="md:col-span-2"
+                  />
+                )}
+              {compensationOutOfRangeWarning && (
+                <p className="md:col-span-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  {compensationOutOfRangeWarning}
+                </p>
+              )}
               <p className="md:col-span-2 text-xs text-muted-foreground">
                 Al aceptar, validaremos que esa persona realmente tenga ese
-                turno disponible en su calendario.
+                turno disponible en su calendario antes de cerrar el acuerdo.
               </p>
             </div>
           )}

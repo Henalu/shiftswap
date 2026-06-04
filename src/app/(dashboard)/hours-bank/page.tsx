@@ -197,7 +197,7 @@ export default async function HoursBankPage() {
           <CardContent className="flex items-center justify-between gap-4 pt-1">
             <div>
               <p className="text-sm font-medium text-muted-foreground">
-                Pendientes de aprobacion
+                Pendientes de cierre
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
                 {pluralizeHours(totalPendingHours)}

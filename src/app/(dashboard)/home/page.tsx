@@ -193,7 +193,7 @@ function MetricCard({
   return (
     <div
       className={cn(
-        "flex min-h-32 items-center gap-4 rounded-2xl border border-border/80 bg-card/96 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.05)]",
+        "flex min-h-32 min-w-0 max-w-full items-center gap-3 rounded-2xl border border-border/80 bg-card/96 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.05)] sm:gap-4 sm:p-5",
         tone === "attention" ? "border-amber-500/20 bg-amber-500/8" : "",
       )}
     >
@@ -226,12 +226,14 @@ function SectionTitle({
   title: string;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
         {title}
       </h2>
       {description ? (
-        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        <p className="max-w-full text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
       ) : null}
     </div>
   );
@@ -252,15 +254,15 @@ function ShiftSummaryRow({
 
   return (
     <Link
-      className="group flex items-center justify-between gap-4 rounded-2xl border border-border/70 px-4 py-3 transition-colors hover:bg-secondary/45"
+      className="group flex min-w-0 max-w-full items-start gap-3 rounded-2xl border border-border/70 px-3 py-3 transition-colors hover:bg-secondary/45 sm:items-center sm:justify-between sm:gap-4 sm:px-4"
       href={href}
     >
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 flex-1 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className={SHIFT_TYPE_STYLES[shift.shift_type]}>
             {SHIFT_TYPE_LABELS[shift.shift_type]}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="min-w-0 text-sm leading-5 text-muted-foreground">
             {formatShortDate(shift.date)} -{" "}
             {formatTimeRange(shift.start_time, shift.end_time)}
           </span>
@@ -491,8 +493,8 @@ export default async function HomePage() {
       exchange.user_b_id === authUser.id &&
       !exchange.signed_by_user_b_at,
   ).length;
-  const pendingValidationCount = typedActiveExchanges.filter(
-    (exchange) => exchange.status === "pending_validation",
+  const acceptedByBothCount = typedActiveExchanges.filter(
+    (exchange) => exchange.status === "approved",
   ).length;
   const unreadCount = unreadResult.count ?? 0;
 
@@ -568,10 +570,10 @@ export default async function HomePage() {
     },
     canUseAdmin
       ? {
-          description: "Revisa expedientes del equipo.",
+          description: "Consulta intercambios aceptados por el equipo.",
           href: "/admin/exchanges",
           icon: ShieldCheck,
-          label: "Aprobaciones",
+          label: "Cambios equipo",
         }
       : null,
   ].filter(Boolean) as Array<{
@@ -582,7 +584,7 @@ export default async function HomePage() {
   }>;
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 max-w-full space-y-8">
       <PageHeader
         eyebrow="Inicio"
         title={`Hola, ${getFirstName(typedProfile.full_name)}`}
@@ -606,7 +608,7 @@ export default async function HomePage() {
       />
 
       <section
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4"
         data-tour="home-summary"
       >
         <MetricCard
@@ -639,7 +641,7 @@ export default async function HomePage() {
           value={String(typedPendingProposals.length)}
         />
         <MetricCard
-          description={`${pendingValidationCount} en validacion y ${pendingSignatureCount} pendientes de firma.`}
+          description={`${acceptedByBothCount} aceptados por ambas partes y ${pendingSignatureCount} pendientes de firma.`}
           icon={Repeat}
           label="Cambios activos"
           tone={pendingSignatureCount > 0 ? "attention" : "default"}
@@ -663,7 +665,7 @@ export default async function HomePage() {
 
                   return (
                     <Link
-                      className="group flex items-center gap-4 rounded-2xl border border-border/70 px-4 py-3 transition-colors hover:bg-secondary/45"
+                      className="group flex min-w-0 items-start gap-3 rounded-2xl border border-border/70 px-3 py-3 transition-colors hover:bg-secondary/45 sm:items-center sm:gap-4 sm:px-4"
                       href={item.href}
                       key={item.label}
                     >
@@ -671,17 +673,17 @@ export default async function HomePage() {
                         <Icon className="size-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold text-foreground">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
                             {item.label}
                           </p>
                           <Badge variant="outline">{item.value}</Badge>
                         </div>
-                        <p className="truncate text-sm text-muted-foreground">
+                        <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">
                           {item.description}
                         </p>
                       </div>
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      <ArrowRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
                     </Link>
                   );
                 })
@@ -735,7 +737,7 @@ export default async function HomePage() {
                 description="Publicaciones propias, solicitudes enviadas y expedientes activos."
               />
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <CardContent className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-3 rounded-2xl border border-border/70 p-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
@@ -888,7 +890,10 @@ export default async function HomePage() {
                       </p>
                     </div>
                     <Badge
-                      className={CALENDAR_DAY_TYPE_STYLES[day.dayType as CalendarDayType]}
+                      className={cn(
+                        "shrink-0",
+                        CALENDAR_DAY_TYPE_STYLES[day.dayType as CalendarDayType],
+                      )}
                     >
                       {CALENDAR_DAY_TYPE_LABELS[day.dayType]}
                     </Badge>
@@ -920,7 +925,7 @@ export default async function HomePage() {
 
                 return (
                   <Link
-                    className="group flex items-center gap-3 rounded-2xl border border-border/70 px-3 py-3 transition-colors hover:bg-secondary/45"
+                    className="group flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 px-3 py-3 transition-colors hover:bg-secondary/45"
                     href={action.href}
                     key={action.href}
                   >
@@ -935,7 +940,7 @@ export default async function HomePage() {
                         {action.description}
                       </p>
                     </div>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                    <ArrowRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
                   </Link>
                 );
               })}

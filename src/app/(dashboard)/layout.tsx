@@ -119,12 +119,12 @@ export default async function DashboardLayout({
         canAccessPlatformConsole={Boolean(platformAdmin)}
         role={role}
       />
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1">
+      <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-7xl flex-1 overflow-x-hidden">
         <aside className="hidden h-full w-72 shrink-0 overflow-hidden border-r border-border/70 bg-sidebar/75 md:block">
           <SidebarNav role={role} />
         </aside>
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-full min-w-0 flex-col gap-8 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 md:pb-6 lg:px-8">
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="flex min-h-full min-w-0 max-w-full flex-col gap-8 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 md:pb-6 lg:px-8">
             {billingState.enabled && billingState.state === "past_due" ? (
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
                 <div className="flex items-start gap-3">

@@ -22,6 +22,9 @@ interface ShiftDatePickerProps {
   name: string;
   value: string;
   calendarDays?: CalendarDay[] | null;
+  minDate?: string;
+  dialogLabel?: string;
+  emptyLabel?: string;
   onChange: (date: string) => void;
 }
 
@@ -94,13 +97,17 @@ export function ShiftDatePicker({
   name,
   value,
   calendarDays,
+  minDate,
+  dialogLabel,
+  emptyLabel,
   onChange,
 }: ShiftDatePickerProps) {
   const [open, setOpen] = useState(false);
   const today = useMemo(() => getMadridToday(), []);
+  const minimumSelectableDate = minDate ?? today;
   const selectedDate = parseDate(value);
   const [visibleMonth, setVisibleMonth] = useState<Date>(
-    selectedDate ?? parseDate(today) ?? new Date(),
+    selectedDate ?? parseDate(minimumSelectableDate) ?? new Date(),
   );
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -142,7 +149,7 @@ export function ShiftDatePicker({
         onClick={() => setOpen((current) => !current)}
       >
         <span className={cn("truncate", !value && "text-muted-foreground")}>
-          {value ? formatShortDate(value) : "Selecciona una fecha"}
+          {value ? formatShortDate(value) : emptyLabel ?? "Selecciona una fecha"}
         </span>
         <CalendarIcon className="size-4 text-muted-foreground" />
       </Button>
@@ -150,8 +157,8 @@ export function ShiftDatePicker({
       {open && (
         <div
           role="dialog"
-          aria-label="Seleccionar fecha del turno"
-          className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-background p-3 shadow-[0_18px_48px_-28px_rgba(15,23,42,0.45)]"
+          aria-label={dialogLabel ?? "Seleccionar fecha del turno"}
+          className="absolute left-1/2 top-[calc(100%+0.5rem)] z-40 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-border bg-background p-3 shadow-[0_18px_48px_-28px_rgba(15,23,42,0.45)] sm:left-0 sm:translate-x-0"
         >
           <div className="flex items-center justify-between gap-2">
             <Button
@@ -196,7 +203,7 @@ export function ShiftDatePicker({
             ))}
             {monthCells.map((cell) => {
               const day = calendarMap.get(cell.date);
-              const isPast = cell.date < today;
+              const isBeforeMinimum = cell.date < minimumSelectableDate;
               const isSelected = cell.date === value;
               const isToday = cell.date === today;
               const isBlocked =
@@ -209,8 +216,8 @@ export function ShiftDatePicker({
                 <button
                   key={cell.date}
                   type="button"
-                  disabled={isPast}
-                  title={`${formatShortDate(cell.date)} · ${label}`}
+                  disabled={isBeforeMinimum}
+                  title={`${formatShortDate(cell.date)} - ${label}`}
                   aria-label={`${formatShortDate(cell.date)}, ${label}`}
                   onClick={() => {
                     onChange(cell.date);
@@ -225,8 +232,8 @@ export function ShiftDatePicker({
                     isBlocked && "opacity-70",
                     isToday && "ring-2 ring-primary/45 ring-offset-1",
                     isSelected && "border-primary bg-primary text-primary-foreground ring-2 ring-primary/25 ring-offset-1",
-                    isPast && "cursor-not-allowed opacity-35",
-                    !isPast &&
+                    isBeforeMinimum && "cursor-not-allowed opacity-35",
+                    !isBeforeMinimum &&
                       !isSelected &&
                       "hover:border-primary/45 hover:bg-secondary",
                   )}

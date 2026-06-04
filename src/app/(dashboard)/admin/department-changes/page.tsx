@@ -192,7 +192,7 @@ export default async function AdminDepartmentChangesPage() {
               <Button variant="outline">Cambios de puesto</Button>
             </Link>
             <Link href="/admin/exchanges">
-              <Button variant="outline">Aprobaciones de cambios</Button>
+              <Button variant="outline">Cambios equipo</Button>
             </Link>
           </div>
         }

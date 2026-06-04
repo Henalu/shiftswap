@@ -186,7 +186,8 @@ export default async function MyShiftsPage() {
                 )
               : null;
             const hasPendingCancellationRequest =
-              activeExchange?.status === "pending_validation" &&
+              (activeExchange?.status === "pending_validation" ||
+                activeExchange?.status === "approved") &&
               Boolean(activeExchange.cancellation_requested_by);
             const isCancellationRequester =
               hasPendingCancellationRequest &&
@@ -297,7 +298,7 @@ export default async function MyShiftsPage() {
                           ) : activeExchange.status === "accepted" ? (
                             <>
                               Propuesta aceptada. Cuando la otra parte firme, el
-                              expediente pasara a validacion.
+                              intercambio quedara aceptado por ambas partes.
                             </>
                           ) : (
                             <>

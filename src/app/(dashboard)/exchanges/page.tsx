@@ -77,8 +77,8 @@ function renderExchangeMessage(
 
   if (exchange.status === "accepted") {
     return isOwner
-      ? `Has aceptado la propuesta de ${otherUser.full_name}. Esperando su firma para enviar a validacion.`
-      : `${otherUser.full_name} ha aceptado tu propuesta. Firma para enviar el expediente a validacion.`;
+      ? `Has aceptado la propuesta de ${otherUser.full_name}. Esperando su firma para cerrar el intercambio.`
+      : `${otherUser.full_name} ha aceptado tu propuesta. Firma para cerrar el intercambio.`;
   }
 
   if (exchange.status === "pending_validation") {
@@ -86,7 +86,7 @@ function renderExchangeMessage(
       return "Hay una retirada pendiente entre participantes. El expediente queda en pausa hasta resolverla.";
     }
 
-    return "La solicitud esta firmada y queda pendiente de validacion por el departamento.";
+    return "La solicitud esta firmada y quedo en un estado antiguo pendiente de normalizacion.";
   }
 
   if (exchange.status === "approved") {
@@ -94,11 +94,11 @@ function renderExchangeMessage(
       return "Hay una retirada pendiente entre participantes antes de la primera fecha del acuerdo.";
     }
 
-    return "El intercambio ya ha sido aprobado. Puedes abrir el expediente para revisar la resolucion.";
+    return "El intercambio ya fue aceptado por ambas partes. El responsable queda informado dentro de la app.";
   }
 
   if (exchange.status === "rejected") {
-    return "El departamento ha rechazado la solicitud. Revisa las observaciones.";
+    return "Este expediente fue rechazado en el flujo anterior. Revisa las observaciones.";
   }
 
   if (exchange.status === "cancelled") {
@@ -195,7 +195,7 @@ export default async function ExchangesPage() {
       <PageHeader
         eyebrow="Acuerdos"
         title="Cambios"
-        description="Sigue cada expediente desde la propuesta aceptada hasta la firma, la validacion y la resolucion final."
+        description="Sigue cada expediente desde la propuesta aceptada hasta la segunda firma y el aviso al responsable."
       />
 
       {typedExchanges.length === 0 ? (
@@ -218,7 +218,7 @@ export default async function ExchangesPage() {
                   Pendientes de firma
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  El publicador ya acepto tu propuesta. Firma para enviar a validacion.
+                  El publicador ya acepto tu propuesta. Firma para cerrar el intercambio.
                 </p>
               </div>
 
@@ -327,10 +327,10 @@ export default async function ExchangesPage() {
             <section className="space-y-4">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  En validacion
+                  Pendientes de normalizar
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Expedientes firmados que estan pendientes de revision por el departamento.
+                  Expedientes firmados con el flujo anterior que se migran a aceptados por ambas partes.
                 </p>
               </div>
 
@@ -368,7 +368,7 @@ export default async function ExchangesPage() {
                               </Badge>
                               <Badge variant="outline">
                                 <ShieldCheck className="size-3.5" />
-                                En revision
+                                Estado antiguo
                               </Badge>
                             </div>
                           </div>
@@ -414,7 +414,7 @@ export default async function ExchangesPage() {
                   Historial y resoluciones
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Intercambios aprobados, rechazados, cancelados o caducados.
+                  Intercambios aceptados por ambas partes, cancelados o caducados.
                 </p>
               </div>
 

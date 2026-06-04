@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { ExchangeApprovalDecisionForm } from "@/app/(dashboard)/admin/exchanges/exchange-approval-decision-form";
 import { startConversation } from "@/app/(dashboard)/chat/actions";
 import {
   formatCompensationDateLabel,
@@ -138,7 +137,7 @@ function renderStatusSummary(
       <>
         La propuesta ha sido aceptada. Falta que{" "}
         <strong>{exchange.requester.full_name}</strong> firme la solicitud para
-        enviarla a validacion del departamento.
+        cerrar el intercambio dentro de la app.
       </>
     );
   }
@@ -155,8 +154,8 @@ function renderStatusSummary(
 
     return (
       <>
-        Las firmas ya estan registradas. El expediente queda pendiente de
-        validacion por parte del responsable del departamento.
+        Las firmas ya estan registradas. Este expediente quedo en un estado
+        antiguo y debe normalizarse automaticamente a aceptado por ambas partes.
       </>
     );
   }
@@ -164,8 +163,8 @@ function renderStatusSummary(
   if (exchange.status === "approved") {
     return (
       <>
-        El intercambio ha sido aprobado dentro de la app y queda resuelto como
-        cambio autorizado.
+        El intercambio ha sido aceptado por ambas partes. La app informa al
+        responsable correspondiente, pero no necesita aprobacion adicional.
       </>
     );
   }
@@ -173,9 +172,9 @@ function renderStatusSummary(
   if (exchange.status === "rejected") {
     return (
       <>
-        El departamento ha rechazado la solicitud. El turno vuelve a quedar
-        disponible y puedes revisar las observaciones para decidir el siguiente
-        paso.
+        Este expediente fue rechazado en el flujo anterior. El turno vuelve a
+        quedar disponible y puedes revisar las observaciones para decidir el
+        siguiente paso.
       </>
     );
   }
@@ -360,8 +359,6 @@ export default async function ExchangeDetailPage({
     isParticipant && EXCHANGE_CAN_CHAT_STATUSES.includes(typed.status);
   const canSign =
     typed.status === "accepted" && isRequester && !typed.signed_by_user_b_at;
-  const showApprovalForm =
-    isApproverReviewer && typed.status === "pending_validation";
   const timeRange = formatTimeRange(typed.shift.start_time, typed.shift.end_time);
   const showExportButton = EXCHANGE_EXPORTABLE_STATUSES.includes(typed.status);
   const agreementSummary = getAgreementSummary({
@@ -437,7 +434,7 @@ export default async function ExchangeDetailPage({
       <PageHeader
         eyebrow="Intercambio"
         title="Expediente del cambio"
-        description="Consulta el estado formal del acuerdo, revisa firmas, sigue el historial y resuelve la aprobacion desde una sola vista."
+        description="Consulta el acuerdo, revisa firmas, sigue el historial y comprueba si el responsable ya fue informado."
         action={
           <Link href={isApproverReviewer ? "/admin/exchanges" : "/exchanges"}>
             <Button variant="ghost">
@@ -464,7 +461,7 @@ export default async function ExchangeDetailPage({
               {isApproverReviewer && (
                 <Badge variant="outline">
                   <ShieldCheck className="size-3.5" />
-                  Revision departamental
+                  Responsable informado
                 </Badge>
               )}
             </div>
@@ -556,7 +553,7 @@ export default async function ExchangeDetailPage({
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       La deuda de 1 turno quedara registrada en el ledger cuando
-                      la solicitud pase a validacion.
+                      ambas partes firmen el acuerdo.
                     </p>
                   )}
                 </div>
@@ -628,7 +625,7 @@ export default async function ExchangeDetailPage({
                   )}
                 </div>
 
-                {(typed.status === "approved" || typed.status === "rejected") &&
+                {typed.status === "rejected" &&
                   typed.departmentApprover && (
                     <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-secondary/45 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
@@ -652,11 +649,11 @@ export default async function ExchangeDetailPage({
               </div>
             </div>
 
-            {(typed.status === "approved" || typed.status === "rejected") &&
+            {typed.status === "rejected" &&
               typed.department_decision_notes && (
                 <div className="rounded-2xl border border-border/70 bg-secondary/35 px-4 py-4 text-sm leading-6 text-muted-foreground">
                   <p className="mb-2 text-sm font-semibold text-foreground">
-                    Observaciones del departamento
+                    Observaciones del flujo anterior
                   </p>
                   {typed.department_decision_notes}
                 </div>
@@ -761,8 +758,8 @@ export default async function ExchangeDetailPage({
               <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-muted-foreground">
                   La firma del propietario queda registrada al aceptar la
-                  propuesta. Solo falta la firma del solicitante para enviar el
-                  expediente a validacion.
+                  propuesta. Solo falta la firma del solicitante para cerrar el
+                  intercambio como aceptado por ambas partes.
                 </p>
 
                 {renderSignatureStatus({
@@ -791,29 +788,19 @@ export default async function ExchangeDetailPage({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  Validacion departamental
+                  Estado antiguo pendiente
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-muted-foreground">
-                  {isApproverReviewer
-                    ? "La solicitud ya esta lista para tu decision. Revisa el contexto, deja observaciones si hace falta y resuelvela desde aqui."
-                    : "La solicitud ya ha salido de la fase de firma y queda pendiente de validacion por parte del departamento."}
+                  Esta solicitud ya tiene las firmas necesarias. El nuevo flujo
+                  no requiere aprobacion del responsable; una migracion la deja
+                  como aceptada por ambas partes.
                 </p>
 
-                {showApprovalForm ? (
-                  <ExchangeApprovalDecisionForm
-                    exchangeId={typed.id}
-                    ownerName={typed.owner.full_name}
-                    requesterName={typed.requester.full_name}
-                  />
-                ) : (
-                  <div className="rounded-2xl border border-border/70 bg-secondary/35 px-4 py-4 text-sm leading-6 text-muted-foreground">
-                    {typed.cancellation_requested_by
-                      ? "Hay una retirada pendiente entre participantes. El expediente no deberia aprobarse hasta que ese paso se resuelva."
-                      : "No hay mas acciones para participantes en este momento. Cuando el departamento resuelva la solicitud, el estado cambiara automaticamente."}
-                  </div>
-                )}
+                <div className="rounded-2xl border border-border/70 bg-secondary/35 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                  No hay acciones de aprobacion disponibles para este expediente.
+                </div>
               </CardContent>
             </Card>
           )}
