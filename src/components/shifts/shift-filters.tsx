@@ -45,7 +45,8 @@ export function ShiftFilters({
     (showDepartmentFilter && searchParams.has("department_id")) ||
     searchParams.has("shift_type") ||
     searchParams.has("from") ||
-    searchParams.has("to");
+    searchParams.has("to") ||
+    searchParams.get("include_mine") === "1";
 
   return (
     <form
@@ -57,6 +58,10 @@ export function ShiftFilters({
       }}
       className={cn(PANEL_CLASSNAME, "space-y-4 p-5")}
     >
+      {searchParams.get("include_mine") === "1" && (
+        <input type="hidden" name="include_mine" value="1" />
+      )}
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

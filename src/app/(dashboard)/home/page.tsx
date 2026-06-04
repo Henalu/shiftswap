@@ -605,7 +605,10 @@ export default async function HomePage() {
         }
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        data-tour="home-summary"
+      >
         <MetricCard
           description={
             todaysCalendar
@@ -646,7 +649,7 @@ export default async function HomePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-6">
-          <Card>
+          <Card data-tour="home-priorities">
             <CardHeader>
               <SectionTitle
                 title="Prioridades"
@@ -695,7 +698,7 @@ export default async function HomePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="home-open-shifts">
             <CardHeader>
               <SectionTitle
                 title="Turnos para revisar"
@@ -725,7 +728,7 @@ export default async function HomePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="home-movements">
             <CardHeader>
               <SectionTitle
                 title="Mis movimientos"
@@ -856,7 +859,7 @@ export default async function HomePage() {
         </div>
 
         <aside className="space-y-6">
-          <Card>
+          <Card data-tour="home-agenda">
             <CardHeader>
               <CardTitle>Agenda proxima</CardTitle>
               <CardDescription>
@@ -904,7 +907,7 @@ export default async function HomePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="home-quick-actions">
             <CardHeader>
               <CardTitle>Accesos rapidos</CardTitle>
               <CardDescription>

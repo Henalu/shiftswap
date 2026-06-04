@@ -6,10 +6,12 @@ import { ShiftFilters } from "@/components/shifts/shift-filters";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { getMadridDateInputValue } from "@/lib/exchange-compensation";
 import {
   getDepartmentScopeLabel,
   isOperationalDepartment,
 } from "@/lib/departments";
+import { expireStaleOpenShifts } from "@/lib/stale-shifts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Department, ShiftWithUser, UserRole } from "@/types";
@@ -20,11 +22,14 @@ interface PageProps {
     shift_type?: string;
     from?: string;
     to?: string;
+    include_mine?: string;
   }>;
 }
 
 export default async function ShiftsPage({ searchParams }: PageProps) {
-  const { department_id, shift_type, from, to } = await searchParams;
+  const { department_id, shift_type, from, to, include_mine } =
+    await searchParams;
+  const includeMine = include_mine === "1";
 
   const supabase = await createClient();
   const adminClient = createAdminClient();
@@ -62,12 +67,17 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     );
   }
 
-  if (!profile?.department_id) {
+  if (!profile) {
     redirect("/profile?setup=1");
   }
 
   const role = (profile.role ?? "member") as UserRole;
   const canBrowseDepartments = role === "hr_admin" || role === "super_admin";
+
+  if (!profile?.department_id && !canBrowseDepartments) {
+    redirect("/profile?setup=1");
+  }
+
   const { data: departments } = await adminClient
     .from("departments")
     .select("id, name, company_id, parent_department_id, is_assignable, created_at")
@@ -99,9 +109,13 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     : canBrowseDepartments
       ? undefined
       : profile.department_id;
-  const scopeLabel = getDepartmentScopeLabel(typedDepartments, profile.department_id);
+  const scopeLabel = profile.department_id
+    ? getDepartmentScopeLabel(typedDepartments, profile.department_id)
+    : null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  await expireStaleOpenShifts();
+
+  const today = getMadridDateInputValue();
 
   let query = supabase
     .from("shifts")
@@ -114,8 +128,12 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     )
     .eq("status", "open")
     .gte("date", today)
-    .neq("user_id", authUser.id)
+    .is("direct_recipient_id", null)
     .order("date", { ascending: true });
+
+  if (!includeMine) {
+    query = query.neq("user_id", authUser.id);
+  }
 
   if (effectiveDepartmentId) {
     query = query.eq("department_id", effectiveDepartmentId);
@@ -146,7 +164,13 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     user: shift.user,
     department: shift.department,
   })) as ShiftWithUser[];
-  const hasFilters = !!(effectiveDepartmentId || shift_type || from || to);
+  const hasFilters = !!(
+    effectiveDepartmentId ||
+    shift_type ||
+    from ||
+    to ||
+    includeMine
+  );
 
   return (
     <div className="space-y-6">

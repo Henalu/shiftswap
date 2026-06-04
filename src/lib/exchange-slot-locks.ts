@@ -5,6 +5,7 @@ import { pickFirstRelation } from "@/lib/supabase-relations";
 import { isShiftType } from "@/lib/shifts";
 import type {
   CalendarExchangeOverlayEntry,
+  ExchangeAgreementType,
   ExchangeStatus,
   ShiftType,
 } from "@/types";
@@ -20,6 +21,12 @@ export const ACTIVE_EXCHANGE_SHIFT_INDEX =
   "idx_exchanges_unique_active_shift";
 export const ACTIVE_EXCHANGE_COMPENSATION_INDEX =
   "idx_exchanges_unique_active_compensation_slot";
+export const ACTIVE_EXCHANGE_DATE_CONFLICT_MESSAGE =
+  "active_exchange_date_conflict";
+export const ACTIVE_EXCHANGE_SHIFT_SLOT_CONFLICT_MESSAGE =
+  "active_exchange_shift_slot_conflict";
+export const ACTIVE_SHIFT_USER_SLOT_INDEX =
+  "idx_shifts_unique_active_user_slot";
 
 export type ExchangeSlotLockKind = "received" | "delivered";
 
@@ -33,6 +40,7 @@ export interface ExchangeSlotLock {
 interface ActiveExchangeSlotRow {
   id: string;
   status: ExchangeStatus;
+  agreement_type: ExchangeAgreementType | null;
   user_a_id: string;
   user_b_id: string;
   compensation_shift_date: string | null;
@@ -65,9 +73,38 @@ function toExchangeSlotLockRows(
   const publishedShiftType = shift?.shift_type;
   const compensationShiftType = exchange.compensation_shift_type;
 
+  if (!shift?.date || !isShiftType(publishedShiftType)) {
+    return [];
+  }
+
+  if (exchange.agreement_type === "hours_bank") {
+    if (exchange.user_a_id === userId) {
+      return [
+        {
+          exchangeId: exchange.id,
+          date: shift.date,
+          shiftType: publishedShiftType,
+          kind: "delivered",
+        },
+      ];
+    }
+
+    if (exchange.user_b_id === userId) {
+      return [
+        {
+          exchangeId: exchange.id,
+          date: shift.date,
+          shiftType: publishedShiftType,
+          kind: "received",
+        },
+      ];
+    }
+
+    return [];
+  }
+
   if (
-    !shift?.date ||
-    !isShiftType(publishedShiftType) ||
+    exchange.agreement_type !== "shift_exchange" ||
     !exchange.compensation_shift_date ||
     !isShiftType(compensationShiftType)
   ) {
@@ -127,6 +164,7 @@ export async function getUserActiveExchangeSlotLocks({
       `
       id,
       status,
+      agreement_type,
       user_a_id,
       user_b_id,
       compensation_shift_date,
@@ -134,7 +172,6 @@ export async function getUserActiveExchangeSlotLocks({
       shift:shifts!shift_id(date, shift_type)
     `,
     )
-    .eq("agreement_type", "shift_exchange")
     .in("status", [...ACTIVE_EXCHANGE_SLOT_LOCK_STATUSES])
     .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`);
 
@@ -215,6 +252,9 @@ export function isActiveExchangeSlotLockError(error: {
   const haystack = `${error.message ?? ""} ${error.details ?? ""}`;
   return (
     haystack.includes(ACTIVE_EXCHANGE_SHIFT_INDEX) ||
-    haystack.includes(ACTIVE_EXCHANGE_COMPENSATION_INDEX)
+    haystack.includes(ACTIVE_EXCHANGE_COMPENSATION_INDEX) ||
+    haystack.includes(ACTIVE_EXCHANGE_DATE_CONFLICT_MESSAGE) ||
+    haystack.includes(ACTIVE_EXCHANGE_SHIFT_SLOT_CONFLICT_MESSAGE) ||
+    haystack.includes(ACTIVE_SHIFT_USER_SLOT_INDEX)
   );
 }

@@ -8,6 +8,7 @@ import { getAccountGateState } from "@/lib/user-profiles";
 import {
   canAccessScopedDepartment,
   canReviewDepartmentChangeRequest,
+  isSuperAdmin,
 } from "@/lib/user-roles";
 import type { UserRole, ValidationStatus } from "@/types";
 
@@ -22,6 +23,11 @@ export interface DepartmentChangeMutationResult {
 }
 
 export interface JobPositionChangeMutationResult {
+  success?: true;
+  error?: string;
+}
+
+export interface SuperAdminLaborScopeMutationResult {
   success?: true;
   error?: string;
 }
@@ -195,6 +201,141 @@ export async function updateProfile(
 
   revalidatePath("/profile");
   revalidatePath("/", "layout");
+  return { success: true };
+}
+
+export async function updateSuperAdminLaborScope(
+  formData: FormData
+): Promise<SuperAdminLaborScopeMutationResult> {
+  const companyId = (formData.get("company_id") as string | null)?.trim();
+  const areaDepartmentId = (
+    formData.get("area_department_id") as string | null
+  )?.trim();
+  const departmentId = (
+    formData.get("department_id") as string | null
+  )?.trim();
+
+  if (!companyId) {
+    return { error: "Selecciona una empresa." };
+  }
+
+  if (!areaDepartmentId) {
+    return { error: "Selecciona un area o taller." };
+  }
+
+  if (!departmentId) {
+    return { error: "Selecciona un departamento operativo." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "No autenticado." };
+  }
+
+  const accountState = await getAccountGateState(user.id);
+  if (!isSuperAdmin(accountState?.role)) {
+    return {
+      error: "Solo un super admin puede cambiar su asignacion laboral directa.",
+    };
+  }
+
+  const adminClient = createAdminClient();
+  const [
+    { data: company, error: companyError },
+    { data: selectedArea, error: areaError },
+    { data: selectedDepartment, error: departmentError },
+    { data: departmentChildren, error: departmentChildrenError },
+  ] = await Promise.all([
+    adminClient
+      .from("companies")
+      .select("id")
+      .eq("id", companyId)
+      .maybeSingle(),
+    adminClient
+      .from("departments")
+      .select("id, company_id, parent_department_id, is_assignable, name")
+      .eq("id", areaDepartmentId)
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    adminClient
+      .from("departments")
+      .select("id, company_id, parent_department_id, is_assignable, name")
+      .eq("id", departmentId)
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    adminClient
+      .from("departments")
+      .select("id")
+      .eq("parent_department_id", departmentId)
+      .limit(1),
+  ]);
+
+  if (companyError || areaError || departmentError || departmentChildrenError) {
+    return {
+      error:
+        "No se pudo validar la asignacion con la estructura organizativa actual.",
+    };
+  }
+
+  if (!company) {
+    return { error: "Selecciona una empresa valida." };
+  }
+
+  const typedArea = (selectedArea as DepartmentRow | null) ?? null;
+  const typedDepartment = (selectedDepartment as DepartmentRow | null) ?? null;
+
+  if (!typedArea || typedArea.parent_department_id) {
+    return { error: "Selecciona un area o taller valido." };
+  }
+
+  if (!typedDepartment) {
+    return { error: "Selecciona un departamento operativo valido." };
+  }
+
+  const isOperationalDepartment =
+    typedDepartment.is_assignable && (departmentChildren?.length ?? 0) === 0;
+  const belongsToSelectedArea =
+    typedDepartment.parent_department_id === areaDepartmentId ||
+    typedDepartment.id === areaDepartmentId;
+
+  if (!isOperationalDepartment) {
+    return {
+      error:
+        "El destino debe ser un departamento operativo final, no un nodo padre.",
+    };
+  }
+
+  if (!belongsToSelectedArea) {
+    return {
+      error:
+        "El departamento elegido no pertenece al area o taller seleccionado.",
+    };
+  }
+
+  const { error } = await adminClient
+    .from("user_profiles")
+    .update({
+      company_id: companyId,
+      department_id: departmentId,
+      job_position_id: null,
+    })
+    .eq("id", user.id)
+    .eq("role", "super_admin");
+
+  if (error) {
+    return { error: "No se pudo actualizar la asignacion. " + error.message };
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/shifts");
+  revalidatePath("/shifts/new");
+  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
+
   return { success: true };
 }
 

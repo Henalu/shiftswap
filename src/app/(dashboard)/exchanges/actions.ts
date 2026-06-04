@@ -19,6 +19,7 @@ import {
   upsertHoursBankDebtTransaction,
 } from "@/lib/exchange-compensation-server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
+import { getShiftDurationHours } from "@/lib/shifts";
 import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { requireSignature } from "@/lib/user-profiles";
@@ -189,7 +190,8 @@ export async function signAsInterested(
     .select(
       `id, shift_id, user_a_id, user_b_id, status,
        signed_by_user_b_at, agreement_type,
-       compensation_shift_date, compensation_shift_type`,
+       compensation_shift_date, compensation_shift_type,
+       shift:shifts!shift_id(start_time, end_time)`,
     )
     .eq("id", exchangeId)
     .eq("user_b_id", user.id)
@@ -262,6 +264,12 @@ export async function signAsInterested(
   });
 
   if (exchange.agreement_type === "hours_bank") {
+    const shift = pickFirstRelation(exchange.shift);
+    const debtUnits = getShiftDurationHours(
+      shift?.start_time,
+      shift?.end_time,
+    );
+
     await upsertHoursBankDebtTransaction({
       exchangeId,
       exchangeStatus: "pending_validation",
@@ -269,6 +277,7 @@ export async function signAsInterested(
       creditorUserId: exchange.user_b_id,
       debtorName: ownerName,
       creditorName: signerName,
+      units: debtUnits,
     });
   }
 

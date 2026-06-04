@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { withdrawPendingCompensationProposalConflicts } from "@/lib/compensation-proposals";
+import {
+  cancelOpenShiftDateConflicts,
+  findActiveExchangeDateConflict,
+  withdrawPendingProposalDateConflicts,
+} from "@/lib/exchange-date-conflicts";
 import {
   findActiveExchangeSlotLock,
   isActiveExchangeSlotLockError,
@@ -11,6 +15,10 @@ import { getAgreementSummary } from "@/lib/exchange-compensation";
 import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
+import {
+  expireStaleOpenShifts,
+  isPastShiftPublicationDate,
+} from "@/lib/stale-shifts";
 import type { ShiftType } from "@/types";
 
 function revalidateShiftViews(shiftId: string) {
@@ -52,11 +60,17 @@ export async function acceptProposal(formData: FormData): Promise<void> {
 
   const { data: shift } = await supabase
     .from("shifts")
-    .select("user_id, status, department_id")
+    .select("user_id, status, department_id, date, shift_type")
     .eq("id", shiftId)
     .single();
 
   if (!shift || shift.user_id !== user.id || shift.status !== "open") return;
+
+  if (isPastShiftPublicationDate(shift.date)) {
+    await expireStaleOpenShifts({ shiftId });
+    revalidateShiftViews(shiftId);
+    return;
+  }
 
   const { data: activeExchange } = await supabase
     .from("exchanges")
@@ -123,6 +137,55 @@ export async function acceptProposal(formData: FormData): Promise<void> {
     !requesterProfile ||
     requesterProfile.department_id !== shift.department_id
   ) {
+    return;
+  }
+
+  const acceptedDates = [
+    shift.date,
+    request.agreement_type === "shift_exchange"
+      ? request.compensation_shift_date
+      : null,
+  ].filter((date): date is string => Boolean(date));
+
+  const [ownerDateConflict, requesterDateConflict] = await Promise.all([
+    findActiveExchangeDateConflict({
+      userId: user.id,
+      dates: acceptedDates,
+    }),
+    findActiveExchangeDateConflict({
+      userId: request.interested_user_id,
+      dates: acceptedDates,
+    }),
+  ]);
+
+  if (ownerDateConflict || requesterDateConflict) {
+    await supabase
+      .from("shift_requests")
+      .update({ status: "rejected" })
+      .eq("id", requestId)
+      .eq("status", "pending");
+
+    await createNotification({
+      userId: request.interested_user_id,
+      type: "proposal_rejected",
+      title: "Propuesta ya no disponible",
+      body: ownerDateConflict
+        ? "El publicador ya tiene otro cambio activo en una de las fechas implicadas."
+        : "Ya tienes otro cambio activo en una de las fechas implicadas.",
+      dedupeKey: `proposal_rejected:${requestId}`,
+      data: {
+        shift_id: shiftId,
+        action_url: `/shifts/${shiftId}`,
+      },
+    });
+
+    await resolveNotifications({
+      userId: user.id,
+      dedupeKey: `proposal_received:${requestId}`,
+      unresolvedOnly: true,
+    });
+
+    revalidateShiftViews(shiftId);
     return;
   }
 
@@ -240,24 +303,46 @@ export async function acceptProposal(formData: FormData): Promise<void> {
     .eq("status", "pending")
     .neq("id", requestId);
 
+  const [
+    ownerWithdrawnConflicts,
+    requesterWithdrawnConflicts,
+    ownerCancelledOpenShifts,
+    requesterCancelledOpenShifts,
+  ] = await Promise.all([
+    withdrawPendingProposalDateConflicts({
+      userId: user.id,
+      dates: acceptedDates,
+    }),
+    withdrawPendingProposalDateConflicts({
+      userId: request.interested_user_id,
+      dates: acceptedDates,
+      excludeRequestId: request.id,
+    }),
+    cancelOpenShiftDateConflicts({
+      userId: user.id,
+      dates: acceptedDates,
+      excludeShiftId: shiftId,
+    }),
+    cancelOpenShiftDateConflicts({
+      userId: request.interested_user_id,
+      dates: acceptedDates,
+    }),
+  ]);
+
+  const withdrawnConflicts = [
+    ...ownerWithdrawnConflicts,
+    ...requesterWithdrawnConflicts,
+  ];
+  const cancelledOpenShifts = [
+    ...ownerCancelledOpenShifts,
+    ...requesterCancelledOpenShifts,
+  ];
+
   await supabase
     .from("shifts")
     .update({ status: "negotiating" })
     .eq("id", shiftId)
     .eq("status", "open");
-
-  const withdrawnConflicts =
-    request.agreement_type === "shift_exchange" &&
-    request.compensation_shift_date &&
-    request.compensation_shift_type &&
-    request.compensation_shift_type !== "rest"
-      ? await withdrawPendingCompensationProposalConflicts({
-          interestedUserId: request.interested_user_id,
-          compensationShiftDate: request.compensation_shift_date,
-          compensationShiftType: request.compensation_shift_type,
-          excludeRequestId: request.id,
-        })
-      : [];
 
   if (exchangeId) {
     await recordExchangeEvent({
@@ -281,45 +366,56 @@ export async function acceptProposal(formData: FormData): Promise<void> {
     });
   }
 
-  const withdrawnShiftOwnerById = new Map<string, string>();
-
-  if (withdrawnConflicts.length > 0) {
-    const { data: withdrawnConflictShifts } = await supabase
-      .from("shifts")
-      .select("id, user_id")
-      .in(
-        "id",
-        withdrawnConflicts.map((conflict) => conflict.shift_id),
-      );
-
-    for (const shiftRow of withdrawnConflictShifts ?? []) {
-      withdrawnShiftOwnerById.set(shiftRow.id, shiftRow.user_id);
-    }
-  }
-
   for (const withdrawnConflict of withdrawnConflicts) {
     await resolveNotifications({
       dedupeKey: `proposal_received:${withdrawnConflict.id}`,
       unresolvedOnly: true,
     });
 
-    const shiftOwnerId = withdrawnShiftOwnerById.get(withdrawnConflict.shift_id);
-    if (shiftOwnerId) {
+    const withdrawnUserName =
+      withdrawnConflict.interestedUserId === request.interested_user_id
+        ? requesterName
+        : ownerName;
+
+    await createNotification({
+      userId: withdrawnConflict.shiftOwnerId,
+      type: "proposal_rejected",
+      title: "Propuesta retirada automaticamente",
+      body: `${withdrawnUserName} ya tiene un cambio aceptado en una de las fechas implicadas y esta propuesta deja de estar disponible.`,
+      dedupeKey: `proposal_rejected_owner:${withdrawnConflict.id}`,
+      data: {
+        shift_id: withdrawnConflict.shiftId,
+        request_id: withdrawnConflict.id,
+        action_url: "/shifts/my",
+      },
+    });
+
+    revalidatePath(`/shifts/${withdrawnConflict.shiftId}`);
+  }
+
+  for (const cancelledShift of cancelledOpenShifts) {
+    await resolveNotifications({
+      userId: cancelledShift.userId,
+      types: ["proposal_received"],
+      dataContains: { shift_id: cancelledShift.id },
+      unresolvedOnly: true,
+    });
+
+    for (const pendingRequest of cancelledShift.pendingRequests) {
       await createNotification({
-        userId: shiftOwnerId,
-        type: "proposal_rejected",
-        title: "Propuesta retirada automaticamente",
-        body: `${requesterName} ya ha comprometido el turno que ofrecia en otro intercambio y esta propuesta deja de estar disponible.`,
-        dedupeKey: `proposal_rejected_owner:${withdrawnConflict.id}`,
+        userId: pendingRequest.interested_user_id,
+        type: "shift_cancelled",
+        title: "Turno cancelado",
+        body: "El publicador ya tiene un cambio aceptado en esa fecha y esta publicacion se ha cerrado automaticamente.",
+        dedupeKey: `shift_cancelled:${cancelledShift.id}`,
         data: {
-          shift_id: withdrawnConflict.shift_id,
-          request_id: withdrawnConflict.id,
-          action_url: "/shifts/my",
+          shift_id: cancelledShift.id,
+          action_url: `/shifts/${cancelledShift.id}`,
         },
       });
     }
 
-    revalidatePath(`/shifts/${withdrawnConflict.shift_id}`);
+    revalidatePath(`/shifts/${cancelledShift.id}`);
   }
 
   await createNotification({

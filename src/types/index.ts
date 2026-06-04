@@ -162,6 +162,7 @@ export interface Company {
   name: string;
   slug: string;
   logo_url?: string;
+  theme_config?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -308,6 +309,7 @@ export interface Shift {
   end_time: string;
   shift_type: ShiftType;
   department_id: string;
+  direct_recipient_id?: string | null;
   description?: string;
   status: ShiftStatus;
   accepted_modalities: AcceptedModality[];
@@ -448,7 +450,7 @@ export interface ExchangeEvent {
 
 export interface Conversation {
   id: string;
-  shift_id: string;
+  shift_id: string | null;
   participant_a_id: string;
   participant_b_id: string;
   created_at: string;

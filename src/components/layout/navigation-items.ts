@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  WalletCards,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ export interface NavigationItem {
   label: string;
   description?: string;
   icon: LucideIcon;
+  tour?: string;
 }
 
 export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
@@ -35,36 +37,49 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Inicio",
     description: "Resumen rapido de tu dia y acciones pendientes.",
     icon: House,
+    tour: "nav-home",
   },
   {
     href: "/shifts",
     label: "Tablon",
     description: "Explora y filtra los turnos abiertos.",
     icon: CalendarDays,
+    tour: "nav-shifts",
   },
   {
     href: "/shifts/my",
     label: "Mis turnos",
     description: "Gestiona publicaciones y solicitudes recibidas.",
     icon: CalendarCheck,
+    tour: "nav-my-shifts",
   },
   {
     href: "/calendar",
     label: "Calendario",
     description: "Consulta tu horario mensual y vacaciones.",
     icon: CalendarRange,
+    tour: "nav-calendar",
   },
   {
     href: "/chat",
     label: "Chat",
-    description: "Habla con otros compañeros sobre cada cambio.",
+    description: "Habla con otros companeros sobre cada cambio.",
     icon: MessageSquare,
+    tour: "nav-chat",
   },
   {
     href: "/exchanges",
     label: "Cambios",
     description: "Revisa acuerdos, firmas y estado del expediente.",
     icon: Repeat,
+    tour: "nav-exchanges",
+  },
+  {
+    href: "/hours-bank",
+    label: "Bolsa horas",
+    description: "Consulta las horas pendientes con otros companeros.",
+    icon: WalletCards,
+    tour: "nav-hours-bank",
   },
 ];
 
@@ -83,12 +98,14 @@ export const ACCOUNT_NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Mi perfil",
     description: "Consulta tus datos y preferencias basicas.",
     icon: User,
+    tour: "nav-profile",
   },
   {
     href: "/help",
     label: "Ayuda",
     description: "Aprende como funciona la app y resuelve dudas.",
     icon: CircleHelp,
+    tour: "nav-help",
   },
   {
     href: "/billing",
@@ -109,6 +126,7 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
       label: "Aprobaciones",
       description: "Resuelve expedientes pendientes del equipo.",
       icon: ClipboardCheck,
+      tour: "nav-admin",
     },
     {
       href: "/admin/department-changes",
@@ -175,6 +193,8 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname === "/chat" || pathname.startsWith("/chat/");
     case "/exchanges":
       return pathname === "/exchanges" || pathname.startsWith("/exchanges/");
+    case "/hours-bank":
+      return pathname === "/hours-bank" || pathname.startsWith("/hours-bank/");
     case "/profile":
       return pathname === "/profile" || pathname.startsWith("/profile/");
     case "/help":

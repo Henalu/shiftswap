@@ -69,3 +69,40 @@ export function matchesShiftSchedule(
     normalizeShiftClock(endTime) === schedule.endTime
   );
 }
+
+function getClockMinutes(value: string | null | undefined): number | null {
+  const normalized = normalizeShiftClock(value);
+  const match = /^(\d{2}):(\d{2})$/.exec(normalized);
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+export function getShiftDurationHours(
+  startTime: string | null | undefined,
+  endTime: string | null | undefined,
+): number {
+  const startMinutes = getClockMinutes(startTime);
+  const endMinutes = getClockMinutes(endTime);
+
+  if (startMinutes === null || endMinutes === null) {
+    return 0;
+  }
+
+  const durationMinutes =
+    endMinutes > startMinutes
+      ? endMinutes - startMinutes
+      : endMinutes + 24 * 60 - startMinutes;
+
+  return durationMinutes / 60;
+}

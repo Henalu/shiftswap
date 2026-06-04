@@ -32,6 +32,7 @@ export function MobileBottomNav() {
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
+                data-tour={item.tour}
                 className={cn(
                   "group flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-[1.3rem] px-2 py-2 text-center outline-none transition-[background-color,color,transform] duration-200 ease-out focus-visible:ring-4 focus-visible:ring-primary/10 motion-reduce:transition-none",
                   isActive

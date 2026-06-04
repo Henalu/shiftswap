@@ -3,6 +3,13 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ShiftForm } from "./shift-form";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { todayISO, formatDateISO } from "@/lib/calendar";
 import { getUserCalendar } from "@/lib/calendar-data";
@@ -46,7 +53,42 @@ export default async function NewShiftPage() {
   }
 
   if (!profile?.department_id) {
-    redirect("/profile?setup=1");
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Publicacion"
+          title="Publicar nuevo turno"
+          description="Para publicar como trabajador necesitas tener un departamento operativo asignado."
+          action={
+            <Link href="/shifts">
+              <Button variant="ghost">
+                <ArrowLeft className="size-4" />
+                Volver a turnos
+              </Button>
+            </Link>
+          }
+        />
+        <Card className="max-w-3xl">
+          <CardHeader>
+            <CardTitle>Asigna primero tu departamento</CardTitle>
+            <CardDescription>
+              El tablon puede verse con permisos administrativos, pero una
+              publicacion de turno siempre debe salir de un departamento
+              operativo concreto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+              Ve a tu perfil, selecciona empresa, area y departamento operativo,
+              y vuelve a publicar. Asi el turno queda asociado al equipo correcto.
+            </p>
+            <Link href="/profile">
+              <Button>Ir a mi perfil</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const { data: department } = await adminClient

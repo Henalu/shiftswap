@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { isValidWorkDay } from "@/lib/calendar";
 import { getUserCalendarInput } from "@/lib/calendar-data";
 import { SHIFT_TYPE_LABELS } from "@/lib/constants";
-import { findActiveExchangeSlotLock } from "@/lib/exchange-slot-locks";
+import { findActiveExchangeDateConflict } from "@/lib/exchange-date-conflicts";
+import { getMadridDateInputValue } from "@/lib/exchange-compensation";
+import {
+  findActiveExchangeSlotLock,
+  isActiveExchangeSlotLockError,
+} from "@/lib/exchange-slot-locks";
 import {
   getShiftSchedule,
   isShiftType,
@@ -47,6 +52,12 @@ export async function createShift(
 
   if (!isShiftType(shiftType)) {
     return { error: "Selecciona un tipo de turno valido." };
+  }
+
+  if (date < getMadridDateInputValue()) {
+    return {
+      error: "No puedes publicar un turno de una fecha que ya ha pasado.",
+    };
   }
 
   const schedule = getShiftSchedule(shiftType);
@@ -145,6 +156,18 @@ export async function createShift(
     };
   }
 
+  const activeExchangeDateConflict = await findActiveExchangeDateConflict({
+    userId: user.id,
+    dates: [date],
+  });
+
+  if (activeExchangeDateConflict) {
+    return {
+      error:
+        "Ya tienes un cambio activo en esa fecha y no puedes publicar otro turno ese mismo dia.",
+    };
+  }
+
   const { error } = await supabase.from("shifts").insert({
     user_id: user.id,
     department_id: profile.department_id,
@@ -159,6 +182,13 @@ export async function createShift(
   });
 
   if (error) {
+    if (isActiveExchangeSlotLockError(error)) {
+      return {
+        error:
+          "Ese turno ya forma parte de un intercambio activo y no puede volver a publicarse.",
+      };
+    }
+
     return { error: error.message };
   }
 

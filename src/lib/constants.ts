@@ -215,6 +215,16 @@ export const CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS = {
   same_day_swap: "bg-fuchsia-500",
 } as const satisfies Record<CalendarExchangeOverlayKind, string>;
 
+export const CALENDAR_PUBLICATION_MARKER_LABELS = {
+  mine: "Mi publicacion",
+  other: "Publicaciones de otros",
+} as const;
+
+export const CALENDAR_PUBLICATION_MARKER_DOT_COLORS = {
+  mine: "bg-rose-500",
+  other: "bg-amber-400",
+} as const;
+
 export const SCHEDULE_TYPE_LABELS = {
   "3t5": "3T5 (turnos rotativos)",
   jornada_normal: "Jornada normal",

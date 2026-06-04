@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { ChatUserSearch } from "@/app/(dashboard)/chat/chat-user-search";
 import {
   EXCHANGE_STATUS_LABELS,
   EXCHANGE_STATUS_STYLES,
@@ -22,6 +23,28 @@ export default async function ChatPage() {
   } = await supabase.auth.getUser();
 
   if (!authUser) redirect("/login");
+
+  const { data: currentProfile } = await supabase
+    .from("user_profiles")
+    .select("company_id")
+    .eq("id", authUser.id)
+    .maybeSingle();
+
+  const availableUsersResult = currentProfile?.company_id
+    ? await supabase
+        .from("user_profiles")
+        .select(
+          `
+          id, full_name, email,
+          department:departments!department_id(id, name)
+        `,
+        )
+        .eq("validation_status", "approved")
+        .eq("company_id", currentProfile.company_id)
+        .neq("id", authUser.id)
+        .order("full_name", { ascending: true })
+    : { data: [] };
+  const availableUsers = availableUsersResult.data;
 
   const { data: conversations } = await supabase
     .from("conversations")
@@ -40,7 +63,7 @@ export default async function ChatPage() {
     )
     .order("updated_at", { ascending: false });
 
-  type Participant = { id: string; full_name: string };
+  type Participant = { id: string; full_name: string | null };
   type RawMessage = {
     id: string;
     content: string;
@@ -66,6 +89,17 @@ export default async function ChatPage() {
   };
 
   const typedConvs = (conversations ?? []) as unknown as RawConversation[];
+  const searchableUsers = ((availableUsers ?? []) as unknown as Array<{
+    id: string;
+    full_name: string | null;
+    email: string;
+    department: { id: string; name: string } | null;
+  }>).map((user) => ({
+    id: user.id,
+    fullName: user.full_name ?? user.email,
+    email: user.email,
+    departmentName: user.department?.name ?? null,
+  }));
   const shiftIds = typedConvs
     .map((conversation) => conversation.shift_id)
     .filter((id): id is string => id !== null);
@@ -92,14 +126,16 @@ export default async function ChatPage() {
       <PageHeader
         eyebrow="Negociacion"
         title="Chat"
-        description="Sigue las conversaciones activas, revisa el contexto del turno y entra rapido en el intercambio adecuado."
+        description="Busca companeros, abre conversaciones directas y envia propuestas privadas cuando ya sepas con quien quieres negociar."
       />
+
+      <ChatUserSearch users={searchableUsers} />
 
       {typedConvs.length === 0 ? (
         <EmptyState
           icon={<SearchX className="size-5" />}
           title="Todavia no tienes conversaciones"
-          description="Cuando muestres interes en un turno o se abra una negociacion, la conversacion aparecera aqui con su contexto."
+          description="Busca a una persona arriba para abrir un chat directo. Si luego quieres negociar, podras enviar una propuesta privada desde la conversacion."
           action={
             <Link href="/shifts">
               <Button variant="outline">Explorar turnos</Button>
@@ -113,6 +149,7 @@ export default async function ChatPage() {
               conversation.participant_a.id === authUser.id
                 ? conversation.participant_b
                 : conversation.participant_a;
+            const otherName = other.full_name ?? "Empleado";
 
             const sortedMessages = [...conversation.messages].sort(
               (a, b) =>
@@ -123,12 +160,12 @@ export default async function ChatPage() {
             const unread = conversation.messages.filter(
               (message) => !message.read && message.sender_id !== authUser.id
             ).length;
-            const initials = other.full_name
+            const initials = otherName
               .split(" ")
               .map((name) => name[0])
               .join("")
               .toUpperCase()
-              .slice(0, 2);
+              .slice(0, 2) || "U";
             const exchangeStatus = conversation.shift_id
               ? exchangesByShiftId.get(conversation.shift_id)
               : undefined;
@@ -150,15 +187,20 @@ export default async function ChatPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-base font-semibold tracking-[-0.02em] text-foreground">
-                          {other.full_name}
+                          {otherName}
                         </p>
                         {conversation.shift && (
                           <p className="truncate text-sm text-muted-foreground">
-                            {formatShortDate(conversation.shift.date)} ·{" "}
+                            {formatShortDate(conversation.shift.date)} -{" "}
                             {SHIFT_TYPE_LABELS[
                               conversation.shift.shift_type as ShiftType
                             ]}{" "}
-                            · {conversation.shift.department.name}
+                            - {conversation.shift.department.name}
+                          </p>
+                        )}
+                        {!conversation.shift && (
+                          <p className="truncate text-sm text-muted-foreground">
+                            Chat directo
                           </p>
                         )}
                       </div>

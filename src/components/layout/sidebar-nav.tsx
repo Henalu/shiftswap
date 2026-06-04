@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { GuidedHelpLaunchButton } from "@/components/layout/guided-help-tour";
 import type { UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 import {
   ACCOUNT_NAVIGATION_ITEMS,
   getAdminNavigationItems,
   isNavigationItemActive,
+  type NavigationItem,
   PRIMARY_NAVIGATION_ITEMS,
 } from "@/components/layout/navigation-items";
 
@@ -19,21 +21,14 @@ export function SidebarNav({ role }: SidebarNavProps) {
   const pathname = usePathname();
   const adminItems = getAdminNavigationItems(role);
 
-  const renderItem = ({
-    href,
-    label,
-    icon: Icon,
-  }: {
-    href: string;
-    label: string;
-    icon: (typeof PRIMARY_NAVIGATION_ITEMS)[number]["icon"];
-  }) => {
+  const renderItem = ({ href, label, icon: Icon, tour }: NavigationItem) => {
     const isActive = isNavigationItemActive(pathname, href);
 
     return (
       <Link
         key={href}
         href={href}
+        data-tour={tour}
         className={cn(
           "flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium transition-colors",
           isActive
@@ -76,7 +71,10 @@ export function SidebarNav({ role }: SidebarNavProps) {
         <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Cuenta
         </p>
-        <div className="space-y-1">{ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}</div>
+        <div className="space-y-1">
+          {ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}
+          <GuidedHelpLaunchButton className="w-full justify-start" />
+        </div>
       </div>
     </nav>
   );

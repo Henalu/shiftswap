@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { buildRequiredPasswordChangeAppMetadata } from "@/lib/auth/required-password-change";
 import { validatePasswordPolicy } from "@/lib/auth/password-policy";
 import {
+  buildCompanyThemeConfig,
+  normalizeHexColor,
+} from "@/lib/company-theme";
+import {
   canManagePlatform,
   canOperatePlatformUsers,
   getCurrentPlatformAccess,
@@ -25,18 +29,31 @@ const CREATABLE_USER_ROLES: readonly UserRole[] = [
 ];
 
 function getConsolePath(params: { error?: string; status?: string } = {}) {
+  return getPlatformFeedbackPath("/console", params);
+}
+
+function getPlatformFeedbackPath(
+  returnTo: string,
+  params: { error?: string; status?: string } = {}
+) {
   const searchParams = new URLSearchParams();
+  const path = returnTo === "/admin/platform" ? "/admin/platform" : "/console";
 
   if (params.error) searchParams.set("error", params.error);
   if (params.status) searchParams.set("status", params.status);
 
   const query = searchParams.toString();
-  return query ? `/console?${query}` : "/console";
+  return query ? `${path}?${query}` : path;
 }
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getReturnPath(formData: FormData) {
+  const value = getString(formData, "returnTo");
+  return value === "/admin/platform" ? "/admin/platform" : "/console";
 }
 
 function normalizeEmail(value: string) {
@@ -50,19 +67,19 @@ function isUuid(value: string) {
 async function requirePlatformAccess(options: {
   write?: boolean;
   userOperations?: boolean;
-}) {
+}, returnTo = "/console") {
   const access = await getCurrentPlatformAccess();
 
   if (!access.ok) {
-    redirect(getConsolePath({ error: access.error }));
+    redirect(getPlatformFeedbackPath(returnTo, { error: access.error }));
   }
 
   if (options.write && !canManagePlatform(access.admin)) {
-    redirect(getConsolePath({ error: "permission-denied" }));
+    redirect(getPlatformFeedbackPath(returnTo, { error: "permission-denied" }));
   }
 
   if (options.userOperations && !canOperatePlatformUsers(access.admin)) {
-    redirect(getConsolePath({ error: "permission-denied" }));
+    redirect(getPlatformFeedbackPath(returnTo, { error: "permission-denied" }));
   }
 
   return access;
@@ -168,6 +185,65 @@ export async function createPlatformCompanyAction(formData: FormData) {
 
   revalidatePath("/console");
   redirect(getConsolePath({ status: "company-created" }));
+}
+
+export async function updatePlatformCompanyThemeAction(formData: FormData) {
+  const returnTo = getReturnPath(formData);
+  const access = await requirePlatformAccess({ write: true }, returnTo);
+  const companyId = getString(formData, "companyId");
+  const rawAccentColor = getString(formData, "accentColor");
+  const accentColor = rawAccentColor ? normalizeHexColor(rawAccentColor) : null;
+
+  if (!isUuid(companyId) || (rawAccentColor && !accentColor)) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "invalid-company-theme" }));
+  }
+
+  const admin = createAdminClient();
+  const { data: company, error: companyError } = await admin
+    .from("companies")
+    .select("id, name, theme_config")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (companyError || !company) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  const typedCompany = company as {
+    id: string;
+    name: string;
+    theme_config: Record<string, unknown> | null;
+  };
+  const themeConfig = buildCompanyThemeConfig(
+    typedCompany.theme_config,
+    accentColor
+  );
+
+  const { error } = await admin
+    .from("companies")
+    .update({ theme_config: themeConfig })
+    .eq("id", companyId);
+
+  if (error) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-theme-save-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "company.theme.update",
+    actor: access.admin,
+    companyId,
+    metadata: {
+      accentColor,
+      companyName: typedCompany.name,
+    },
+    targetId: companyId,
+    targetType: "company",
+  });
+
+  revalidatePath("/admin/platform");
+  revalidatePath("/console");
+  revalidatePath("/home", "layout");
+  redirect(getPlatformFeedbackPath(returnTo, { status: "company-theme-updated" }));
 }
 
 export async function createPlatformDepartmentAction(formData: FormData) {

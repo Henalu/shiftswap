@@ -30,6 +30,10 @@ import {
 } from "@/lib/exchange-compensation";
 import { formatDateISO } from "@/lib/calendar";
 import { getUserCalendar } from "@/lib/calendar-data";
+import {
+  expireStaleOpenShifts,
+  isPastShiftPublicationDate,
+} from "@/lib/stale-shifts";
 import { formatDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import type { AcceptedModality, ExchangeAgreementType, RequestStatus, ShiftType, ShiftWithUser } from "@/types";
@@ -48,6 +52,8 @@ export default async function ShiftDetailPage({ params }: PageProps) {
   if (!authUser) {
     redirect("/login");
   }
+
+  await expireStaleOpenShifts({ shiftId: id });
 
   const { data: shiftData } = await supabase
     .from("shifts")
@@ -125,10 +131,13 @@ export default async function ShiftDetailPage({ params }: PageProps) {
       (request.status === "pending" || request.status === "accepted")
   );
   const canPropose = !isOwner && shift.status === "open" && !myActiveProposal;
+  const isExpiredByDate = isPastShiftPublicationDate(shift.date);
+  const canNegotiate =
+    canPropose && !isExpiredByDate;
   const showChatButton = !isOwner;
   const acceptedModalities = (shift.accepted_modalities ?? ["hours_bank", "shift_exchange"]) as AcceptedModality[];
   const shouldLoadProposalCalendar =
-    canPropose && acceptedModalities.includes("shift_exchange");
+    canNegotiate && acceptedModalities.includes("shift_exchange");
   const minCompensationDate = getMinimumCompensationDate();
   const compensationDateSeed = new Date(
     Number(minCompensationDate.slice(0, 4)),
@@ -216,7 +225,7 @@ export default async function ShiftDetailPage({ params }: PageProps) {
             )}
 
             <div className="flex flex-wrap gap-3">
-              {canPropose && (
+              {canNegotiate && (
                 <ProposeExchangeDialog
                   shiftId={shift.id}
                   acceptedModalities={acceptedModalities}

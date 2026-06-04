@@ -26,17 +26,28 @@ import { getShiftSchedule, isShiftType } from "@/lib/shifts";
 import { formatTimeRange, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
 import type { ShiftType } from "@/types";
 import { createShift } from "./actions";
+import { ShiftDatePicker } from "./shift-date-picker";
 
 interface ShiftFormProps {
   areaName: string;
   departmentName: string;
   calendarDays?: CalendarDay[] | null;
+  initialDate?: string;
+  initialShiftType?: ShiftType | null;
 }
 
-export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormProps) {
+export function ShiftForm({
+  areaName,
+  departmentName,
+  calendarDays,
+  initialDate = "",
+  initialShiftType = null,
+}: ShiftFormProps) {
   const [state, formAction] = useActionState(createShift, {});
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">("");
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">(
+    initialShiftType ?? "",
+  );
 
   // Build a lookup map for calendar hints
   const calendarMap = useMemo(() => {
@@ -112,17 +123,13 @@ export function ShiftForm({ areaName, departmentName, calendarDays }: ShiftFormP
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Fecha</Label>
-              <Input
+              <ShiftDatePicker
                 id="date"
                 name="date"
-                type="date"
-                required
-                min={new Date().toISOString().split("T")[0]}
                 value={selectedDate}
-                onChange={(e) => {
-                  const date = e.target.value;
+                calendarDays={calendarDays}
+                onChange={(date) => {
                   setSelectedDate(date);
-                  // Auto-populate shift type from calendar
                   if (calendarMap) {
                     const day = calendarMap.get(date);
                     if (day) {

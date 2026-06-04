@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronDown,
   KeyRound,
+  Palette,
   Plus,
   ShieldCheck,
   Users,
@@ -22,14 +23,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ColorPaletteField } from "@/components/ui/color-palette-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getCompanyThemeAccentColor } from "@/lib/company-theme";
 import {
   createPlatformCompanyAction,
   createPlatformDepartmentAction,
   createPlatformJobPositionAction,
   createPlatformUserAction,
   resetPlatformUserPasswordAction,
+  updatePlatformCompanyThemeAction,
   updatePlatformScheduleConfigAction,
 } from "@/lib/platform-console-actions";
 import {
@@ -56,6 +60,7 @@ interface CompanyRow {
   id: string;
   name: string;
   slug: string;
+  theme_config: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -107,8 +112,12 @@ const errorCopy: Record<string, string> = {
   "auth-user-not-found": "No se encontro la cuenta Auth del usuario.",
   "authentication-required": "Inicia sesion para abrir Console.",
   "company-create-failed": "No se pudo crear la empresa. Revisa el slug.",
+  "company-not-found": "No se encontro la empresa.",
+  "company-theme-save-failed": "No se pudo guardar el color corporativo.",
   "department-create-failed": "No se pudo crear el departamento.",
   forbidden: "Tu usuario no tiene rol activo de plataforma.",
+  "invalid-company-theme":
+    "Usa un color hexadecimal valido, por ejemplo #2563eb.",
   "invalid-company-name": "El nombre de empresa no es valido.",
   "invalid-company-slug":
     "El slug solo puede usar minusculas, numeros y guiones.",
@@ -137,6 +146,7 @@ const errorCopy: Record<string, string> = {
 
 const successCopy: Record<string, string> = {
   "company-created": "Empresa creada con area y departamento inicial.",
+  "company-theme-updated": "Color corporativo actualizado.",
   "department-created": "Departamento creado.",
   "job-position-created": "Puesto creado.",
   "password-reset":
@@ -350,7 +360,10 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
     { data: scheduleConfigs, error: scheduleConfigsError },
     { data: billingAccounts },
   ] = await Promise.all([
-    admin.from("companies").select("id, name, slug, created_at").order("name"),
+    admin
+      .from("companies")
+      .select("id, name, slug, theme_config, created_at")
+      .order("name"),
     admin
       .from("departments")
       .select("id, company_id, name, parent_department_id, is_assignable")
@@ -534,6 +547,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                   <th className="px-4 py-3 font-semibold">Usuarios</th>
                   <th className="px-4 py-3 font-semibold">Pendientes</th>
                   <th className="px-4 py-3 font-semibold">Departamentos</th>
+                  <th className="px-4 py-3 font-semibold">Color</th>
                   <th className="px-4 py-3 font-semibold">Billing</th>
                   <th className="px-4 py-3 font-semibold">Alta</th>
                 </tr>
@@ -545,6 +559,9 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                   );
                   const companyBilling = billingRows.find(
                     (billing) => billing.owner_company_id === company.id
+                  );
+                  const accentColor = getCompanyThemeAccentColor(
+                    company.theme_config
                   );
 
                   return (
@@ -571,6 +588,21 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                         }
                       </td>
                       <td className="px-4 py-3">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="size-4 rounded-full border border-border"
+                            style={
+                              accentColor
+                                ? { backgroundColor: accentColor }
+                                : undefined
+                            }
+                          />
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {accentColor ?? "por defecto"}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
                         <Badge variant="outline">
                           {companyBilling?.current_billing_state ?? "sin cuenta"}
                         </Badge>
@@ -584,6 +616,46 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
               </tbody>
             </table>
           </div>
+
+          {canManage ? (
+            <div className="mt-5 grid gap-3">
+              <div>
+                <h3 className="font-semibold">Color corporativo</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Solo el admin principal de plataforma puede cambiar el color
+                  visual del dashboard de cada empresa.
+                </p>
+              </div>
+              {companyRows.map((company) => (
+                <form
+                  action={updatePlatformCompanyThemeAction}
+                  className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
+                  key={`company-theme-${company.id}`}
+                >
+                  <input name="companyId" type="hidden" value={company.id} />
+                  <input name="returnTo" type="hidden" value="/console" />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{company.name}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {company.slug}
+                    </p>
+                  </div>
+                  <ColorPaletteField
+                    defaultValue={getCompanyThemeAccentColor(
+                      company.theme_config
+                    )}
+                    label="Color"
+                    name="accentColor"
+                    paletteLabel={`Paleta de ${company.name}`}
+                  />
+                  <Button type="submit" variant="outline">
+                    <Palette className="size-4" />
+                    Guardar color
+                  </Button>
+                </form>
+              ))}
+            </div>
+          ) : null}
 
           {canManage ? (
             <form

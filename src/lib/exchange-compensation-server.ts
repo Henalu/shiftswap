@@ -14,6 +14,7 @@ export async function upsertHoursBankDebtTransaction({
   creditorUserId,
   debtorName,
   creditorName,
+  units,
 }: {
   exchangeId: string;
   exchangeStatus: ExchangeStatus;
@@ -21,9 +22,11 @@ export async function upsertHoursBankDebtTransaction({
   creditorUserId: string;
   debtorName: string;
   creditorName: string;
+  units: number;
 }): Promise<void> {
   const supabase = createAdminClient();
   const status = getHoursBankTransactionStatusForExchange(exchangeStatus);
+  const normalizedUnits = Math.max(1, Math.round(units));
   const now = new Date().toISOString();
   const { error } = await supabase.from("shift_debt_transactions").upsert(
     {
@@ -31,11 +34,16 @@ export async function upsertHoursBankDebtTransaction({
       debtor_user_id: debtorUserId,
       creditor_user_id: creditorUserId,
       movement_type: "hours_bank_debt",
-      units: 1,
+      units: normalizedUnits,
       status,
-      description: getHoursBankDescription(debtorName, creditorName),
+      description: getHoursBankDescription(
+        debtorName,
+        creditorName,
+        normalizedUnits,
+      ),
       metadata: {
         agreement_type: "hours_bank",
+        units_kind: "hours",
       },
       approved_at: status === "active" ? now : null,
       voided_at: status === "voided" ? now : null,

@@ -17,12 +17,15 @@ import {
   EXCHANGE_AGREEMENT_LABELS,
   EXCHANGE_STATUS_LABELS,
   EXCHANGE_STATUS_STYLES,
+  REQUEST_STATUS_LABELS,
+  REQUEST_STATUS_STYLES,
   SHIFT_STATUS_LABELS,
   SHIFT_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
 import { formatCompensationDateLabel } from "@/lib/exchange-compensation";
+import { expireStaleOpenShifts } from "@/lib/stale-shifts";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import { acceptProposal, rejectProposal } from "./actions";
@@ -50,6 +53,7 @@ interface ShiftWithProposals {
   start_time: string;
   end_time: string;
   shift_type: string;
+  direct_recipient_id: string | null;
   status: string;
   description: string | null;
   department: { id: string; name: string };
@@ -80,11 +84,13 @@ export default async function MyShiftsPage() {
     redirect("/login");
   }
 
+  await expireStaleOpenShifts({ userId: authUser.id });
+
   const { data: shifts } = await supabase
     .from("shifts")
     .select(
       `
-      id, date, start_time, end_time, shift_type, status, description,
+      id, date, start_time, end_time, shift_type, direct_recipient_id, status, description,
       department:departments!department_id(id, name),
       shift_requests(
         id, shift_id, interested_user_id, agreement_type,
@@ -168,9 +174,17 @@ export default async function MyShiftsPage() {
               : "Ver detalle";
             const pendingProposals = shift.shift_requests.filter(
               (request) =>
+                !shift.direct_recipient_id &&
+                shift.status === "open" &&
                 request.status === "pending" &&
                 request.interested_user_id !== activeExchange?.user_b_id,
             );
+            const directProposal = shift.direct_recipient_id
+              ? shift.shift_requests.find(
+                  (request) =>
+                    request.interested_user_id === shift.direct_recipient_id,
+                )
+              : null;
             const hasPendingCancellationRequest =
               activeExchange?.status === "pending_validation" &&
               Boolean(activeExchange.cancellation_requested_by);
@@ -209,6 +223,11 @@ export default async function MyShiftsPage() {
                         <Badge variant="outline" className="text-foreground">
                           {shift.department.name}
                         </Badge>
+                        {shift.direct_recipient_id && (
+                          <Badge variant="outline" className="text-foreground">
+                            Directa
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -290,6 +309,46 @@ export default async function MyShiftsPage() {
                         </p>
                       </div>
                     </div>
+                  ) : shift.direct_recipient_id ? (
+                    <div className="rounded-2xl border border-border/70 bg-secondary/45 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Users className="size-4 text-primary" />
+                            Propuesta directa enviada
+                          </div>
+                          <p className="text-sm font-medium text-foreground">
+                            {directProposal?.requester.full_name ??
+                              "Destinatario"}
+                          </p>
+                          {directProposal?.requester.email && (
+                            <p className="text-sm text-muted-foreground">
+                              {directProposal.requester.email}
+                            </p>
+                          )}
+                        </div>
+                        {directProposal && (
+                          <Badge
+                            className={
+                              REQUEST_STATUS_STYLES[
+                                directProposal.status as keyof typeof REQUEST_STATUS_STYLES
+                              ]
+                            }
+                          >
+                            {
+                              REQUEST_STATUS_LABELS[
+                                directProposal.status as keyof typeof REQUEST_STATUS_LABELS
+                              ]
+                            }
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                        {directProposal?.status === "pending"
+                          ? "Esta propuesta no aparece en el tablon. Queda pendiente de respuesta por la persona destinataria."
+                          : "Esta propuesta directa ya no admite acciones desde aqui."}
+                      </p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -299,7 +358,9 @@ export default async function MyShiftsPage() {
 
                       {pendingProposals.length === 0 ? (
                         <p className="rounded-2xl border border-dashed border-border/80 bg-secondary/35 px-4 py-6 text-sm text-muted-foreground">
-                          Todavia nadie ha propuesto por este turno.
+                          {shift.status === "open"
+                            ? "Todavia nadie ha propuesto por este turno."
+                            : "Esta publicacion ya esta cerrada y no admite mas propuestas."}
                         </p>
                       ) : (
                         <ul className="space-y-3">

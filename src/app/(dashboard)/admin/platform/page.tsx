@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  AlertCircle,
   Building2,
   CalendarDays,
+  CheckCircle2,
+  Palette,
   Repeat,
   TrendingUp,
   Users,
@@ -16,11 +19,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ColorPaletteField } from "@/components/ui/color-palette-field";
 import { PageHeader } from "@/components/ui/page-header";
+import { getCompanyThemeAccentColor } from "@/lib/company-theme";
+import {
+  canManagePlatform,
+  getActivePlatformAdminForUser,
+} from "@/lib/platform-console";
+import { updatePlatformCompanyThemeAction } from "@/lib/platform-console-actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import { isSuperAdmin, USER_ROLE_LABELS } from "@/lib/user-roles";
+import { cn } from "@/lib/utils";
 import type {
   BillingAccessState,
   BillingInterval,
@@ -34,6 +45,7 @@ interface CompanyRow {
   id: string;
   name: string;
   slug: string;
+  theme_config: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -105,6 +117,56 @@ interface ExchangeRow {
 function pickRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+const errorCopy: Record<string, string> = {
+  "authentication-required": "Inicia sesion para continuar.",
+  "company-not-found": "No se encontro la empresa.",
+  "company-theme-save-failed": "No se pudo guardar el color corporativo.",
+  forbidden: "Tu usuario no tiene rol activo de plataforma.",
+  "invalid-company-theme":
+    "Usa un color hexadecimal valido, por ejemplo #2563eb.",
+  "permission-denied":
+    "Solo el admin principal de plataforma puede cambiar el color.",
+};
+
+const successCopy: Record<string, string> = {
+  "company-theme-updated": "Color corporativo actualizado.",
+};
+
+function Feedback({
+  error,
+  status,
+}: {
+  error?: string;
+  status?: string;
+}) {
+  const errorMessage = error ? errorCopy[error] ?? errorCopy.forbidden : null;
+  const successMessage = status ? successCopy[status] : null;
+
+  if (!errorMessage && !successMessage) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border px-4 py-3 text-sm",
+        errorMessage
+          ? "border-destructive/20 bg-destructive/10 text-destructive"
+          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-800"
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {errorMessage ? (
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+        ) : (
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+        )}
+        <p>{errorMessage ?? successMessage}</p>
+      </div>
+    </div>
+  );
 }
 
 function monthKey(date: Date | string) {
@@ -192,7 +254,17 @@ function StatCard({
   );
 }
 
-export default async function PlatformAdminPage() {
+interface PlatformAdminPageProps {
+  searchParams: Promise<{
+    error?: string;
+    status?: string;
+  }>;
+}
+
+export default async function PlatformAdminPage({
+  searchParams,
+}: PlatformAdminPageProps) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -207,6 +279,8 @@ export default async function PlatformAdminPage() {
     redirect("/admin/exchanges");
   }
 
+  const platformAdmin = await getActivePlatformAdminForUser(user.id);
+  const canManageCompanyTheme = canManagePlatform(platformAdmin);
   const admin = createAdminClient();
   const buckets = buildMonthBuckets();
   const since = new Date();
@@ -221,7 +295,10 @@ export default async function PlatformAdminPage() {
     { data: shifts, error: shiftsError },
     { data: exchanges, error: exchangesError },
   ] = await Promise.all([
-    admin.from("companies").select("id, name, slug, created_at").order("name"),
+    admin
+      .from("companies")
+      .select("id, name, slug, theme_config, created_at")
+      .order("name"),
     admin
       .from("user_profiles")
       .select("id, full_name, email, role, company_id, validation_status, created_at")
@@ -305,6 +382,8 @@ export default async function PlatformAdminPage() {
           </div>
         }
       />
+
+      <Feedback error={params.error} status={params.status} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -464,6 +543,7 @@ export default async function PlatformAdminPage() {
                 <th className="py-3 pr-4 font-semibold">Pendientes</th>
                 <th className="py-3 pr-4 font-semibold">Turnos mes</th>
                 <th className="py-3 pr-4 font-semibold">Cambios mes</th>
+                <th className="py-3 pr-4 font-semibold">Color</th>
                 <th className="py-3 font-semibold">Billing</th>
               </tr>
             </thead>
@@ -493,6 +573,9 @@ export default async function PlatformAdminPage() {
                     ?.current_billing_state ??
                   companyBilling[0]?.current_billing_state ??
                   "inactive";
+                const accentColor = getCompanyThemeAccentColor(
+                  company.theme_config
+                );
 
                 return (
                   <tr key={company.id}>
@@ -510,6 +593,21 @@ export default async function PlatformAdminPage() {
                     </td>
                     <td className="py-4 pr-4">{companyShifts}</td>
                     <td className="py-4 pr-4">{companyExchanges}</td>
+                    <td className="py-4 pr-4">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-4 rounded-full border border-border"
+                          style={
+                            accentColor
+                              ? { backgroundColor: accentColor }
+                              : undefined
+                          }
+                        />
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {accentColor ?? "por defecto"}
+                        </span>
+                      </span>
+                    </td>
                     <td className="py-4">
                       <Badge variant="outline">{commercialState}</Badge>
                     </td>
@@ -518,6 +616,50 @@ export default async function PlatformAdminPage() {
               })}
             </tbody>
           </table>
+
+          {canManageCompanyTheme ? (
+            <div className="mt-5 grid gap-3">
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  Color corporativo
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Este ajuste cambia los acentos visuales del dashboard de la
+                  empresa.
+                </p>
+              </div>
+              {companyRows.map((company) => (
+                <form
+                  action={updatePlatformCompanyThemeAction}
+                  className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
+                  key={`platform-company-theme-${company.id}`}
+                >
+                  <input name="companyId" type="hidden" value={company.id} />
+                  <input name="returnTo" type="hidden" value="/admin/platform" />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-foreground">
+                      {company.name}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {company.slug}
+                    </p>
+                  </div>
+                  <ColorPaletteField
+                    defaultValue={getCompanyThemeAccentColor(
+                      company.theme_config
+                    )}
+                    label="Color"
+                    name="accentColor"
+                    paletteLabel={`Paleta de ${company.name}`}
+                  />
+                  <Button type="submit" variant="outline">
+                    <Palette className="size-4" />
+                    Guardar color
+                  </Button>
+                </form>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

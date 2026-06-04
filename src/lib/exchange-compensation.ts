@@ -128,9 +128,12 @@ export function getCompensationShiftTypeLabel(
 
 export function getHoursBankDescription(
   debtorName: string,
-  creditorName: string
+  creditorName: string,
+  units = 1,
 ): string {
-  return `${debtorName} queda debiendo 1 turno a ${creditorName} dentro de la bolsa de horas.`;
+  return `${debtorName} queda debiendo ${units} hora${
+    units === 1 ? "" : "s"
+  } a ${creditorName} dentro de la bolsa de horas.`;
 }
 
 export function getShiftDebtStatusLabel(

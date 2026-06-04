@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
+import type { CSSProperties } from "react";
+import { GuidedHelpTour } from "@/components/layout/guided-help-tour";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { OnboardingModal } from "@/components/layout/onboarding-modal";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { AlertTriangle } from "lucide-react";
 import { resolveBillingGateState } from "@/lib/billing";
+import {
+  getCompanyThemeCssVariables,
+  type CompanyThemeCssVariables,
+} from "@/lib/company-theme";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -13,6 +19,8 @@ import {
 } from "@/lib/user-profiles";
 import { getActivePlatformAdminForUser } from "@/lib/platform-console";
 import type { Notification } from "@/types";
+
+type CompanyThemeStyle = CSSProperties & CompanyThemeCssVariables;
 
 export default async function DashboardLayout({
   children,
@@ -79,17 +87,30 @@ export default async function DashboardLayout({
   const showOnboarding = !(onboardingRow as { onboarding_completed_at: string | null } | null)?.onboarding_completed_at;
 
   let companyName: string | undefined;
+  let companyThemeStyle: CompanyThemeStyle | undefined;
+
   if (accountState?.company_id) {
     const { data: company } = await supabase
       .from("companies")
-      .select("name")
+      .select("name, theme_config")
       .eq("id", accountState.company_id)
       .maybeSingle();
-    companyName = (company as { name?: string } | null)?.name ?? undefined;
+    const typedCompany = company as {
+      name?: string;
+      theme_config?: Record<string, unknown> | null;
+    } | null;
+    companyName = typedCompany?.name ?? undefined;
+    companyThemeStyle = getCompanyThemeCssVariables(
+      typedCompany?.theme_config
+    ) as CompanyThemeStyle | undefined;
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div
+      className="flex min-h-screen flex-col"
+      data-company-theme={companyThemeStyle ? "custom" : "default"}
+      style={companyThemeStyle}
+    >
       <Header
         user={profile}
         companyName={companyName}
@@ -132,6 +153,7 @@ export default async function DashboardLayout({
       </div>
       <MobileBottomNav />
       {showOnboarding && <OnboardingModal />}
+      <GuidedHelpTour autoStart={!showOnboarding} role={role} />
     </div>
   );
 }

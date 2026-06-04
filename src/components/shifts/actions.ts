@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidCompensationDay } from "@/lib/calendar";
 import { getUserCalendarInput } from "@/lib/calendar-data";
+import { findActiveExchangeDateConflict } from "@/lib/exchange-date-conflicts";
 import { findActiveExchangeSlotLock } from "@/lib/exchange-slot-locks";
 import { createNotification, resolveNotifications } from "@/lib/notifications";
 import {
@@ -14,6 +15,10 @@ import {
 import { isCompensationShiftType } from "@/lib/shifts";
 import { requireSignature } from "@/lib/user-profiles";
 import { formatShortDate } from "@/lib/utils";
+import {
+  expireStaleOpenShifts,
+  isPastShiftPublicationDate,
+} from "@/lib/stale-shifts";
 
 export interface ProposalState {
   error?: string;
@@ -51,7 +56,9 @@ export async function proposeExchange(
       .maybeSingle(),
     supabase
       .from("shifts")
-      .select("id, user_id, department_id, status, accepted_modalities")
+      .select(
+        "id, user_id, department_id, status, accepted_modalities, date, shift_type",
+      )
       .eq("id", shiftId)
       .maybeSingle(),
   ]);
@@ -66,6 +73,18 @@ export async function proposeExchange(
     return { error: "Este turno ya no esta disponible." };
   }
 
+  if (isPastShiftPublicationDate(shift.date)) {
+    await expireStaleOpenShifts({ shiftId });
+    revalidatePath("/shifts");
+    revalidatePath(`/shifts/${shiftId}`);
+    revalidatePath("/shifts/my");
+
+    return {
+      error:
+        "Esta publicacion ya ha caducado porque la fecha del turno ya paso.",
+    };
+  }
+
   if (shift.department_id !== profile.department_id) {
     return {
       error: "Solo puedes proponer en turnos de tu propio departamento.",
@@ -75,6 +94,18 @@ export async function proposeExchange(
   const modalities = (shift.accepted_modalities ?? []) as string[];
   if (!modalities.includes(agreementTypeValue)) {
     return { error: "El publicador no acepta este tipo de acuerdo." };
+  }
+
+  const targetDateConflict = await findActiveExchangeDateConflict({
+    userId: user.id,
+    dates: [shift.date],
+  });
+
+  if (targetDateConflict) {
+    return {
+      error:
+        "Ya tienes un cambio activo en la fecha de este turno. No puedes negociar otro cambio el mismo dia.",
+    };
   }
 
   // Check if user already has an active proposal
@@ -144,6 +175,18 @@ export async function proposeExchange(
       return {
         error:
           "Ese turno ya esta comprometido en un intercambio aceptado y no puedes volver a ofrecerlo.",
+      };
+    }
+
+    const compensationDateConflict = await findActiveExchangeDateConflict({
+      userId: user.id,
+      dates: [compensationShiftDate],
+    });
+
+    if (compensationDateConflict) {
+      return {
+        error:
+          "Ya tienes un cambio activo en la fecha del turno que ofreces. No puedes negociar otro cambio el mismo dia.",
       };
     }
   }

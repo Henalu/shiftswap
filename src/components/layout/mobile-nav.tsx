@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { GuidedHelpLaunchButton } from "@/components/layout/guided-help-tour";
 import { ChevronRight, LogOut, ShieldCheck, X } from "lucide-react";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export function MobileNav({
         <Link
           href={item.href}
           aria-current={active ? "page" : undefined}
+          data-tour={item.tour}
           className={cn(
             "group flex items-center gap-4 rounded-[1.6rem] border px-4 py-3.5 text-left outline-none transition-[border-color,background-color,box-shadow,transform] duration-200 ease-out focus-visible:ring-4 focus-visible:ring-primary/10 motion-reduce:transition-none",
             active
@@ -226,6 +228,11 @@ export function MobileNav({
                   </p>
                   <div className="space-y-1.5">
                     {ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}
+                    <GuidedHelpLaunchButton
+                      className="min-h-11 w-full justify-start rounded-[1.6rem] py-3.5"
+                      label="Guia inicial"
+                      onLaunch={() => setIsOpen(false)}
+                    />
                   </div>
                 </section>
 

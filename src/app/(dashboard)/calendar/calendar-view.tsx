@@ -1,16 +1,30 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ShiftForm } from "@/app/(dashboard)/shifts/new/shift-form";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn, PANEL_CLASSNAME } from "@/lib/utils";
 import {
   CALENDAR_EXCHANGE_OVERLAY_DOT_COLORS,
   CALENDAR_EXCHANGE_OVERLAY_LABELS,
   CALENDAR_DAY_TYPE_LABELS,
   CALENDAR_DAY_TYPE_DOT_COLORS,
+  CALENDAR_PUBLICATION_MARKER_DOT_COLORS,
+  CALENDAR_PUBLICATION_MARKER_LABELS,
 } from "@/lib/constants";
-import type { CalendarDay } from "@/lib/calendar";
+import {
+  calendarDayTypeToShiftType,
+  type CalendarDay,
+} from "@/lib/calendar";
 import type { CalendarDayType, CalendarExchangeOverlayKind } from "@/types";
 import { CalendarDayCell } from "@/app/(dashboard)/calendar/calendar-day-cell";
 
@@ -32,6 +46,15 @@ const EXCHANGE_LEGEND_ITEMS: CalendarExchangeOverlayKind[] = [
   "same_day_swap",
 ];
 
+export interface CalendarPublicationMarker {
+  date: string;
+  mineCount: number;
+  otherCount: number;
+  boardHref: string;
+}
+
+const EMPTY_PUBLICATION_MARKERS: CalendarPublicationMarker[] = [];
+
 interface CalendarViewProps {
   days: CalendarDay[];
   monthLabel: string;
@@ -40,6 +63,11 @@ interface CalendarViewProps {
   nextMonth: string;
   year: number;
   month: number;
+  publicationScope?: {
+    areaName: string;
+    departmentName: string;
+  } | null;
+  publicationMarkers?: CalendarPublicationMarker[];
 }
 
 export function CalendarView({
@@ -50,7 +78,23 @@ export function CalendarView({
   nextMonth,
   year,
   month,
+  publicationScope = null,
+  publicationMarkers = EMPTY_PUBLICATION_MARKERS,
 }: CalendarViewProps) {
+  const [publishDay, setPublishDay] = useState<CalendarDay | null>(null);
+  const publicationMarkerByDate = useMemo(
+    () =>
+      new Map(
+        publicationMarkers.map((marker) => [marker.date, marker] as const)
+      ),
+    [publicationMarkers]
+  );
+  const hasMyPublicationMarkers = publicationMarkers.some(
+    (marker) => marker.mineCount > 0
+  );
+  const hasOtherPublicationMarkers = publicationMarkers.some(
+    (marker) => marker.otherCount > 0
+  );
   // Calculate offset: what day of the week is the 1st?
   // ISO: Mon=1 ... Sun=7
   const firstDate = new Date(year, month - 1, 1);
@@ -69,7 +113,12 @@ export function CalendarView({
     presentExchangeTypes.has(kind),
   );
 
+  const publishShiftType = publishDay
+    ? calendarDayTypeToShiftType(publishDay.dayType)
+    : null;
+
   return (
+    <>
     <div className={cn(PANEL_CLASSNAME, "overflow-hidden")}>
       {/* Header with month navigation */}
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-6">
@@ -120,27 +169,46 @@ export function CalendarView({
           }
           return weeks.map((week, wi) => (
             <div key={wi} role="row" className="grid grid-cols-7 gap-px">
-              {week.map((day, di) =>
-                day ? (
+              {week.map((day, di) => {
+                if (!day) {
+                  return (
+                    <div
+                      key={`empty-${wi}-${di}`}
+                      role="gridcell"
+                      aria-hidden="true"
+                      className="min-h-[3.5rem] bg-background sm:min-h-[4.5rem]"
+                    />
+                  );
+                }
+
+                const publicationMarker = publicationMarkerByDate.get(day.date);
+
+                return (
                   <div key={day.date} role="gridcell" className="bg-background">
-                    <CalendarDayCell day={day} isToday={day.date === today} />
+                    <CalendarDayCell
+                      day={day}
+                      isToday={day.date === today}
+                      onPublish={
+                        publicationScope && day.date >= today
+                          ? () => setPublishDay(day)
+                          : undefined
+                      }
+                      publicationMarker={publicationMarker}
+                      boardHref={publicationMarker?.boardHref}
+                    />
                   </div>
-                ) : (
-                  <div
-                    key={`empty-${wi}-${di}`}
-                    role="gridcell"
-                    aria-hidden="true"
-                    className="min-h-[3.5rem] bg-background sm:min-h-[4.5rem]"
-                  />
-                )
-              )}
+                );
+              })}
             </div>
           ));
         })()}
       </div>
 
       {/* Legend */}
-      {(activeLegend.length > 0 || activeExchangeLegend.length > 0) && (
+      {(activeLegend.length > 0 ||
+        activeExchangeLegend.length > 0 ||
+        hasMyPublicationMarkers ||
+        hasOtherPublicationMarkers) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border/40 px-4 py-3 sm:px-6">
           {activeLegend.map((type) => (
             <div key={type} className="flex items-center gap-1.5">
@@ -170,8 +238,66 @@ export function CalendarView({
               </span>
             </div>
           ))}
+          {hasMyPublicationMarkers && (
+            <div className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "size-2.5 rounded-full",
+                  CALENDAR_PUBLICATION_MARKER_DOT_COLORS.mine
+                )}
+              />
+              <span className="text-[11px] text-muted-foreground">
+                {CALENDAR_PUBLICATION_MARKER_LABELS.mine}
+              </span>
+            </div>
+          )}
+          {hasOtherPublicationMarkers && (
+            <div className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "size-2.5 rounded-full",
+                  CALENDAR_PUBLICATION_MARKER_DOT_COLORS.other
+                )}
+              />
+              <span className="text-[11px] text-muted-foreground">
+                {CALENDAR_PUBLICATION_MARKER_LABELS.other}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
+
+    <Dialog
+      open={Boolean(publishDay)}
+      onOpenChange={(open) => {
+        if (!open) {
+          setPublishDay(null);
+        }
+      }}
+    >
+      <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto border-0 bg-transparent p-0 shadow-none sm:rounded-xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Publicar turno desde calendario</DialogTitle>
+          <DialogDescription>
+            Formulario de publicacion con la fecha y el turno del calendario
+            precargados.
+          </DialogDescription>
+        </DialogHeader>
+        {publishDay && publicationScope && (
+          <ShiftForm
+            key={publishDay.date}
+            areaName={publicationScope.areaName}
+            departmentName={publicationScope.departmentName}
+            calendarDays={days}
+            initialDate={publishDay.date}
+            initialShiftType={publishShiftType}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
