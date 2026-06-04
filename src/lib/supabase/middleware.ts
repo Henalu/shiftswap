@@ -3,6 +3,10 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from '@/lib/auth/required-password-change';
 import { resolveBillingGateState } from '@/lib/billing';
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import type { AccountGateState } from '@/lib/user-profiles';
@@ -66,6 +70,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password');
   const isBillingPage = pathname.startsWith('/billing');
+  const isConsolePage = pathname.startsWith('/console');
   const isPendingValidationPage = pathname.startsWith('/pending-validation');
   const isAuthApiRoute = pathname.startsWith('/api/auth');
   const isHealthRoute = pathname.startsWith('/api/health');
@@ -97,6 +102,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user) {
+    return supabaseResponse;
+  }
+
+  const passwordChangeRequired = isPasswordChangeRequired(user);
+
+  if (passwordChangeRequired && !pathname.startsWith('/reset-password')) {
+    const url = request.nextUrl.clone();
+    url.pathname = getRequiredPasswordChangePath().split("?")[0];
+    url.search = getRequiredPasswordChangePath().split("?")[1] ?? "";
+    return withPrivateAppCacheHeaders(NextResponse.redirect(url));
+  }
+
+  if (isConsolePage) {
     return supabaseResponse;
   }
 

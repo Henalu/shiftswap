@@ -7,6 +7,10 @@ import {
   consumeRateLimit,
   getRequestIp,
 } from "@/lib/rate-limit";
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from "@/lib/auth/required-password-change";
 import { createClient } from "@/lib/supabase/server";
 
 export interface LoginActionState {
@@ -56,7 +60,7 @@ export async function loginWithPassword(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -68,6 +72,10 @@ export async function loginWithPassword(
           ? "Email o contraseña incorrectos."
           : error.message,
     };
+  }
+
+  if (isPasswordChangeRequired(data.user)) {
+    redirect(getRequiredPasswordChangePath());
   }
 
   redirect("/shifts");

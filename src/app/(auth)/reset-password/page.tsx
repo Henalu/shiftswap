@@ -1,11 +1,7 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { KeyRound } from "lucide-react";
+import { updatePassword } from "@/app/(auth)/reset-password/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -14,142 +10,98 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/server";
 
-export default function ResetPasswordPage() {
-  const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
+interface ResetPasswordPageProps {
+  searchParams: Promise<{
+    error?: string;
+    reason?: string;
+  }>;
+}
 
-  useEffect(() => {
-    const supabase = createClient();
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSessionReady(Boolean(data.session));
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionReady(Boolean(session));
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    if (password.length < 8) {
-      setError("La nueva contraseña debe tener al menos 8 caracteres.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Las dos contraseñas deben coincidir.");
-      return;
-    }
-
-    setLoading(true);
-    const supabase = createClient();
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-    });
-    setLoading(false);
-
-    if (updateError) {
-      setError(
-        "No se pudo actualizar la contraseña. " + updateError.message
-      );
-      return;
-    }
-
-    setSuccess(true);
-    setTimeout(() => {
-      router.push("/login");
-      router.refresh();
-    }, 1200);
-  }
+export default async function ResetPasswordPage({
+  searchParams,
+}: ResetPasswordPageProps) {
+  const params = await searchParams;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const hasSession = Boolean(user);
+  const isTemporaryPassword = params.reason === "temporary-password";
 
   return (
     <Card className="border-border/80">
       <CardHeader className="space-y-3">
+        <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <KeyRound className="size-5" />
+        </div>
         <div className="space-y-2">
-          <CardTitle>Definir nueva contraseña</CardTitle>
+          <CardTitle>Definir nueva contrasena</CardTitle>
           <CardDescription>
-            Crea una contraseña nueva para volver a entrar con seguridad.
+            {isTemporaryPassword
+              ? "Tu acceso usa una contrasena temporal. Cambiala antes de entrar."
+              : "Crea una contrasena nueva para volver a entrar con seguridad."}
           </CardDescription>
         </div>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
+      <form action={updatePassword}>
         <CardContent className="space-y-5">
-          {error ? (
+          {params.error ? (
             <p className="rounded-2xl border border-destructive/15 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
+              {params.error}
             </p>
           ) : null}
 
-          {success ? (
-            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
-              Contrasena actualizada. Te llevamos al login en un momento.
-            </div>
-          ) : null}
-
-          {!sessionReady ? (
+          {!hasSession ? (
             <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
-              Abre esta pantalla desde el enlace de recuperacion que recibiste
-              por email. Si el enlace ha caducado, vuelve a solicitar uno.
+              Abre esta pantalla desde el enlace de recuperacion o vuelve a
+              iniciar sesion con tu contrasena temporal.
             </div>
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="password">Nueva contraseña</Label>
+            <Label htmlFor="password">Nueva contrasena</Label>
             <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={8}
               autoComplete="new-password"
+              disabled={!hasSession}
+              id="password"
+              minLength={8}
+              name="password"
+              required
+              type="password"
             />
+            <p className="text-xs text-muted-foreground">
+              Minimo 8 caracteres, con al menos una letra y un numero.
+            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm_password">Repite la contraseña</Label>
+            <Label htmlFor="confirmPassword">Repite la contrasena</Label>
             <Input
-              id="confirm_password"
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              minLength={8}
               autoComplete="new-password"
+              disabled={!hasSession}
+              id="confirmPassword"
+              minLength={8}
+              name="confirmPassword"
+              required
+              type="password"
             />
           </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || success || !sessionReady}
-          >
-            {loading ? "Guardando..." : "Actualizar contraseña"}
+          <Button className="w-full" disabled={!hasSession} type="submit">
+            Actualizar contrasena
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Prefieres volver al acceso normal?{" "}
             <Link
-              href="/login"
               className="font-medium text-primary underline-offset-4 hover:underline"
+              href="/login"
             >
               Ir al login
             </Link>

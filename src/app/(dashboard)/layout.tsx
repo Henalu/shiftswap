@@ -11,6 +11,7 @@ import {
   getAccountGateState,
   USER_PROFILE_PUBLIC_SELECT,
 } from "@/lib/user-profiles";
+import { getActivePlatformAdminForUser } from "@/lib/platform-console";
 import type { Notification } from "@/types";
 
 export default async function DashboardLayout({
@@ -29,9 +30,10 @@ export default async function DashboardLayout({
 
   const adminClient = createAdminClient();
 
-  const [accountState, { data: profile }, { data: notifications }, unreadResult, { data: onboardingRow }] =
+  const [accountState, platformAdmin, { data: profile }, { data: notifications }, unreadResult, { data: onboardingRow }] =
     await Promise.all([
       getAccountGateState(authUser.id),
+      getActivePlatformAdminForUser(authUser.id),
       supabase
         .from("user_profiles")
         .select(USER_PROFILE_PUBLIC_SELECT)
@@ -93,6 +95,7 @@ export default async function DashboardLayout({
         companyName={companyName}
         initialNotifications={typedNotifications}
         initialUnreadCount={unreadCount}
+        canAccessPlatformConsole={Boolean(platformAdmin)}
         role={role}
       />
       <div className="mx-auto flex w-full max-w-7xl flex-1">

@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
-import { LogOut, Repeat, User } from "lucide-react";
+import { LogOut, Repeat, ShieldCheck, User } from "lucide-react";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import type { Notification, UserProfile, UserRole } from "@/types";
 
@@ -40,6 +40,7 @@ interface HeaderProps {
   companyName?: string;
   initialNotifications: Notification[];
   initialUnreadCount: number;
+  canAccessPlatformConsole?: boolean;
   role: UserRole;
 }
 
@@ -48,6 +49,7 @@ export function Header({
   companyName,
   initialNotifications,
   initialUnreadCount,
+  canAccessPlatformConsole = false,
   role,
 }: HeaderProps) {
   const router = useRouter();
@@ -100,6 +102,16 @@ export function Header({
         </Link>
 
         <div className="ml-auto flex items-center gap-2">
+          {canAccessPlatformConsole ? (
+            <Link
+              className="hidden h-10 items-center gap-2 rounded-xl border border-border bg-background/90 px-3 text-sm font-semibold shadow-sm transition-colors hover:bg-secondary md:inline-flex"
+              href="/console"
+            >
+              <ShieldCheck className="size-4" />
+              Console
+            </Link>
+          ) : null}
+
           {user && (
             <NotificationBell
               userId={user.id}
@@ -132,6 +144,12 @@ export function Header({
                     <User className="mr-2 size-4" />
                     Mi perfil
                   </DropdownMenuItem>
+                  {canAccessPlatformConsole ? (
+                    <DropdownMenuItem onClick={() => router.push("/console")}>
+                      <ShieldCheck className="mr-2 size-4" />
+                      Console de plataforma
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
@@ -156,7 +174,11 @@ export function Header({
           </div>
 
           {/* Mobile only: secondary account menu */}
-          <MobileNav user={user} role={role} />
+          <MobileNav
+            canAccessPlatformConsole={canAccessPlatformConsole}
+            user={user}
+            role={role}
+          />
         </div>
       </div>
     </header>

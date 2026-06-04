@@ -5,7 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ChevronRight, LogOut, X } from "lucide-react";
+import { ChevronRight, LogOut, ShieldCheck, X } from "lucide-react";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import { cn } from "@/lib/utils";
 import type { UserProfile, UserRole } from "@/types";
@@ -18,11 +18,16 @@ import {
 } from "@/components/layout/navigation-items";
 
 interface MobileNavProps {
+  canAccessPlatformConsole?: boolean;
   user: UserProfile | null;
   role: UserRole;
 }
 
-export function MobileNav({ user, role }: MobileNavProps) {
+export function MobileNav({
+  canAccessPlatformConsole = false,
+  user,
+  role,
+}: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -223,6 +228,33 @@ export function MobileNav({ user, role }: MobileNavProps) {
                     {ACCOUNT_NAVIGATION_ITEMS.map(renderItem)}
                   </div>
                 </section>
+
+                {canAccessPlatformConsole ? (
+                  <section className="space-y-2 border-t border-border/70 pt-6">
+                    <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Plataforma
+                    </p>
+                    <DialogPrimitive.Close asChild>
+                      <Link
+                        className="group flex items-center gap-4 rounded-[1.6rem] border border-primary/15 bg-primary/[0.08] px-4 py-3.5 text-left outline-none transition-colors hover:bg-primary/[0.12] focus-visible:ring-4 focus-visible:ring-primary/10"
+                        href="/console"
+                      >
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-primary/12 bg-primary/12 text-primary">
+                          <ShieldCheck className="size-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate text-[15px] font-semibold tracking-[-0.02em]">
+                            Console
+                          </span>
+                          <p className="truncate text-sm text-muted-foreground">
+                            Panel separado de plataforma.
+                          </p>
+                        </div>
+                        <ChevronRight className="size-4 shrink-0 text-primary" />
+                      </Link>
+                    </DialogPrimitive.Close>
+                  </section>
+                ) : null}
               </nav>
             </div>
 
