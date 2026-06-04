@@ -87,7 +87,7 @@ export const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
 export const MOBILE_NAVIGATION_ITEMS: NavigationItem[] = [
   PRIMARY_NAVIGATION_ITEMS[0], // Inicio
   PRIMARY_NAVIGATION_ITEMS[1], // Tablon
-  PRIMARY_NAVIGATION_ITEMS[3], // Calendario
+  { ...PRIMARY_NAVIGATION_ITEMS[3], label: "Calend." }, // Calendario
   PRIMARY_NAVIGATION_ITEMS[4], // Chat
   PRIMARY_NAVIGATION_ITEMS[5], // Cambios
 ];
@@ -123,8 +123,8 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
   const adminItems: NavigationItem[] = [
     {
       href: "/admin/exchanges",
-      label: "Aprobaciones",
-      description: "Resuelve expedientes pendientes del equipo.",
+      label: "Cambios equipo",
+      description: "Consulta intercambios aceptados por el equipo.",
       icon: ClipboardCheck,
       tour: "nav-admin",
     },

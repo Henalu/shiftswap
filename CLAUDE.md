@@ -121,9 +121,11 @@ tests/
   - se crea `exchanges`
   - la firma del publicador queda implicita
 - La unica firma explicita del flujo v2 es `signAsInterested`, realizada por `user_b`.
-- Tras esa firma, el expediente pasa a `pending_validation`.
-- La aprobacion o rechazo departamental vive en `/admin/exchanges`.
-- En `pending_validation` puede solicitarse retirada reciproca antes de resolverse.
+- Tras esa firma, el expediente pasa a `approved` como aceptado por ambas partes.
+- El responsable no aprueba ni rechaza el intercambio; solo recibe aviso informativo si tiene alcance en la app.
+- `/admin/exchanges` es una bandeja de consulta para cambios aceptados por ambas partes.
+- `pending_validation` queda como estado legado pendiente de normalizar a `approved`.
+- En intercambios firmados puede solicitarse retirada reciproca antes de la primera fecha implicada.
 - El PDF es una salida del expediente, no el centro del negocio.
 
 ### Notifications - patrones clave
@@ -218,8 +220,6 @@ tests/
   - `proposeExchange`
   - `acceptProposal`
   - `signAsInterested`
-  - `approveExchangeRequest`
-  - `rejectExchangeRequest`
 - `SignaturePad` guarda PNG en Storage.
 - Los dos PDFs renderizan la firma cuando existe.
 
@@ -234,7 +234,7 @@ tests/
 
 - Ruta: `/help`
 - Miembros ven ayuda de uso diario
-- Admins ven tambien aprobaciones, validaciones y gestion organizativa
+- Admins ven tambien cambios informados, validaciones y gestion organizativa
 
 ## Convenciones de Codigo
 
@@ -335,7 +335,7 @@ tests/
 ### Estados de un Intercambio (`exchanges.status`)
 
 - `accepted`
-- `pending_validation`
+- `pending_validation` (legado)
 - `approved`
 - `rejected`
 - `completed`
@@ -347,11 +347,10 @@ tests/
 - `open` -> `proposeExchange` -> crea `shift_requests.pending`
 - `pending` -> `acceptProposal` -> `shift_requests.accepted` + `shifts.negotiating` + `exchanges.accepted`
 - `pending` -> `rejectProposal` -> `shift_requests.rejected`
-- `accepted` -> `signAsInterested` -> `exchanges.pending_validation`
-- `pending_validation` -> `approveExchangeRequest` -> `exchanges.approved`
-- `pending_validation` -> `rejectExchangeRequest` -> `exchanges.rejected` + turno reabierto
-- `pending_validation` -> `requestSignedExchangeCancellation` -> retirada pendiente
-- `pending_validation` -> `confirmSignedExchangeCancellation` -> `exchanges.cancelled` + turno reabierto
+- `accepted` -> `signAsInterested` -> `exchanges.approved` + aviso informativo al responsable
+- `pending_validation` -> estado legado que debe migrarse a `exchanges.approved`
+- `approved` -> `requestSignedExchangeCancellation` -> retirada pendiente
+- `approved` -> `confirmSignedExchangeCancellation` -> `exchanges.cancelled` + turno reabierto
 - turnos pasados sin cerrar pueden acabar en `expired`
 
 ## Fases de Desarrollo

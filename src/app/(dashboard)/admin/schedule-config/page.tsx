@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { CalendarCog } from "lucide-react";
+import { CalendarCog, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { getDepartmentArea, getDepartmentById } from "@/lib/departments";
@@ -10,7 +10,8 @@ import { hasAdminPanelAccess, isSuperAdmin } from "@/lib/user-roles";
 import { SCHEDULE_TYPE_LABELS } from "@/lib/constants";
 import type { Department, ScheduleTypeCode, UserRole } from "@/types";
 import { AreaConfigForm } from "@/app/(dashboard)/admin/schedule-config/area-config-form";
-import { UserRotationForm } from "@/app/(dashboard)/admin/schedule-config/user-rotation-form";
+import { ScheduleConfigFilters } from "@/app/(dashboard)/admin/schedule-config/schedule-config-filters";
+import { RotationAssignmentList } from "@/app/(dashboard)/admin/schedule-config/rotation-assignment-list";
 
 interface AreaScheduleConfigRow {
   id: string;
@@ -37,7 +38,55 @@ interface ScheduleUserRow {
   department_id: string | null;
 }
 
-export default async function AdminScheduleConfigPage() {
+interface PageProps {
+  searchParams: Promise<{
+    q?: string;
+    schedule_type?: string;
+  }>;
+}
+
+type ScheduleTypeFilter = ScheduleTypeCode | "unconfigured";
+
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isScheduleTypeFilter(
+  value: string | undefined
+): value is ScheduleTypeFilter {
+  return value === "3t5" || value === "jornada_normal" || value === "unconfigured";
+}
+
+function getScheduleTypeLabel(scheduleType: ScheduleTypeCode | null) {
+  return scheduleType ? SCHEDULE_TYPE_LABELS[scheduleType] : "Sin configurar";
+}
+
+function matchesSearch(parts: Array<string | null | undefined>, searchTerm: string) {
+  if (!searchTerm) return true;
+
+  return normalizeSearchValue(parts.filter(Boolean).join(" ")).includes(searchTerm);
+}
+
+function matchesScheduleType(
+  scheduleType: ScheduleTypeCode | null,
+  filter: ScheduleTypeFilter | ""
+) {
+  if (!filter) return true;
+  if (filter === "unconfigured") return !scheduleType;
+
+  return scheduleType === filter;
+}
+
+export default async function AdminScheduleConfigPage({ searchParams }: PageProps) {
+  const { q, schedule_type } = await searchParams;
+  const searchTerm = normalizeSearchValue(q?.trim() ?? "");
+  const scheduleTypeFilter = isScheduleTypeFilter(schedule_type)
+    ? schedule_type
+    : "";
+
   const supabase = await createClient();
   const {
     data: { user: authUser },
@@ -144,12 +193,45 @@ export default async function AdminScheduleConfigPage() {
   const rotatingUsers = usersWithSchedule.filter(
     (user) => user.scheduleType === "3t5"
   );
+  const filteredAreas = areas.filter((area) => {
+    const scheduleType = configMap.get(area.id)?.schedule_type ?? null;
+
+    return (
+      matchesScheduleType(scheduleType, scheduleTypeFilter) &&
+      matchesSearch([area.name, getScheduleTypeLabel(scheduleType)], searchTerm)
+    );
+  });
+  const filteredRotatingUsers = rotatingUsers.filter((user) => {
+    const scheduleType = user.scheduleType;
+
+    return (
+      matchesScheduleType(scheduleType, scheduleTypeFilter) &&
+      matchesSearch(
+        [
+          user.full_name,
+          user.areaName,
+          user.departmentName,
+          user.currentGroup?.label,
+          getScheduleTypeLabel(scheduleType),
+        ],
+        searchTerm
+      )
+    );
+  });
+  const hasFilters = Boolean(searchTerm || scheduleTypeFilter);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Calendarios"
         description="Configura el tipo de jornada por area y asigna grupos de rotacion a los empleados."
+      />
+
+      <ScheduleConfigFilters
+        filteredAreaCount={filteredAreas.length}
+        filteredRotationUserCount={filteredRotatingUsers.length}
+        totalAreaCount={areas.length}
+        totalRotationUserCount={rotatingUsers.length}
       />
 
       {/* Area schedule type configuration */}
@@ -163,9 +245,9 @@ export default async function AdminScheduleConfigPage() {
           </p>
         </div>
 
-        {areas.length > 0 ? (
+        {filteredAreas.length > 0 ? (
           <div className="divide-y divide-border/60">
-            {areas.map((area) => {
+            {filteredAreas.map((area) => {
               const config = configMap.get(area.id);
               return (
                 <div
@@ -192,9 +274,21 @@ export default async function AdminScheduleConfigPage() {
         ) : (
           <div className="p-5">
             <EmptyState
-              icon={<CalendarCog className="size-6" />}
-              title="Sin areas disponibles"
-              description="No hay areas configuradas en el sistema."
+              icon={
+                hasFilters ? (
+                  <SearchX className="size-6" />
+                ) : (
+                  <CalendarCog className="size-6" />
+                )
+              }
+              title={
+                hasFilters ? "Sin areas con esos filtros" : "Sin areas disponibles"
+              }
+              description={
+                hasFilters
+                  ? "Prueba con otro nombre, otro tipo de jornada o limpia los filtros para volver a ver todas las areas."
+                  : "No hay areas configuradas en el sistema."
+              }
             />
           </div>
         )}
@@ -211,38 +305,31 @@ export default async function AdminScheduleConfigPage() {
             </p>
           </div>
 
-          {rotatingUsers.length > 0 ? (
-            <div className="divide-y divide-border/60">
-              {rotatingUsers.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-6"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {u.full_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {u.areaName} - {u.departmentName}
-                    </p>
-                    <p className="text-xs font-medium text-foreground">
-                      Grupo actual: {u.currentGroup?.label ?? "Sin grupo asignado"}
-                    </p>
-                  </div>
-                  <UserRotationForm
-                    userId={u.id}
-                    currentGroupId={u.currentGroupId}
-                    rotationGroups={typedRotationGroups}
-                  />
-                </div>
-              ))}
-            </div>
+          {filteredRotatingUsers.length > 0 ? (
+            <RotationAssignmentList
+              rotationGroups={typedRotationGroups}
+              users={filteredRotatingUsers}
+            />
           ) : (
             <div className="p-5">
               <EmptyState
-                icon={<CalendarCog className="size-6" />}
-                title="Sin empleados 3T5 para asignar"
-                description="Configura primero un area como 3T5 o revisa que los empleados aprobados pertenezcan a esa area."
+                icon={
+                  hasFilters ? (
+                    <SearchX className="size-6" />
+                  ) : (
+                    <CalendarCog className="size-6" />
+                  )
+                }
+                title={
+                  hasFilters
+                    ? "Sin empleados con esos filtros"
+                    : "Sin empleados 3T5 para asignar"
+                }
+                description={
+                  hasFilters
+                    ? "Ajusta el nombre o vuelve a tipo 3T5 para ver empleados asignables a grupos de rotacion."
+                    : "Configura primero un area como 3T5 o revisa que los empleados aprobados pertenezcan a esa area."
+                }
               />
             </div>
           )}

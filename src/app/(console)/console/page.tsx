@@ -5,7 +5,6 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarCog,
-  CheckCircle2,
   ChevronDown,
   KeyRound,
   Palette,
@@ -24,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ColorPaletteField } from "@/components/ui/color-palette-field";
+import { FeedbackToast } from "@/components/ui/feedback-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getCompanyThemeAccentColor } from "@/lib/company-theme";
@@ -32,10 +32,10 @@ import {
   createPlatformDepartmentAction,
   createPlatformJobPositionAction,
   createPlatformUserAction,
-  resetPlatformUserPasswordAction,
   updatePlatformCompanyThemeAction,
   updatePlatformScheduleConfigAction,
 } from "@/lib/platform-console-actions";
+import { ConsoleUsersTable } from "@/app/(console)/console/console-users-table";
 import {
   canManagePlatform,
   canOperatePlatformUsers,
@@ -201,41 +201,6 @@ function AccessDeniedState({ message }: { message: string }) {
   );
 }
 
-function Feedback({
-  error,
-  status,
-}: {
-  error?: string;
-  status?: string;
-}) {
-  const errorMessage = error ? errorCopy[error] ?? errorCopy["forbidden"] : null;
-  const successMessage = status ? successCopy[status] : null;
-
-  if (!errorMessage && !successMessage) {
-    return null;
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border px-4 py-3 text-sm",
-        errorMessage
-          ? "border-destructive/20 bg-destructive/10 text-destructive"
-          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-800"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {errorMessage ? (
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-        ) : (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-        )}
-        <p>{errorMessage ?? successMessage}</p>
-      </div>
-    </div>
-  );
-}
-
 function MetricCard({
   icon: Icon,
   label,
@@ -284,10 +249,10 @@ function SectionDetails({
 }) {
   return (
     <details
-      className="group rounded-2xl border border-border/80 bg-card/96 shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
+      className="group min-w-0 rounded-2xl border border-border/80 bg-card/96 shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
       open={open}
     >
-      <summary className="grid cursor-pointer list-none gap-4 px-5 py-4 outline-none transition-colors hover:bg-secondary/40 focus-visible:ring-4 focus-visible:ring-primary/15 sm:grid-cols-[1fr_auto] sm:items-center [&::-webkit-details-marker]:hidden">
+      <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 outline-none transition-colors hover:bg-secondary/40 focus-visible:ring-4 focus-visible:ring-primary/15 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 [&::-webkit-details-marker]:hidden">
         <div className="flex min-w-0 items-start gap-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Icon className="size-5" />
@@ -315,7 +280,7 @@ function SectionDetails({
           </span>
         </span>
       </summary>
-      <div className="border-t border-border/70 p-5">{children}</div>
+      <div className="min-w-0 border-t border-border/70 p-4 sm:p-5">{children}</div>
     </details>
   );
 }
@@ -338,6 +303,12 @@ function Field({
 export default async function ConsolePage({ searchParams }: ConsolePageProps) {
   const params = await searchParams;
   const access = await getCurrentPlatformAccess();
+  const feedbackErrorMessage = params.error
+    ? errorCopy[params.error] ?? errorCopy["forbidden"]
+    : null;
+  const feedbackSuccessMessage = params.status
+    ? successCopy[params.status]
+    : null;
 
   if (!access.ok) {
     if (access.error === "authentication-required") {
@@ -377,8 +348,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
       .select(
         "id, email, full_name, role, company_id, department_id, job_position_id, validation_status, created_at"
       )
-      .order("created_at", { ascending: false })
-      .limit(150),
+      .order("created_at", { ascending: false }),
     admin
       .from("area_schedule_configs")
       .select("id, department_id, schedule_type"),
@@ -423,10 +393,30 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
   const activeBilling = billingRows.filter((row) =>
     ["trialing", "active", "past_due"].includes(row.current_billing_state)
   );
+  const consoleUsers = userRows.map((user) => {
+    const company = user.company_id ? companyMap.get(user.company_id) : null;
+    const department = user.department_id
+      ? departmentMap.get(user.department_id)
+      : null;
+    const jobPosition = user.job_position_id
+      ? jobPositionMap.get(user.job_position_id)
+      : null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      companyName: company?.name ?? "Global",
+      departmentName: department?.name ?? "Sin departamento",
+      jobPositionName: jobPosition?.name ?? "Sin puesto",
+      role: user.role,
+      validationStatus: user.validation_status,
+    };
+  });
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:items-end">
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:items-end">
         <div className="min-w-0">
           <Badge className="mb-3" variant="secondary">
             Plataforma
@@ -463,9 +453,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
         </Card>
       </section>
 
-      <Feedback error={params.error} status={params.status} />
+      <FeedbackToast
+        errorMessage={feedbackErrorMessage}
+        successMessage={feedbackSuccessMessage}
+      />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           detail={`${activeBilling.length} con billing activo/trial`}
           icon={Building2}
@@ -492,7 +485,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
         />
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <a
           className="rounded-2xl border border-border/80 bg-card px-4 py-3 text-sm transition-colors hover:bg-secondary/45"
           href="#companies"
@@ -629,7 +622,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
               {companyRows.map((company) => (
                 <form
                   action={updatePlatformCompanyThemeAction}
-                  className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
+                  className="grid grid-cols-1 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_auto] md:items-end"
                   key={`company-theme-${company.id}`}
                 >
                   <input name="companyId" type="hidden" value={company.id} />
@@ -660,7 +653,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
           {canManage ? (
             <form
               action={createPlatformCompanyAction}
-              className="mt-5 grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 lg:grid-cols-2"
+              className="mt-5 grid grid-cols-1 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 lg:grid-cols-2"
             >
               <div className="lg:col-span-2">
                 <h3 className="font-semibold">Crear empresa</h3>
@@ -708,7 +701,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
           {canManage ? (
             <form
               action={createPlatformUserAction}
-              className="mb-5 grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-2 xl:grid-cols-3"
+              className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4 md:grid-cols-2 xl:grid-cols-3"
             >
               <div className="md:col-span-2 xl:col-span-3">
                 <h3 className="font-semibold">Crear usuario</h3>
@@ -805,92 +798,10 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
             </form>
           ) : null}
 
-          <div className="overflow-x-auto rounded-2xl border border-border/70">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="border-b border-border/70 bg-secondary/35 text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Usuario</th>
-                  <th className="px-4 py-3 font-semibold">Empresa</th>
-                  <th className="px-4 py-3 font-semibold">Departamento</th>
-                  <th className="px-4 py-3 font-semibold">Puesto</th>
-                  <th className="px-4 py-3 font-semibold">Rol</th>
-                  <th className="px-4 py-3 font-semibold">Estado</th>
-                  <th className="px-4 py-3 font-semibold">Acceso</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {userRows.map((user) => {
-                  const company = user.company_id
-                    ? companyMap.get(user.company_id)
-                    : null;
-                  const department = user.department_id
-                    ? departmentMap.get(user.department_id)
-                    : null;
-                  const jobPosition = user.job_position_id
-                    ? jobPositionMap.get(user.job_position_id)
-                    : null;
-
-                  return (
-                    <tr key={user.id} className="align-top">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{user.full_name}</p>
-                        <p className="text-muted-foreground">{user.email}</p>
-                      </td>
-                      <td className="px-4 py-3">{company?.name ?? "Global"}</td>
-                      <td className="px-4 py-3">
-                        {department?.name ?? "Sin departamento"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {jobPosition?.name ?? "Sin puesto"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">{USER_ROLE_LABELS[user.role]}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">{user.validation_status}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {canOperateUsers ? (
-                          <details>
-                            <summary className="cursor-pointer text-sm font-medium text-primary underline-offset-4 hover:underline">
-                              Resetear
-                            </summary>
-                            <form
-                              action={resetPlatformUserPasswordAction}
-                              className="mt-3 grid w-72 gap-2"
-                            >
-                              <input name="userId" type="hidden" value={user.id} />
-                              <Input
-                                autoComplete="new-password"
-                                minLength={8}
-                                name="temporaryPassword"
-                                placeholder="Contrasena temporal"
-                                required
-                                type="password"
-                              />
-                              <Input
-                                autoComplete="new-password"
-                                minLength={8}
-                                name="confirmTemporaryPassword"
-                                placeholder="Confirmar"
-                                required
-                                type="password"
-                              />
-                              <Button size="sm" type="submit" variant="outline">
-                                Forzar cambio
-                              </Button>
-                            </form>
-                          </details>
-                        ) : (
-                          <span className="text-muted-foreground">Lectura</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ConsoleUsersTable
+            canOperateUsers={canOperateUsers}
+            users={consoleUsers}
+          />
         </SectionDetails>
       </section>
 
@@ -902,10 +813,10 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
           title="Estructura laboral"
         >
           {canManage ? (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <form
                 action={createPlatformDepartmentAction}
-                className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4"
+                className="grid grid-cols-1 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4"
               >
                 <div>
                   <h3 className="font-semibold">Crear area/departamento</h3>
@@ -952,7 +863,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
 
               <form
                 action={createPlatformJobPositionAction}
-                className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4"
+                className="grid grid-cols-1 gap-4 rounded-2xl border border-border/70 bg-secondary/25 p-4"
               >
                 <div>
                   <h3 className="font-semibold">Crear puesto</h3>
@@ -1003,7 +914,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
             </div>
           ) : null}
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card size="sm">
               <CardHeader>
                 <CardTitle>Departamentos</CardTitle>
@@ -1071,7 +982,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
               return (
                 <form
                   action={updatePlatformScheduleConfigAction}
-                  className="grid gap-3 rounded-2xl border border-border/70 p-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end"
+                  className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 p-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end"
                   key={area.id}
                 >
                   <input name="departmentId" type="hidden" value={area.id} />

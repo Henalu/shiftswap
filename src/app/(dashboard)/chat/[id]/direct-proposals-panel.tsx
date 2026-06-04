@@ -51,6 +51,7 @@ interface DirectProposalsPanelProps {
   otherUserId: string;
   otherUserName: string;
   calendarDays?: CalendarDay[] | null;
+  otherUserCalendarDays?: CalendarDay[] | null;
   proposals: DirectChatProposal[];
 }
 
@@ -80,6 +81,7 @@ export function DirectProposalsPanel({
   otherUserId,
   otherUserName,
   calendarDays,
+  otherUserCalendarDays,
   proposals,
 }: DirectProposalsPanelProps) {
   const visibleProposals = proposals.slice(0, 4);
@@ -101,6 +103,7 @@ export function DirectProposalsPanel({
           recipientId={otherUserId}
           recipientName={otherUserName}
           calendarDays={calendarDays}
+          recipientCalendarDays={otherUserCalendarDays}
         />
       </div>
 

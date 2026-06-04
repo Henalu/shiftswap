@@ -483,15 +483,17 @@ function getLastUpdatedLabel(exchange: ExchangePdfData) {
 
 function getApprovalLabel(exchange: ExchangePdfData) {
   if (exchange.status === "approved") {
-    return "Aprobado por departamento";
+    return exchange.department_reviewed_at
+      ? "Aprobado por departamento"
+      : "Aceptado por ambas partes";
   }
 
   if (exchange.status === "rejected") {
-    return "Rechazado por departamento";
+    return "Rechazado en flujo anterior";
   }
 
   if (exchange.status === "pending_validation") {
-    return "Pendiente de aprobacion";
+    return "Estado antiguo pendiente";
   }
 
   if (exchange.status === "accepted") {
@@ -507,18 +509,20 @@ function getDecisionText(exchange: ExchangePdfData) {
   }
 
   if (exchange.status === "approved") {
-    return "Solicitud aprobada dentro del flujo interno de ShiftSwap y lista para ejecutarse como cambio autorizado.";
+    return exchange.department_reviewed_at
+      ? "Solicitud aprobada dentro del flujo interno anterior de ShiftSwap."
+      : "Las dos partes han firmado el acuerdo. El responsable queda informado dentro de ShiftSwap sin aprobacion adicional.";
   }
 
   if (exchange.status === "rejected") {
-    return "La solicitud fue rechazada por el taller o departamento. Revisa el expediente en ShiftSwap para continuar.";
+    return "La solicitud fue rechazada dentro del flujo anterior. Revisa el expediente en ShiftSwap para continuar.";
   }
 
   if (exchange.status === "pending_validation") {
-    return "La solicitud ya cuenta con acuerdo y firmas de las partes. Queda pendiente de resolucion por parte del taller o departamento.";
+    return "Estado antiguo: la solicitud ya cuenta con acuerdo y firmas de las partes y debe normalizarse a aceptada por ambas partes.";
   }
 
-  return "El expediente sigue en curso dentro de ShiftSwap y aun no tiene una resolucion departamental final.";
+  return "El expediente sigue en curso dentro de ShiftSwap y aun no esta cerrado por ambas partes.";
 }
 
 function getFieldValue(value: string | null | undefined) {
@@ -792,7 +796,7 @@ export function ExchangeCorporatePdf({
               <Text style={styles.subtitle}>
                 Expediente {exchange.id.slice(0, 8)}. Documento generado para el
                 flujo interno de {companyName}. Mantiene el estado operativo de
-                ShiftSwap y la informacion relevante para revision.
+                ShiftSwap y la informacion relevante para seguimiento.
               </Text>
             </View>
           </View>
@@ -917,7 +921,7 @@ export function ExchangeCorporatePdf({
           <View style={styles.diligenceHeader}>
             <View>
               <Text style={styles.diligenceTitle}>
-                Diligencia del taller o departamento
+                Aviso al taller o departamento
               </Text>
               <Text style={styles.diligenceMeta}>
                 Estado ShiftSwap: {EXCHANGE_STATUS_LABELS[exchange.status]}
@@ -949,21 +953,24 @@ export function ExchangeCorporatePdf({
 
             <View style={styles.approvalSide}>
               <View style={styles.infoListItem}>
-                <Text style={styles.label}>Firma final</Text>
+                <Text style={styles.label}>Responsable informado</Text>
                 <Text style={styles.value}>
-                  {exchange.departmentApprover?.full_name ?? "Pendiente"}
+                  {exchange.departmentApprover?.full_name ??
+                    "Notificacion registrada"}
                 </Text>
                 <Text style={styles.secondaryValue}>
                   {exchange.departmentApprover
                     ? exchange.departmentApprover.email
-                    : "Sin responsable asignado todavia"}
+                    : "Sin aprobacion adicional requerida"}
                 </Text>
               </View>
 
               <View style={styles.infoListItem}>
-                <Text style={styles.label}>Fecha de revision</Text>
+                <Text style={styles.label}>Fecha de cierre</Text>
                 <Text style={styles.smallValue}>
-                  {formatDateOrPlaceholder(exchange.department_reviewed_at)}
+                  {formatDateOrPlaceholder(
+                    exchange.approved_at ?? exchange.department_reviewed_at
+                  )}
                 </Text>
               </View>
 
@@ -991,12 +998,16 @@ export function ExchangeCorporatePdf({
               value={formatDateOrPlaceholder(exchange.signed_by_user_b_at)}
             />
             <TimelineItem
-              label="Enviado a aprobacion"
-              value={formatDateOrPlaceholder(exchange.submitted_for_approval_at)}
+              label="Cierre por firmas"
+              value={formatDateOrPlaceholder(
+                exchange.approved_at ?? exchange.submitted_for_approval_at
+              )}
             />
             <TimelineItem
-              label="Revision del departamento"
-              value={formatDateOrPlaceholder(exchange.department_reviewed_at)}
+              label="Aviso al responsable"
+              value={formatDateOrPlaceholder(
+                exchange.department_reviewed_at ?? exchange.approved_at
+              )}
             />
             <TimelineItem
               label="Ultimo estado"

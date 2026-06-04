@@ -20,7 +20,7 @@ function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
     status === "approved" ||
     status === "rejected" ||
     status === "completed";
-  const validationComplete =
+  const notificationComplete =
     status === "approved" || status === "rejected" || status === "completed";
   const resolvedComplete =
     status === "approved" ||
@@ -37,8 +37,8 @@ function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
     },
     {
       key: "signature",
-      label: "Firma",
-      description: "El solicitante firma la solicitud dentro de la app.",
+      label: "Segunda firma",
+      description: "El solicitante acepta y firma el acuerdo dentro de la app.",
       state: signatureComplete
         ? "complete"
         : status === "accepted"
@@ -46,10 +46,10 @@ function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
           : "upcoming",
     },
     {
-      key: "validation",
-      label: "Validacion",
-      description: "El responsable del departamento revisa y decide.",
-      state: validationComplete
+      key: "notification",
+      label: "Responsable informado",
+      description: "La app avisa al responsable sin pedir aprobacion.",
+      state: notificationComplete
         ? "complete"
         : status === "pending_validation"
           ? "current"
@@ -57,8 +57,8 @@ function getWorkflowSteps(status: ExchangeStatus): WorkflowStep[] {
     },
     {
       key: "resolution",
-      label: "Resolucion",
-      description: "El expediente queda aprobado, rechazado o cancelado.",
+      label: "Cierre",
+      description: "El expediente queda aceptado, cancelado o caducado.",
       state: resolvedComplete ? "complete" : "upcoming",
     },
   ];

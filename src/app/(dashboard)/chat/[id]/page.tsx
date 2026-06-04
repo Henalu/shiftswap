@@ -98,7 +98,10 @@ export default async function ConversationPage({ params }: PageProps) {
   );
   calendarEndSeed.setDate(calendarEndSeed.getDate() + 180);
   const calendarEnd = formatDateISO(calendarEndSeed);
-  const calendarDays = await getUserCalendar(authUser.id, today, calendarEnd);
+  const [calendarDays, otherUserCalendarDays] = await Promise.all([
+    getUserCalendar(authUser.id, today, calendarEnd),
+    getUserCalendar(otherUser.id, today, calendarEnd),
+  ]);
 
   const { data: directShifts } = await supabase
     .from("shifts")
@@ -178,6 +181,7 @@ export default async function ConversationPage({ params }: PageProps) {
             otherUserId={otherUser.id}
             otherUserName={otherUserName}
             calendarDays={calendarDays}
+            otherUserCalendarDays={otherUserCalendarDays}
             proposals={directProposals}
           />
         </div>

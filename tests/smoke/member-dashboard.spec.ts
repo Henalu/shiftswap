@@ -1,6 +1,7 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { hasCredentials, memberCredentials } from "./helpers/env";
 import {
+  expectNoFrameworkError,
   loginAs,
   openAndExpectHeading,
   openAndExpectText,
@@ -23,5 +24,33 @@ test.describe("member dashboard smoke", () => {
     await openAndExpectText(page, "/billing", /Suscripcion y acceso/i);
     await openAndExpectHeading(page, "/help", /Ayuda|preguntas frecuentes/i);
     await openAndExpectHeading(page, "/profile", /Mi perfil|Perfil/i);
+  });
+
+  test("home fits the mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginAs(page, memberCredentials!);
+
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
+    await expectNoFrameworkError(page);
+    await expect(page.getByRole("heading", { name: /Hola,/i }).first()).toBeVisible();
+
+    const overflow = await page.evaluate(() => {
+      const root = document.documentElement;
+      const main = document.querySelector("main");
+
+      return {
+        viewportWidth: root.clientWidth,
+        documentWidth: root.scrollWidth,
+        mainClientWidth: main?.clientWidth ?? 0,
+        mainScrollWidth: main?.scrollWidth ?? 0,
+      };
+    });
+
+    expect(overflow.documentWidth).toBeLessThanOrEqual(
+      overflow.viewportWidth + 1
+    );
+    expect(overflow.mainScrollWidth).toBeLessThanOrEqual(
+      overflow.mainClientWidth + 1
+    );
   });
 });

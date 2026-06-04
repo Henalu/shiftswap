@@ -469,18 +469,20 @@ function getDecisionText(exchange: ExchangeOfficialPdfData): string {
   }
 
   if (exchange.status === "approved") {
-    return "Autorizado por el taller o departamento dentro del flujo de ShiftSwap.";
+    return exchange.department_reviewed_at
+      ? "Autorizado por el taller o departamento dentro del flujo anterior de ShiftSwap."
+      : "Aceptado por ambas partes en ShiftSwap. Responsable informado sin autorizacion adicional.";
   }
 
   if (exchange.status === "rejected") {
-    return "Solicitud rechazada por el taller o departamento.";
+    return "Solicitud rechazada dentro del flujo anterior de ShiftSwap.";
   }
 
   if (exchange.status === "pending_validation") {
-    return "Pendiente de resolución por parte del taller o departamento.";
+    return "Estado antiguo pendiente de normalizar a aceptado por ambas partes.";
   }
 
-  return "Solicitud registrada dentro de ShiftSwap y pendiente de completar su tramitación.";
+  return "Solicitud registrada dentro de ShiftSwap y pendiente de completar sus firmas.";
 }
 
 function getValue(value: string | null | undefined): string {
@@ -636,7 +638,8 @@ export function ExchangeOfficialShiftChangePdf({
   const requestDate = getRequestDate(exchange);
   const [day, month, year] = getDateParts(requestDate);
   const requestedShift = buildRequestedShiftSummary(exchange);
-  const approvalMark = exchange.status === "approved" ? "X" : "";
+  const approvalMark =
+    exchange.status === "approved" && exchange.department_reviewed_at ? "X" : "";
   const ownerFormalName = getValue(exchange.owner.full_name);
   const requesterFormalName = getValue(exchange.requester.full_name);
   const ownerSignature = exchange.signed_by_user_a_at

@@ -765,7 +765,7 @@ export async function acceptDirectProposal(formData: FormData): Promise<void> {
     userId: shift.user_id,
     type: "proposal_accepted",
     title: "Propuesta directa aceptada",
-    body: `${recipientName} ha aceptado tu propuesta directa. Falta su firma para enviarla a validacion.`,
+    body: `${recipientName} ha aceptado tu propuesta directa. Falta tu firma para cerrar el intercambio.`,
     dedupeKey: `proposal_accepted:${createdExchange.id}`,
     data: {
       shift_id: shiftId,

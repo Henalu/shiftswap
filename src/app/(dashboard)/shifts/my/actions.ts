@@ -422,7 +422,7 @@ export async function acceptProposal(formData: FormData): Promise<void> {
     userId: request.interested_user_id,
     type: "proposal_accepted",
     title: "Tu propuesta fue aceptada",
-    body: `${ownerName} ha aceptado tu propuesta. Firma para enviarla a validacion.`,
+    body: `${ownerName} ha aceptado tu propuesta. Firma para cerrar el intercambio entre ambas partes.`,
     dedupeKey: `proposal_accepted:${exchangeId ?? requestId}`,
     data: {
       shift_id: shiftId,

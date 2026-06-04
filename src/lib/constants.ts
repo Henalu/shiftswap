@@ -61,8 +61,8 @@ export const REQUEST_STATUS_LABELS = {
 
 export const EXCHANGE_STATUS_LABELS = {
   accepted: "Aceptado",
-  pending_validation: "Pendiente de validacion",
-  approved: "Aprobado",
+  pending_validation: "Pendiente de cierre",
+  approved: "Aceptado por ambas partes",
   rejected: "Rechazado",
   completed: "Completado",
   cancelled: "Cancelado",
@@ -123,7 +123,7 @@ export const EXCHANGE_AGREEMENT_STYLES = {
 } as const satisfies Record<ExchangeAgreementType, string>;
 
 export const SHIFT_DEBT_TRANSACTION_STATUS_LABELS = {
-  pending_approval: "Pendiente de aprobacion",
+  pending_approval: "Pendiente de cierre",
   active: "Pendiente de compensacion",
   voided: "Anulado",
   settled: "Compensado",

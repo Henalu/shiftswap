@@ -422,6 +422,7 @@ export interface JobPositionChangeRequest {
 export type ExchangeEventType =
   | 'proposal_accepted'
   | 'interested_signed'
+  | 'accepted_by_both'
   | 'submitted_for_validation'
   | 'department_approved'
   | 'department_rejected'
@@ -493,6 +494,7 @@ export type NotificationType =
   | 'exchange_cancelled'
   | 'exchange_cancellation_requested'
   | 'exchange_cancellation_rejected'
+  | 'exchange_accepted_by_both'
   | 'exchange_pending_validation'
   | 'exchange_department_approved'
   | 'exchange_department_rejected'

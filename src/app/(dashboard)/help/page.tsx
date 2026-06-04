@@ -59,12 +59,12 @@ function getMemberSections(): HelpSection[] {
         {
           question: "Que significa firmar un acuerdo?",
           answer:
-            "Firmar confirma que aceptas las condiciones del cambio. Tu firma digital (la que configuraste en el perfil) aparecera automaticamente en el documento oficial. Ambas partes deben firmar para que el expediente avance a validacion.",
+            "Firmar confirma que aceptas las condiciones del cambio. Tu firma digital (la que configuraste en el perfil) aparecera automaticamente en el documento oficial. Cuando ambas partes firman, el intercambio queda aceptado y el responsable queda informado.",
         },
         {
           question: "Puedo cancelar un cambio ya aceptado?",
           answer:
-            "Si, mientras no haya sido aprobado por el departamento. Si ya esta en validacion, puedes solicitar una retirada que la otra parte debe confirmar.",
+            "Si, antes de la primera fecha implicada. Si ya esta firmado por ambas partes, puedes solicitar una retirada que la otra parte debe confirmar.",
         },
       ],
     },
@@ -79,7 +79,7 @@ function getMemberSections(): HelpSection[] {
         {
           question: "Cuando puedo usar el chat?",
           answer:
-            "El chat esta disponible desde que se crea el expediente de cambio hasta que se resuelve (aprobado, rechazado o cancelado).",
+            "El chat esta disponible desde que se crea el expediente de cambio hasta que se cierra o se cancela.",
         },
       ],
     },
@@ -94,7 +94,7 @@ function getMemberSections(): HelpSection[] {
         {
           question: "Cuando puedo descargar los PDF?",
           answer:
-            "Los documentos estan disponibles una vez que el expediente ha sido firmado por ambas partes y enviado a validacion.",
+            "Los documentos estan disponibles una vez que el expediente ha sido firmado por ambas partes.",
         },
       ],
     },
@@ -104,17 +104,17 @@ function getMemberSections(): HelpSection[] {
 function getAdminSections(): HelpSection[] {
   return [
     {
-      title: "Aprobaciones de cambios",
+      title: "Cambios informados",
       items: [
         {
-          question: "Como apruebo o rechazo un cambio?",
+          question: "Que tengo que hacer cuando dos usuarios aceptan un cambio?",
           answer:
-            "Ve a Aprobaciones en el panel de administracion. Veras los expedientes pendientes de tu departamento. Revisa el detalle y pulsa Aprobar o Rechazar. Si rechazas, debes indicar el motivo.",
+            "No tienes que aprobarlo. Ve a Cambios equipo en el panel de administracion para consultar los expedientes aceptados por ambas partes dentro de tu alcance.",
         },
         {
-          question: "Puedo aprobar un cambio en el que participo?",
+          question: "Puedo bloquear un cambio ya aceptado por ambas partes?",
           answer:
-            "No. Si eres parte del intercambio (como publicador o solicitante), la aprobacion debe resolverla otra persona con permisos en el departamento.",
+            "El flujo de intercambio se cierra con las dos firmas. El responsable queda informado para seguimiento operativo, no como paso de aprobacion.",
         },
       ],
     },
