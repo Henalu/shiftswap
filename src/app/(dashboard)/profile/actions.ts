@@ -27,6 +27,11 @@ export interface JobPositionChangeMutationResult {
   error?: string;
 }
 
+export interface LaborPreferencesMutationResult {
+  success?: true;
+  error?: string;
+}
+
 export interface SuperAdminLaborScopeMutationResult {
   success?: true;
   error?: string;
@@ -46,6 +51,10 @@ interface JobPositionRow {
   department_id: string;
   name: string;
   active: boolean;
+}
+
+interface RotationGroupRow {
+  id: string;
 }
 
 interface ApproverRow {
@@ -334,6 +343,260 @@ export async function updateSuperAdminLaborScope(
   revalidatePath("/shifts");
   revalidatePath("/shifts/new");
   revalidatePath("/calendar");
+  revalidatePath("/", "layout");
+
+  return { success: true };
+}
+
+export async function updateLaborPreferences(
+  formData: FormData
+): Promise<LaborPreferencesMutationResult> {
+  const areaDepartmentId = (
+    formData.get("area_department_id") as string | null
+  )?.trim();
+  const departmentId = (formData.get("department_id") as string | null)?.trim();
+  const jobPositionId =
+    (formData.get("job_position_id") as string | null)?.trim() || null;
+  const scheduleType = (formData.get("schedule_type") as string | null)?.trim();
+  const rotationGroupId =
+    (formData.get("rotation_group_id") as string | null)?.trim() || null;
+
+  if (!areaDepartmentId) {
+    return { error: "Selecciona un area o taller." };
+  }
+
+  if (!departmentId) {
+    return { error: "Selecciona un departamento operativo." };
+  }
+
+  if (scheduleType !== "3t5" && scheduleType !== "jornada_normal") {
+    return { error: "Selecciona un tipo de jornada valido." };
+  }
+
+  if (scheduleType === "3t5" && !rotationGroupId) {
+    return { error: "Selecciona tu grupo de rotacion." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "No autenticado." };
+  }
+
+  const accountState = await getAccountGateState(user.id);
+  if (!accountState?.company_id) {
+    return {
+      error:
+        "Tu perfil no tiene una empresa asignada. No se puede guardar la configuracion laboral.",
+    };
+  }
+
+  const adminClient = createAdminClient();
+  const [
+    { data: selectedArea, error: areaError },
+    { data: selectedDepartment, error: departmentError },
+    { data: departmentChildren, error: departmentChildrenError },
+    { data: requestedJobPosition, error: jobPositionError },
+    { data: rotationGroup, error: rotationGroupError },
+  ] = await Promise.all([
+    adminClient
+      .from("departments")
+      .select("id, company_id, parent_department_id, is_assignable, name")
+      .eq("id", areaDepartmentId)
+      .eq("company_id", accountState.company_id)
+      .maybeSingle(),
+    adminClient
+      .from("departments")
+      .select("id, company_id, parent_department_id, is_assignable, name")
+      .eq("id", departmentId)
+      .eq("company_id", accountState.company_id)
+      .maybeSingle(),
+    adminClient
+      .from("departments")
+      .select("id")
+      .eq("parent_department_id", departmentId)
+      .limit(1),
+    jobPositionId
+      ? adminClient
+          .from("job_positions")
+          .select("id, company_id, department_id, name, active")
+          .eq("id", jobPositionId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    scheduleType === "3t5" && rotationGroupId
+      ? adminClient
+          .from("rotation_groups")
+          .select("id")
+          .eq("id", rotationGroupId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (
+    areaError ||
+    departmentError ||
+    departmentChildrenError ||
+    jobPositionError ||
+    rotationGroupError
+  ) {
+    return {
+      error:
+        "No se pudo validar la configuracion laboral con la estructura actual.",
+    };
+  }
+
+  const typedArea = (selectedArea as DepartmentRow | null) ?? null;
+  const typedDepartment = (selectedDepartment as DepartmentRow | null) ?? null;
+  const typedJobPosition = (requestedJobPosition as JobPositionRow | null) ?? null;
+  const typedRotationGroup = (rotationGroup as RotationGroupRow | null) ?? null;
+
+  if (!typedArea || typedArea.parent_department_id) {
+    return { error: "Selecciona un area o taller valido." };
+  }
+
+  if (!typedDepartment) {
+    return { error: "Selecciona un departamento operativo valido." };
+  }
+
+  const isOperationalDepartment =
+    typedDepartment.is_assignable && (departmentChildren?.length ?? 0) === 0;
+  const belongsToSelectedArea =
+    typedDepartment.parent_department_id === areaDepartmentId ||
+    typedDepartment.id === areaDepartmentId;
+
+  if (!isOperationalDepartment) {
+    return {
+      error:
+        "El departamento debe ser operativo final, no un area o nodo padre.",
+    };
+  }
+
+  if (!belongsToSelectedArea) {
+    return {
+      error: "El departamento elegido no pertenece al area o taller seleccionado.",
+    };
+  }
+
+  if (jobPositionId) {
+    if (!typedJobPosition || !typedJobPosition.active) {
+      return { error: "Selecciona un puesto de trabajo activo y valido." };
+    }
+
+    if (
+      typedJobPosition.company_id !== accountState.company_id ||
+      typedJobPosition.department_id !== departmentId
+    ) {
+      return {
+        error:
+          "El puesto de trabajo debe pertenecer al departamento operativo elegido.",
+      };
+    }
+  }
+
+  if (scheduleType === "3t5" && !typedRotationGroup) {
+    return { error: "El grupo de rotacion seleccionado no existe." };
+  }
+
+  const { error: profileUpdateError } = await adminClient
+    .from("user_profiles")
+    .update({
+      department_id: departmentId,
+      job_position_id: jobPositionId,
+    })
+    .eq("id", user.id);
+
+  if (profileUpdateError) {
+    return {
+      error:
+        "No se pudo actualizar tu departamento o puesto. " +
+        profileUpdateError.message,
+    };
+  }
+
+  const { error: schedulePreferenceError } = await adminClient
+    .from("user_schedule_preferences")
+    .upsert(
+      {
+        user_id: user.id,
+        schedule_type: scheduleType,
+      },
+      { onConflict: "user_id" }
+    );
+
+  if (schedulePreferenceError) {
+    return {
+      error:
+        "No se pudo guardar tu tipo de jornada. " +
+        schedulePreferenceError.message,
+    };
+  }
+
+  if (scheduleType === "3t5" && rotationGroupId) {
+    const { error: rotationAssignmentError } = await adminClient
+      .from("user_rotation_assignments")
+      .upsert(
+        {
+          user_id: user.id,
+          rotation_group_id: rotationGroupId,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (rotationAssignmentError) {
+      return {
+        error:
+          "No se pudo guardar tu grupo de rotacion. " +
+          rotationAssignmentError.message,
+      };
+    }
+  } else {
+    const { error: rotationDeleteError } = await adminClient
+      .from("user_rotation_assignments")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (rotationDeleteError) {
+      return {
+        error:
+          "No se pudo limpiar tu grupo de rotacion. " +
+          rotationDeleteError.message,
+      };
+    }
+  }
+
+  await Promise.all([
+    adminClient
+      .from("department_change_requests")
+      .update({
+        status: "cancelled",
+        reviewed_at: new Date().toISOString(),
+        review_notes:
+          "Cancelada automaticamente porque el usuario actualizo su departamento desde el perfil.",
+      })
+      .eq("user_id", user.id)
+      .eq("status", "pending"),
+    adminClient
+      .from("job_position_change_requests")
+      .update({
+        status: "cancelled",
+        reviewed_at: new Date().toISOString(),
+        review_notes:
+          "Cancelada automaticamente porque el usuario actualizo su puesto desde el perfil.",
+      })
+      .eq("user_id", user.id)
+      .eq("status", "pending"),
+  ]);
+
+  revalidatePath("/profile");
+  revalidatePath("/calendar");
+  revalidatePath("/calendar/vacations");
+  revalidatePath("/shifts");
+  revalidatePath("/shifts/new");
+  revalidatePath("/chat");
+  revalidatePath("/home");
   revalidatePath("/", "layout");
 
   return { success: true };

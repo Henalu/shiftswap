@@ -1,29 +1,20 @@
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import {
-  DepartmentChangeRequestCard,
-  type ProfileDepartmentChangeRequestSummary,
-} from "./department-change-request-card";
-import {
-  JobPositionChangeRequestCard,
-  type ProfileJobPositionChangeRequestSummary,
-} from "./job-position-change-request-card";
+  LaborPreferencesCard,
+  type ProfileAreaScheduleConfig,
+  type ProfileRotationGroupOption,
+} from "./labor-preferences-card";
 import { getDepartmentArea, getDepartmentById } from "@/lib/departments";
-import {
-  ROTATION_SEQUENCE_LABELS,
-  SCHEDULE_TYPE_LABELS,
-} from "@/lib/constants";
+import { ROTATION_SEQUENCE_LABELS } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
 import { SuperAdminLaborScopeCard } from "./super-admin-labor-scope-card";
 import type {
   Company,
   Department,
-  DepartmentChangeRequest,
   JobPosition,
-  JobPositionChangeRequestStatus,
   ScheduleTypeCode,
   UserProfile,
 } from "@/types";
@@ -43,30 +34,8 @@ type ProfilePageProfile = Pick<
   | "role"
 >;
 
-interface ProfileJobPositionChangeRequestRow {
-  id: string;
-  user_id: string;
-  company_id: string;
-  current_department_id: string;
-  current_job_position_id: string | null;
-  requested_job_position_id: string;
-  request_reason: string | null;
-  review_notes: string | null;
-  status: JobPositionChangeRequestStatus;
-  created_at: string;
-  reviewed_at: string | null;
-  updated_at: string;
-  current_job_position: {
-    id: string;
-    name: string;
-  } | null;
-  requested_job_position: {
-    id: string;
-    name: string;
-  } | null;
-}
-
 interface AreaScheduleConfigRow {
+  department_id: string;
   schedule_type: ScheduleTypeCode;
 }
 
@@ -79,8 +48,17 @@ interface RotationGroupRow {
 }
 
 interface RotationPatternRow {
+  id: string;
   label: string;
   sequence: string[];
+}
+
+interface UserSchedulePreferenceRow {
+  schedule_type: ScheduleTypeCode;
+}
+
+interface UserRotationAssignmentRow {
+  rotation_group_id: string;
 }
 
 function formatRotationSequence(sequence: string[] | null | undefined) {
@@ -159,202 +137,130 @@ export default async function ProfilePage() {
     { data: companies },
     { data: company },
     { data: companyDepartments },
-    { data: departmentChangeRequests },
-    { data: departmentJobPositions },
-    { data: jobPositionChangeRequests },
+    { data: companyJobPositions },
+    { data: areaScheduleConfigs },
+    { data: userSchedulePreference },
+    { data: userRotationAssignment },
+    { data: rotationGroups },
+    { data: rotationPatterns },
   ] = await Promise.all([
-      isSuperAdminProfile
-        ? adminClient
-            .from("companies")
-            .select("id, name")
-            .order("name", { ascending: true })
-        : Promise.resolve({ data: null, error: null }),
-      profile.company_id
-        ? adminClient
-            .from("companies")
-            .select("name")
-            .eq("id", profile.company_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      isSuperAdminProfile
-        ? adminClient
-            .from("departments")
-            .select(
-              "id, name, company_id, parent_department_id, is_assignable, created_at"
-            )
-            .order("name", { ascending: true })
-        : profile.company_id
-        ? adminClient
-            .from("departments")
-            .select(
-              "id, name, company_id, parent_department_id, is_assignable, created_at"
-            )
-            .eq("company_id", profile.company_id)
-        : Promise.resolve({ data: null, error: null }),
-      profile.id
-        ? adminClient
-            .from("department_change_requests")
-            .select(
-              "id, user_id, company_id, current_department_id, requested_department_id, request_reason, status, review_notes, created_at, reviewed_at, updated_at"
-            )
-            .eq("user_id", profile.id)
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: null, error: null }),
-      profile.department_id
-        ? adminClient
-            .from("job_positions")
-            .select(
-              "id, company_id, department_id, name, code, active, created_at, updated_at"
-            )
-            .eq("department_id", profile.department_id)
-            .order("name", { ascending: true })
-        : Promise.resolve({ data: null, error: null }),
-      profile.id
-        ? adminClient
-            .from("job_position_change_requests")
-            .select(
-              `
-              id, user_id, company_id, current_department_id, current_job_position_id,
-              requested_job_position_id, request_reason, review_notes, status,
-              created_at, reviewed_at, updated_at,
-              current_job_position:job_positions!current_job_position_id(id, name),
-              requested_job_position:job_positions!requested_job_position_id(id, name)
-            `
-            )
-            .eq("user_id", profile.id)
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: null, error: null }),
-    ]);
+    isSuperAdminProfile
+      ? adminClient
+          .from("companies")
+          .select("id, name")
+          .order("name", { ascending: true })
+      : Promise.resolve({ data: null, error: null }),
+    profile.company_id
+      ? adminClient
+          .from("companies")
+          .select("name")
+          .eq("id", profile.company_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    isSuperAdminProfile
+      ? adminClient
+          .from("departments")
+          .select(
+            "id, name, company_id, parent_department_id, is_assignable, created_at"
+          )
+          .order("name", { ascending: true })
+      : profile.company_id
+      ? adminClient
+          .from("departments")
+          .select(
+            "id, name, company_id, parent_department_id, is_assignable, created_at"
+          )
+          .eq("company_id", profile.company_id)
+          .order("name", { ascending: true })
+      : Promise.resolve({ data: null, error: null }),
+    isSuperAdminProfile
+      ? adminClient
+          .from("job_positions")
+          .select(
+            "id, company_id, department_id, name, code, active, created_at, updated_at"
+          )
+          .order("name", { ascending: true })
+      : profile.company_id
+      ? adminClient
+          .from("job_positions")
+          .select(
+            "id, company_id, department_id, name, code, active, created_at, updated_at"
+          )
+          .eq("company_id", profile.company_id)
+          .order("name", { ascending: true })
+      : Promise.resolve({ data: null, error: null }),
+    adminClient
+      .from("area_schedule_configs")
+      .select("department_id, schedule_type"),
+    adminClient
+      .from("user_schedule_preferences")
+      .select("schedule_type")
+      .eq("user_id", profile.id)
+      .maybeSingle(),
+    adminClient
+      .from("user_rotation_assignments")
+      .select("rotation_group_id")
+      .eq("user_id", profile.id)
+      .maybeSingle(),
+    adminClient
+      .from("rotation_groups")
+      .select("id, code, label, rotation_pattern_id, reference_date")
+      .order("code", { ascending: true }),
+    adminClient
+      .from("rotation_patterns")
+      .select("id, label, sequence"),
+  ]);
 
   const typedCompanies = (companies ?? []) as Pick<Company, "id" | "name">[];
   const typedDepartments = (companyDepartments ?? []) as Department[];
-  const typedDepartmentJobPositions = (departmentJobPositions ?? []) as JobPosition[];
+  const typedJobPositions = (companyJobPositions ?? []) as JobPosition[];
+  const departmentIds = new Set(typedDepartments.map((department) => department.id));
+  const typedAreaScheduleConfigs = (
+    (areaScheduleConfigs ?? []) as AreaScheduleConfigRow[]
+  ).filter((config) => departmentIds.has(config.department_id));
+  const areaScheduleConfigMap = new Map(
+    typedAreaScheduleConfigs.map((config) => [
+      config.department_id,
+      config.schedule_type,
+    ])
+  );
+  const typedUserSchedulePreference =
+    (userSchedulePreference as UserSchedulePreferenceRow | null) ?? null;
+  const typedUserRotationAssignment =
+    (userRotationAssignment as UserRotationAssignmentRow | null) ?? null;
+  const typedRotationGroups = (rotationGroups ?? []) as RotationGroupRow[];
+  const typedRotationPatterns = (rotationPatterns ?? []) as RotationPatternRow[];
+  const rotationPatternMap = new Map(
+    typedRotationPatterns.map((pattern) => [pattern.id, pattern])
+  );
+  const rotationGroupOptions: ProfileRotationGroupOption[] =
+    typedRotationGroups.map((group) => {
+      const pattern = rotationPatternMap.get(group.rotation_pattern_id);
+
+      return {
+        id: group.id,
+        code: group.code,
+        label: group.label,
+        patternLabel: pattern?.label ?? "Secuencia sin configurar",
+        sequenceLabel: formatRotationSequence(pattern?.sequence),
+      };
+    });
+  const profileAreaScheduleConfigs: ProfileAreaScheduleConfig[] =
+    typedAreaScheduleConfigs.map((config) => ({
+      department_id: config.department_id,
+      schedule_type: config.schedule_type,
+    }));
   const currentDepartment =
     getDepartmentById(typedDepartments, profile.department_id) ?? null;
   const currentArea =
     getDepartmentArea(typedDepartments, profile.department_id) ?? currentDepartment;
   const currentJobPosition =
-    typedDepartmentJobPositions.find(
+    typedJobPositions.find(
       (jobPosition) => jobPosition.id === profile.job_position_id
     ) ?? null;
-
-  let scheduleTypeName = "Sin calendario configurado";
-  let rotationGroupName = "Sin grupo asignado";
-  let rotationPatternName = "No aplica";
-  let rotationSequenceName =
-    "El administrador debe configurar el calendario del area.";
-
-  if (currentArea?.id) {
-    const { data: areaScheduleConfig } = await adminClient
-      .from("area_schedule_configs")
-      .select("schedule_type")
-      .eq("department_id", currentArea.id)
-      .maybeSingle();
-    const typedAreaScheduleConfig =
-      areaScheduleConfig as AreaScheduleConfigRow | null;
-
-    if (typedAreaScheduleConfig?.schedule_type) {
-      scheduleTypeName =
-        SCHEDULE_TYPE_LABELS[typedAreaScheduleConfig.schedule_type];
-
-      if (typedAreaScheduleConfig.schedule_type === "jornada_normal") {
-        rotationGroupName = "No aplica";
-        rotationSequenceName =
-          "Lun-Jue jornada completa, viernes jornada reducida";
-      } else {
-        const { data: assignment } = await adminClient
-          .from("user_rotation_assignments")
-          .select("rotation_group_id")
-          .eq("user_id", profile.id)
-          .maybeSingle();
-
-        if (assignment?.rotation_group_id) {
-          const { data: rotationGroup } = await adminClient
-            .from("rotation_groups")
-            .select("id, code, label, rotation_pattern_id, reference_date")
-            .eq("id", assignment.rotation_group_id)
-            .maybeSingle();
-          const typedRotationGroup = rotationGroup as RotationGroupRow | null;
-
-          if (typedRotationGroup) {
-            rotationGroupName = typedRotationGroup.label;
-
-            const { data: rotationPattern } = await adminClient
-              .from("rotation_patterns")
-              .select("label, sequence")
-              .eq("id", typedRotationGroup.rotation_pattern_id)
-              .maybeSingle();
-            const typedRotationPattern =
-              rotationPattern as RotationPatternRow | null;
-
-            if (typedRotationPattern) {
-              rotationPatternName = typedRotationPattern.label;
-              rotationSequenceName = formatRotationSequence(
-                typedRotationPattern.sequence
-              );
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const typedDepartmentRequests = (
-    (departmentChangeRequests ?? []) as DepartmentChangeRequest[]
-  ).map((request) => {
-      const currentRequestDepartment =
-        getDepartmentById(typedDepartments, request.current_department_id) ?? null;
-      const requestedRequestDepartment =
-        getDepartmentById(typedDepartments, request.requested_department_id) ?? null;
-      const currentRequestArea =
-        getDepartmentArea(typedDepartments, request.current_department_id) ??
-        currentRequestDepartment;
-      const requestedRequestArea =
-        getDepartmentArea(typedDepartments, request.requested_department_id) ??
-        requestedRequestDepartment;
-
-      return {
-        ...request,
-        currentAreaName: currentRequestArea?.name ?? "Sin area",
-        currentDepartmentName: currentRequestDepartment?.name ?? "Sin departamento",
-        requestedAreaName: requestedRequestArea?.name ?? "Sin area",
-        requestedDepartmentName:
-          requestedRequestDepartment?.name ?? "Sin departamento",
-      } satisfies ProfileDepartmentChangeRequestSummary;
-    });
-  const typedJobPositionRequests = (
-    (jobPositionChangeRequests ?? []) as unknown[]
-  ).map((request) => {
-    const typedRequest = request as ProfileJobPositionChangeRequestRow & {
-      current_job_position:
-        | ProfileJobPositionChangeRequestRow["current_job_position"]
-        | ProfileJobPositionChangeRequestRow["current_job_position"][];
-      requested_job_position:
-        | ProfileJobPositionChangeRequestRow["requested_job_position"]
-        | ProfileJobPositionChangeRequestRow["requested_job_position"][];
-    };
-    const currentRequestDepartment =
-      getDepartmentById(typedDepartments, typedRequest.current_department_id) ?? null;
-    const currentRequestArea =
-      getDepartmentArea(typedDepartments, typedRequest.current_department_id) ??
-      currentRequestDepartment;
-    const currentRequestJobPosition = pickFirstRelation(
-      typedRequest.current_job_position
-    );
-    const requestedRequestJobPosition = pickFirstRelation(
-      typedRequest.requested_job_position
-    );
-
-    return {
-      ...typedRequest,
-      currentAreaName: currentRequestArea?.name ?? "Sin area",
-      currentDepartmentName: currentRequestDepartment?.name ?? "Sin departamento",
-      currentJobPositionName:
-        currentRequestJobPosition?.name ?? "Sin puesto asignado",
-      requestedJobPositionName:
-        requestedRequestJobPosition?.name ?? "Puesto no disponible",
-    } satisfies ProfileJobPositionChangeRequestSummary;
-  });
+  const currentScheduleType =
+    typedUserSchedulePreference?.schedule_type ??
+    (currentArea?.id ? areaScheduleConfigMap.get(currentArea.id) ?? null : null);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
@@ -366,16 +272,27 @@ export default async function ProfilePage() {
 
       <ProfileForm
         profile={profile as ProfilePageProfile}
-        companyName={company?.name ?? "Sin empresa"}
-        areaName={currentArea?.name ?? "Sin area"}
-        departmentName={currentDepartment?.name ?? "Sin departamento"}
-        jobPositionName={currentJobPosition?.name ?? "Sin puesto asignado"}
-        scheduleTypeName={scheduleTypeName}
-        rotationGroupName={rotationGroupName}
-        rotationPatternName={rotationPatternName}
-        rotationSequenceName={rotationSequenceName}
         userId={authUser.id}
       />
+
+      {profile.company_id ? (
+        <LaborPreferencesCard
+          areaScheduleConfigs={profileAreaScheduleConfigs}
+          companyId={profile.company_id}
+          companyName={company?.name ?? "Sin empresa"}
+          currentAreaId={currentArea?.id ?? null}
+          currentDepartmentId={currentDepartment?.id ?? null}
+          currentJobPositionId={currentJobPosition?.id ?? null}
+          currentRotationGroupId={
+            typedUserRotationAssignment?.rotation_group_id ?? null
+          }
+          currentScheduleType={currentScheduleType}
+          departments={typedDepartments}
+          employeeId={profile.employee_id ?? null}
+          jobPositions={typedJobPositions}
+          rotationGroups={rotationGroupOptions}
+        />
+      ) : null}
 
       {isSuperAdminProfile ? (
         <SuperAdminLaborScopeCard
@@ -388,29 +305,6 @@ export default async function ProfilePage() {
           currentDepartmentName={
             currentDepartment?.name ?? "Sin departamento asignado"
           }
-        />
-      ) : null}
-
-      {!isSuperAdminProfile && profile.company_id && profile.department_id ? (
-        <DepartmentChangeRequestCard
-          companyName={company?.name ?? "Sin empresa"}
-          currentDepartmentId={profile.department_id}
-          currentAreaName={currentArea?.name ?? "Sin area"}
-          currentDepartmentName={currentDepartment?.name ?? "Sin departamento"}
-          departments={typedDepartments}
-          requests={typedDepartmentRequests}
-        />
-      ) : null}
-
-      {!isSuperAdminProfile && profile.company_id && profile.department_id ? (
-        <JobPositionChangeRequestCard
-          companyName={company?.name ?? "Sin empresa"}
-          currentAreaName={currentArea?.name ?? "Sin area"}
-          currentDepartmentName={currentDepartment?.name ?? "Sin departamento"}
-          currentJobPositionId={profile.job_position_id ?? null}
-          currentJobPositionName={currentJobPosition?.name ?? "Sin puesto asignado"}
-          jobPositions={typedDepartmentJobPositions}
-          requests={typedJobPositionRequests}
         />
       ) : null}
     </div>

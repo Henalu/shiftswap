@@ -180,7 +180,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         <EmptyState
           icon={<CalendarRange className="size-6" />}
           title="Calendario no configurado"
-          description="Tu area o departamento aun no tiene un tipo de jornada asignado. Cuando un administrador lo configure, aqui veras tu horario mensual."
+          description="Configura tu tipo de jornada y, si aplica, tu grupo de rotacion desde Mi perfil para ver tu horario mensual."
         />
       )}
     </div>

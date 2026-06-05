@@ -9,15 +9,10 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
-  BriefcaseBusiness,
-  Building2,
   Camera,
-  CalendarCog,
-  IdCard,
   Loader2,
   Mail,
   Phone,
-  Repeat,
   ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,16 +36,8 @@ import type { UserProfile } from "@/types";
 interface ProfileFormProps {
   profile: Pick<
     UserProfile,
-    "full_name" | "email" | "phone" | "avatar_url" | "signature_url" | "employee_id"
+    "full_name" | "email" | "phone" | "avatar_url" | "signature_url"
   >;
-  companyName: string;
-  areaName: string;
-  departmentName: string;
-  jobPositionName: string;
-  scheduleTypeName: string;
-  rotationGroupName: string;
-  rotationPatternName: string;
-  rotationSequenceName: string;
   userId: string;
 }
 
@@ -85,14 +72,6 @@ function ReadonlyField({ icon, label, value, className }: ReadonlyFieldProps) {
 
 export function ProfileForm({
   profile,
-  companyName,
-  areaName,
-  departmentName,
-  jobPositionName,
-  scheduleTypeName,
-  rotationGroupName,
-  rotationPatternName,
-  rotationSequenceName,
   userId,
 }: ProfileFormProps) {
   const [fullName, setFullName] = useState(profile.full_name ?? "");
@@ -277,8 +256,8 @@ export function ProfileForm({
         <CardHeader className="gap-2">
           <CardTitle>Informacion personal</CardTitle>
           <CardDescription>
-            Solo editas tus datos de contacto. La informacion laboral validada se
-            mantiene como referencia fija.
+            Actualiza los datos con los que el equipo te identifica y contacta
+            dentro de ShiftSwap.
           </CardDescription>
         </CardHeader>
 
@@ -320,72 +299,6 @@ export function ProfileForm({
               autoComplete="email"
             />
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>Informacion laboral</CardTitle>
-          <CardDescription>
-            Estos datos vienen de la validacion inicial y sirven como contexto en
-            aprobaciones, turnos y negociaciones. Los cambios de departamento y de
-            puesto se solicitan y revisan por separado.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <ReadonlyField
-            icon={<Building2 className="size-4" />}
-            label="Empresa"
-            value={companyName}
-            className="xl:col-span-2"
-          />
-          <ReadonlyField
-            icon={<BriefcaseBusiness className="size-4" />}
-            label="Area o taller"
-            value={areaName}
-            className="xl:col-span-2"
-          />
-          <ReadonlyField
-            icon={<IdCard className="size-4" />}
-            label="ID de empleado"
-            value={profile.employee_id?.trim() || "No disponible"}
-            className="xl:col-span-2"
-          />
-          <ReadonlyField
-            icon={<BriefcaseBusiness className="size-4" />}
-            label="Departamento"
-            value={departmentName}
-            className="xl:col-span-3"
-          />
-          <ReadonlyField
-            icon={<BriefcaseBusiness className="size-4" />}
-            label="Puesto de trabajo"
-            value={jobPositionName}
-            className="xl:col-span-3"
-          />
-          <ReadonlyField
-            icon={<CalendarCog className="size-4" />}
-            label="Tipo de jornada"
-            value={scheduleTypeName}
-            className="xl:col-span-3"
-          />
-          <ReadonlyField
-            icon={<Repeat className="size-4" />}
-            label="Grupo de turno"
-            value={
-              rotationPatternName !== "No aplica"
-                ? `${rotationGroupName} - ${rotationPatternName}`
-                : rotationGroupName
-            }
-            className="xl:col-span-3"
-          />
-          <ReadonlyField
-            icon={<Repeat className="size-4" />}
-            label="Orden de turnos"
-            value={rotationSequenceName}
-            className="xl:col-span-6"
-          />
         </CardContent>
       </Card>
 

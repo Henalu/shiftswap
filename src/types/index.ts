@@ -79,6 +79,14 @@ export interface AreaScheduleConfig {
   updated_at: string;
 }
 
+export interface UserSchedulePreference {
+  id: string;
+  user_id: string;
+  schedule_type: ScheduleTypeCode;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserRotationAssignment {
   id: string;
   user_id: string;

@@ -60,14 +60,25 @@ export async function getUserCalendarInput({
     return { configured: false };
   }
 
-  // 3. Check area_schedule_config for the area
-  const { data: areaConfig } = await admin
-    .from("area_schedule_configs")
-    .select("schedule_type")
-    .eq("department_id", area.id)
-    .maybeSingle();
+  // 3. Resolve the user's schedule type. Personal preference wins over area default.
+  const [{ data: userSchedulePreference }, { data: areaConfig }] =
+    await Promise.all([
+      admin
+        .from("user_schedule_preferences")
+        .select("schedule_type")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      admin
+        .from("area_schedule_configs")
+        .select("schedule_type")
+        .eq("department_id", area.id)
+        .maybeSingle(),
+    ]);
 
-  if (!areaConfig) {
+  const scheduleType =
+    userSchedulePreference?.schedule_type ?? areaConfig?.schedule_type ?? null;
+
+  if (!scheduleType) {
     return { configured: false };
   }
 
@@ -89,13 +100,13 @@ export async function getUserCalendarInput({
 
   const base: Omit<CalendarInput, "rotation"> & { rotation?: CalendarInput["rotation"] } = {
     configured: true,
-    scheduleType: areaConfig.schedule_type,
+    scheduleType,
     vacations: vacations ?? [],
     overrides: overrides ?? [],
   };
 
   // 5. For 3t5, load rotation group + pattern
-  if (areaConfig.schedule_type === "3t5") {
+  if (scheduleType === "3t5") {
     const { data: assignment } = await admin
       .from("user_rotation_assignments")
       .select("rotation_group_id")

@@ -528,8 +528,8 @@ export default async function HomePage() {
       : null,
     !calendarDays
       ? {
-          description: "No hay tipo de jornada asignado para tu area.",
-          href: "/calendar",
+          description: "Configura tu jornada en Mi perfil.",
+          href: "/profile",
           icon: CalendarRange,
           label: "Calendario sin configurar",
           value: "!",
@@ -617,7 +617,7 @@ export default async function HomePage() {
               ? todaysCalendar.dayType === "rest"
                 ? "Hoy figura como descanso en tu calendario."
                 : "Turno previsto segun tu calendario laboral."
-              : "Pendiente de configuracion por area."
+              : "Pendiente de configuracion en tu perfil."
           }
           icon={CalendarCheck}
           label="Hoy"
@@ -905,7 +905,7 @@ export default async function HomePage() {
                     Calendario pendiente
                   </p>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Cuando se configure tu area, este bloque mostrara tus turnos.
+                    Configura tu jornada en Mi perfil para ver tus turnos.
                   </p>
                 </div>
               )}

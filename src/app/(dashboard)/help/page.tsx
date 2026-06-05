@@ -26,6 +26,11 @@ function getMemberSections(): HelpSection[] {
           answer:
             "Ve a Mi perfil y busca la seccion Firma digital. Dibuja tu firma en el recuadro y pulsa Guardar. Solo necesitas hacerlo una vez.",
         },
+        {
+          question: "Donde cambio mi departamento, puesto o jornada?",
+          answer:
+            "Ve a Mi perfil y usa Configuracion laboral. Los cambios se guardan al momento y se aplican a tu calendario y a tu contexto de turnos.",
+        },
       ],
     },
     {
@@ -129,17 +134,17 @@ function getAdminSections(): HelpSection[] {
       ],
     },
     {
-      title: "Gestion de departamento",
+      title: "Configuracion laboral",
       items: [
         {
-          question: "Que son los cambios de departamento?",
+          question: "Quien cambia ahora el departamento o puesto de un empleado?",
           answer:
-            "Cuando un empleado necesita trasladarse a otro departamento operativo, puede solicitarlo. Desde Cambios de depto. puedes revisar y resolver estas solicitudes.",
+            "Cada empleado puede actualizarlo desde Mi perfil. La administracion ya no tiene que aprobar esas modificaciones de perfil laboral.",
         },
         {
-          question: "Que son los cambios de puesto?",
+          question: "Quien asigna el grupo de rotacion?",
           answer:
-            "Los empleados pueden solicitar un cambio de puesto dentro de su departamento. Desde Cambios de puesto puedes revisar y aprobar estas peticiones.",
+            "El propio empleado puede elegir su tipo de jornada y su grupo de rotacion desde Configuracion laboral. El panel de calendarios sigue sirviendo para revisar la configuracion general del area.",
         },
       ],
     },

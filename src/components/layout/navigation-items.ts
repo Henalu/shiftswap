@@ -4,7 +4,6 @@ import {
   CalendarCheck,
   CalendarDays,
   CalendarRange,
-  BriefcaseBusiness,
   CalendarCog,
   CircleHelp,
   ClipboardCheck,
@@ -17,7 +16,6 @@ import {
   User,
   Users,
   WalletCards,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { hasAdminPanelAccess, isSuperAdmin } from "@/lib/user-roles";
@@ -129,18 +127,6 @@ export function getAdminNavigationItems(role: UserRole): NavigationItem[] {
       tour: "nav-admin",
     },
     {
-      href: "/admin/department-changes",
-      label: "Cambios de depto.",
-      description: "Revisa traslados entre departamentos operativos.",
-      icon: Workflow,
-    },
-    {
-      href: "/admin/job-position-changes",
-      label: "Cambios de puesto",
-      description: "Revisa ajustes de puesto dentro de cada departamento.",
-      icon: BriefcaseBusiness,
-    },
-    {
       href: "/admin/validations",
       label: "Validaciones",
       description: "Revisa altas y accesos antes de aprobarlos.",
@@ -205,10 +191,6 @@ export function isNavigationItemActive(pathname: string, href: string) {
       return pathname === "/admin" || pathname.startsWith("/admin/exchanges");
     case "/admin/validations":
       return pathname.startsWith("/admin/validations");
-    case "/admin/department-changes":
-      return pathname.startsWith("/admin/department-changes");
-    case "/admin/job-position-changes":
-      return pathname.startsWith("/admin/job-position-changes");
     case "/admin/users":
       return pathname.startsWith("/admin/users");
     case "/admin/platform":
