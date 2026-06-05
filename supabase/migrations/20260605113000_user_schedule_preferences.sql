@@ -2,7 +2,7 @@
 -- Lets each employee choose their own schedule type without changing the area default.
 
 CREATE TABLE IF NOT EXISTS public.user_schedule_preferences (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   schedule_type TEXT NOT NULL CHECK (schedule_type IN ('3t5', 'jornada_normal')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
