@@ -15,6 +15,7 @@ import {
   getShiftSchedule,
   isShiftType,
   matchesShiftSchedule,
+  validateShiftCoverageWindow,
 } from "@/lib/shifts";
 import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
@@ -31,6 +32,12 @@ export async function createShift(
   const shiftType = formData.get("shift_type") as string;
   const submittedStartTime = formData.get("start_time") as string | null;
   const submittedEndTime = formData.get("end_time") as string | null;
+  const submittedCoverageStartTime = formData.get("coverage_start_time") as
+    | string
+    | null;
+  const submittedCoverageEndTime = formData.get("coverage_end_time") as
+    | string
+    | null;
   const description = (formData.get("description") as string) || null;
   const acceptedModalities = formData.getAll("accepted_modalities") as string[];
 
@@ -61,6 +68,11 @@ export async function createShift(
   }
 
   const schedule = getShiftSchedule(shiftType);
+  const hasCoverageWindow = Boolean(
+    submittedCoverageStartTime || submittedCoverageEndTime
+  );
+  let coverageStartTime: string | null = null;
+  let coverageEndTime: string | null = null;
 
   if (
     (submittedStartTime || submittedEndTime) &&
@@ -73,6 +85,32 @@ export async function createShift(
         schedule.endTime
       }. Vuelve a elegir el tipo de turno para recalcularlo.`,
     };
+  }
+
+  if (hasCoverageWindow) {
+    if (
+      !validModalities.includes("hours_bank") ||
+      validModalities.includes("shift_exchange")
+    ) {
+      return {
+        error:
+          "La cobertura parcial solo es compatible con bolsa de horas.",
+      };
+    }
+
+    const coverageCheck = validateShiftCoverageWindow({
+      shiftStartTime: schedule.startTime,
+      shiftEndTime: schedule.endTime,
+      coverageStartTime: submittedCoverageStartTime,
+      coverageEndTime: submittedCoverageEndTime,
+    });
+
+    if (!coverageCheck.valid) {
+      return { error: coverageCheck.reason };
+    }
+
+    coverageStartTime = coverageCheck.startTime;
+    coverageEndTime = coverageCheck.endTime;
   }
 
   const supabase = await createClient();
@@ -175,6 +213,8 @@ export async function createShift(
     // The stored schedule is derived from shift_type to prevent invalid mixes.
     start_time: schedule.startTime,
     end_time: schedule.endTime,
+    coverage_start_time: coverageStartTime,
+    coverage_end_time: coverageEndTime,
     shift_type: shiftType,
     description: description || undefined,
     accepted_modalities: validModalities,

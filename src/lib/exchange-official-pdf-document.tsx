@@ -25,6 +25,8 @@ export interface ExchangeOfficialPdfData {
   id: string;
   status: ExchangeStatus;
   agreement_type: ExchangeAgreementType | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   created_at: string;
   confirmed_at: string | null;
   submitted_for_approval_at: string | null;
@@ -461,8 +463,32 @@ function getRequestDate(exchange: ExchangeOfficialPdfData): string {
   );
 }
 
+function formatClockTime(value: string | null | undefined): string {
+  return value ? value.slice(0, 5) : "";
+}
+
+function getCoverageTimeRange(
+  exchange: ExchangeOfficialPdfData,
+): string | null {
+  if (
+    exchange.agreement_type !== "hours_bank" ||
+    !exchange.coverage_start_time ||
+    !exchange.coverage_end_time
+  ) {
+    return null;
+  }
+
+  return `${formatClockTime(exchange.coverage_start_time)} - ${formatClockTime(
+    exchange.coverage_end_time,
+  )}`;
+}
+
 function getDecisionText(exchange: ExchangeOfficialPdfData): string {
   const notes = exchange.department_decision_notes?.trim();
+  const coverageTimeRange = getCoverageTimeRange(exchange);
+  const coveragePrefix = coverageTimeRange
+    ? `Cobertura parcial ${coverageTimeRange}. `
+    : "";
 
   if (notes) {
     return notes;
@@ -470,19 +496,19 @@ function getDecisionText(exchange: ExchangeOfficialPdfData): string {
 
   if (exchange.status === "approved") {
     return exchange.department_reviewed_at
-      ? "Autorizado por el taller o departamento dentro del flujo anterior de ShiftSwap."
-      : "Aceptado por ambas partes en ShiftSwap. Responsable informado sin autorizacion adicional.";
+      ? `${coveragePrefix}Autorizado por el taller o departamento dentro del flujo anterior de ShiftSwap.`
+      : `${coveragePrefix}Aceptado por ambas partes en ShiftSwap. Responsable informado sin autorizacion adicional.`;
   }
 
   if (exchange.status === "rejected") {
-    return "Solicitud rechazada dentro del flujo anterior de ShiftSwap.";
+    return `${coveragePrefix}Solicitud rechazada dentro del flujo anterior de ShiftSwap.`;
   }
 
   if (exchange.status === "pending_validation") {
-    return "Estado antiguo pendiente de normalizar a aceptado por ambas partes.";
+    return `${coveragePrefix}Estado antiguo pendiente de normalizar a aceptado por ambas partes.`;
   }
 
-  return "Solicitud registrada dentro de ShiftSwap y pendiente de completar sus firmas.";
+  return `${coveragePrefix}Solicitud registrada dentro de ShiftSwap y pendiente de completar sus firmas.`;
 }
 
 function getValue(value: string | null | undefined): string {
@@ -638,6 +664,7 @@ export function ExchangeOfficialShiftChangePdf({
   const requestDate = getRequestDate(exchange);
   const [day, month, year] = getDateParts(requestDate);
   const requestedShift = buildRequestedShiftSummary(exchange);
+  const coverageTimeRange = getCoverageTimeRange(exchange);
   const approvalMark =
     exchange.status === "approved" && exchange.department_reviewed_at ? "X" : "";
   const ownerFormalName = getValue(exchange.owner.full_name);
@@ -813,6 +840,13 @@ export function ExchangeOfficialShiftChangePdf({
                 <Text style={styles.fieldBoxText}>{requestedShift.dateLabel}</Text>
               </View>
             </View>
+
+            {coverageTimeRange ? (
+              <Text style={styles.paragraphIndented}>
+                Cobertura parcial: {coverageTimeRange}. Compensacion mediante
+                bolsa de horas.
+              </Text>
+            ) : null}
 
             <Text style={styles.signatureHeading}>FIRMAS.</Text>
 

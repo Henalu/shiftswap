@@ -30,12 +30,14 @@ interface ProposeExchangeDialogProps {
   shiftId: string;
   acceptedModalities: AcceptedModality[];
   calendarDays?: CalendarDay[] | null;
+  coverageTimeRange?: string | null;
 }
 
 export function ProposeExchangeDialog({
   shiftId,
   acceptedModalities,
   calendarDays,
+  coverageTimeRange = null,
 }: ProposeExchangeDialogProps) {
   const [state, formAction, isPending] = useActionState(proposeExchange, null);
   const [open, setOpen] = useState(false);
@@ -114,13 +116,22 @@ export function ProposeExchangeDialog({
   return (
     <div className="flex flex-wrap gap-3">
       {acceptsHoursBank && (
-        <form action={formAction}>
+        <form action={formAction} className="space-y-2">
           <input type="hidden" name="shift_id" value={shiftId} />
           <input type="hidden" name="agreement_type" value="hours_bank" />
           <Button type="submit" disabled={isPending}>
             <Clock className="size-4" />
-            {isPending ? "Enviando..." : "Aceptar"}
+            {isPending
+              ? "Enviando..."
+              : coverageTimeRange
+                ? "Aceptar cobertura"
+                : "Aceptar"}
           </Button>
+          {coverageTimeRange ? (
+            <p className="max-w-xs text-xs leading-5 text-muted-foreground">
+              Bolsa de horas para {coverageTimeRange}.
+            </p>
+          ) : null}
         </form>
       )}
 

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { formatHoursQuantity } from "@/lib/shifts";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import type { ShiftDebtTransactionStatus } from "@/types";
@@ -39,6 +40,8 @@ interface HoursBankDebtRow {
     | {
         id: string;
         shift_id: string;
+        coverage_start_time: string | null;
+        coverage_end_time: string | null;
         shift:
           | {
               date: string;
@@ -55,6 +58,8 @@ interface HoursBankDebtRow {
     | {
         id: string;
         shift_id: string;
+        coverage_start_time: string | null;
+        coverage_end_time: string | null;
         shift:
           | {
               date: string;
@@ -80,6 +85,7 @@ interface HoursBankSummary {
   latestShiftId: string | null;
   latestDate: string | null;
   latestTimeRange: string | null;
+  latestIsPartialCoverage: boolean;
 }
 
 function pickFirst<T>(value: T | T[] | null | undefined): T | null {
@@ -88,10 +94,6 @@ function pickFirst<T>(value: T | T[] | null | undefined): T | null {
   }
 
   return value ?? null;
-}
-
-function pluralizeHours(value: number) {
-  return `${value} hora${value === 1 ? "" : "s"}`;
 }
 
 export default async function HoursBankPage() {
@@ -118,6 +120,8 @@ export default async function HoursBankPage() {
       exchange:exchanges!exchange_id(
         id,
         shift_id,
+        coverage_start_time,
+        coverage_end_time,
         shift:shifts!shift_id(date, start_time, end_time)
       )
     `,
@@ -143,6 +147,7 @@ export default async function HoursBankPage() {
       latestShiftId: null,
       latestDate: null,
       latestTimeRange: null,
+      latestIsPartialCoverage: false,
     };
 
     if (debt.status === "active") {
@@ -152,11 +157,20 @@ export default async function HoursBankPage() {
     }
 
     if (!existing.latestDate && exchange?.shift_id) {
+      const coverageTimeRange =
+        exchange.coverage_start_time && exchange.coverage_end_time
+          ? formatTimeRange(
+              exchange.coverage_start_time,
+              exchange.coverage_end_time,
+            )
+          : null;
+
       existing.latestShiftId = exchange.shift_id;
       existing.latestDate = shift?.date ?? null;
-      existing.latestTimeRange = shift
-        ? formatTimeRange(shift.start_time, shift.end_time)
-        : null;
+      existing.latestTimeRange =
+        coverageTimeRange ??
+        (shift ? formatTimeRange(shift.start_time, shift.end_time) : null);
+      existing.latestIsPartialCoverage = Boolean(coverageTimeRange);
     }
 
     summaries.set(creditor.id, existing);
@@ -184,7 +198,7 @@ export default async function HoursBankPage() {
                 Horas confirmadas
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                {pluralizeHours(totalActiveHours)}
+                {formatHoursQuantity(totalActiveHours)}
               </p>
             </div>
             <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -200,7 +214,7 @@ export default async function HoursBankPage() {
                 Pendientes de cierre
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-                {pluralizeHours(totalPendingHours)}
+                {formatHoursQuantity(totalPendingHours)}
               </p>
             </div>
             <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-700">
@@ -232,11 +246,11 @@ export default async function HoursBankPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge className="border-amber-500/15 bg-amber-500/10 text-amber-700">
-                      {pluralizeHours(row.activeHours)}
+                      {formatHoursQuantity(row.activeHours)}
                     </Badge>
                     {row.pendingHours > 0 ? (
                       <Badge variant="outline">
-                        {pluralizeHours(row.pendingHours)} pendientes
+                        {formatHoursQuantity(row.pendingHours)} pendientes
                       </Badge>
                     ) : null}
                   </div>
@@ -246,7 +260,13 @@ export default async function HoursBankPage() {
                 <p className="text-sm leading-6 text-muted-foreground">
                   {row.latestDate
                     ? `Ultimo cambio: ${formatShortDate(row.latestDate)}${
-                        row.latestTimeRange ? `, ${row.latestTimeRange}` : ""
+                        row.latestTimeRange
+                          ? `, ${
+                              row.latestIsPartialCoverage
+                                ? `cobertura ${row.latestTimeRange}`
+                                : row.latestTimeRange
+                            }`
+                          : ""
                       }.`
                     : "Ultimo cambio sin fecha disponible."}
                 </p>

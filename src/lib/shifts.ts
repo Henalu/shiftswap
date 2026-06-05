@@ -32,7 +32,7 @@ export const SHIFT_TYPE_VALUES = Object.keys(
   SHIFT_TYPE_SCHEDULES,
 ) as ShiftType[];
 
-function normalizeShiftClock(value: string | null | undefined): string {
+export function normalizeShiftClock(value: string | null | undefined): string {
   if (!value) {
     return "";
   }
@@ -70,7 +70,7 @@ export function matchesShiftSchedule(
   );
 }
 
-function getClockMinutes(value: string | null | undefined): number | null {
+export function getClockMinutes(value: string | null | undefined): number | null {
   const normalized = normalizeShiftClock(value);
   const match = /^(\d{2}):(\d{2})$/.exec(normalized);
 
@@ -105,4 +105,145 @@ export function getShiftDurationHours(
       : endMinutes + 24 * 60 - startMinutes;
 
   return durationMinutes / 60;
+}
+
+function formatClockMinutes(minutes: number): string {
+  const normalizedMinutes = ((minutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hours = Math.floor(normalizedMinutes / 60);
+  const mins = normalizedMinutes % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function getTimelineMinutes(
+  value: string | null | undefined,
+  shiftStartMinutes: number,
+  wrapWhenEqual = false,
+): number | null {
+  const minutes = getClockMinutes(value);
+
+  if (minutes === null) {
+    return null;
+  }
+
+  if (minutes < shiftStartMinutes || (wrapWhenEqual && minutes === shiftStartMinutes)) {
+    return minutes + 24 * 60;
+  }
+
+  return minutes;
+}
+
+export function getShiftHalfHourOptions(
+  startTime: string | null | undefined,
+  endTime: string | null | undefined,
+): string[] {
+  const startMinutes = getClockMinutes(startTime);
+  const endMinutes = getClockMinutes(endTime);
+
+  if (startMinutes === null || endMinutes === null) {
+    return [];
+  }
+
+  const durationMinutes =
+    endMinutes > startMinutes
+      ? endMinutes - startMinutes
+      : endMinutes + 24 * 60 - startMinutes;
+  const options: string[] = [];
+
+  for (let offset = 0; offset <= durationMinutes; offset += 30) {
+    options.push(formatClockMinutes(startMinutes + offset));
+  }
+
+  return options;
+}
+
+export function validateShiftCoverageWindow({
+  shiftStartTime,
+  shiftEndTime,
+  coverageStartTime,
+  coverageEndTime,
+}: {
+  shiftStartTime: string | null | undefined;
+  shiftEndTime: string | null | undefined;
+  coverageStartTime: string | null | undefined;
+  coverageEndTime: string | null | undefined;
+}):
+  | {
+      valid: true;
+      startTime: string;
+      endTime: string;
+      durationHours: number;
+    }
+  | {
+      valid: false;
+      reason: string;
+    } {
+  const shiftStartMinutes = getClockMinutes(shiftStartTime);
+  const shiftEndMinutes = getClockMinutes(shiftEndTime);
+  const coverageStartMinutes = getClockMinutes(coverageStartTime);
+  const coverageEndMinutes = getClockMinutes(coverageEndTime);
+
+  if (
+    shiftStartMinutes === null ||
+    shiftEndMinutes === null ||
+    coverageStartMinutes === null ||
+    coverageEndMinutes === null
+  ) {
+    return { valid: false, reason: "Selecciona horas validas para la cobertura parcial." };
+  }
+
+  if (coverageStartMinutes % 30 !== 0 || coverageEndMinutes % 30 !== 0) {
+    return {
+      valid: false,
+      reason: "La cobertura parcial solo admite horas enteras o medias horas.",
+    };
+  }
+
+  const shiftEndTimeline =
+    shiftEndMinutes > shiftStartMinutes
+      ? shiftEndMinutes
+      : shiftEndMinutes + 24 * 60;
+  const coverageStartTimeline = getTimelineMinutes(
+    coverageStartTime,
+    shiftStartMinutes,
+  );
+  const coverageEndTimeline = getTimelineMinutes(
+    coverageEndTime,
+    shiftStartMinutes,
+    true,
+  );
+
+  if (coverageStartTimeline === null || coverageEndTimeline === null) {
+    return { valid: false, reason: "Selecciona una franja valida." };
+  }
+
+  if (
+    coverageStartTimeline < shiftStartMinutes ||
+    coverageStartTimeline >= shiftEndTimeline ||
+    coverageEndTimeline <= coverageStartTimeline ||
+    coverageEndTimeline > shiftEndTimeline
+  ) {
+    return {
+      valid: false,
+      reason: "La cobertura parcial debe estar dentro del horario del turno.",
+    };
+  }
+
+  return {
+    valid: true,
+    startTime: normalizeShiftClock(coverageStartTime),
+    endTime: normalizeShiftClock(coverageEndTime),
+    durationHours: (coverageEndTimeline - coverageStartTimeline) / 60,
+  };
+}
+
+export function formatHoursQuantity(hours: number): string {
+  const normalizedHours = Number.isFinite(hours) ? hours : 0;
+  const value = Number.isInteger(normalizedHours)
+    ? String(normalizedHours)
+    : normalizedHours.toLocaleString("es-ES", {
+        maximumFractionDigits: 1,
+      });
+
+  return `${value} hora${normalizedHours === 1 ? "" : "s"}`;
 }

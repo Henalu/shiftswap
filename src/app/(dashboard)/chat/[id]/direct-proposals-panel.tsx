@@ -32,6 +32,8 @@ export interface DirectChatProposal {
   date: string;
   start_time: string;
   end_time: string;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   shift_type: string;
   status: string;
   description: string | null;
@@ -62,7 +64,17 @@ function getProposalSummary(proposal: DirectChatProposal) {
   }
 
   if (request.agreement_type === "hours_bank") {
-    return EXCHANGE_AGREEMENT_LABELS.hours_bank;
+    const coverageTimeRange =
+      proposal.coverage_start_time && proposal.coverage_end_time
+        ? formatTimeRange(
+            proposal.coverage_start_time,
+            proposal.coverage_end_time,
+          )
+        : null;
+
+    return coverageTimeRange
+      ? `${EXCHANGE_AGREEMENT_LABELS.hours_bank}: cobertura ${coverageTimeRange}`
+      : EXCHANGE_AGREEMENT_LABELS.hours_bank;
   }
 
   const compensationLabel = request.compensation_shift_type
@@ -121,6 +133,13 @@ export function DirectProposalsPanel({
               proposal.start_time,
               proposal.end_time,
             );
+            const coverageTimeRange =
+              proposal.coverage_start_time && proposal.coverage_end_time
+                ? formatTimeRange(
+                    proposal.coverage_start_time,
+                    proposal.coverage_end_time,
+                  )
+                : null;
             const statusClassName = proposal.request
               ? REQUEST_STATUS_STYLES[proposal.request.status as RequestStatus]
               : SHIFT_STATUS_STYLES[proposal.status as ShiftStatus];
@@ -139,6 +158,11 @@ export function DirectProposalsPanel({
                       <Badge className={SHIFT_TYPE_STYLES[proposal.shift_type as ShiftType]}>
                         {SHIFT_TYPE_LABELS[proposal.shift_type as ShiftType]}
                       </Badge>
+                      {coverageTimeRange && (
+                        <Badge variant="outline" className="text-foreground">
+                          Cobertura {coverageTimeRange}
+                        </Badge>
+                      )}
                       <Badge className={statusClassName}>{statusLabel}</Badge>
                       {proposal.exchangeId && (
                         <Badge variant="outline" className="text-foreground">

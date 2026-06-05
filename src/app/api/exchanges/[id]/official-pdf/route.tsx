@@ -31,6 +31,8 @@ interface ExchangeOfficialDocumentDetail {
   agreement_type: ExchangeAgreementType | null;
   compensation_shift_date: string | null;
   compensation_shift_type: ShiftType | "rest" | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   created_at: string;
   confirmed_at: string | null;
   signed_by_user_a_at: string | null;
@@ -120,6 +122,7 @@ export async function GET(
     .select(
       `
       id, status, agreement_type, compensation_shift_date, compensation_shift_type,
+      coverage_start_time, coverage_end_time,
       created_at, confirmed_at,
       signed_by_user_a_at, signed_by_user_b_at,
       signed_by_user_a_name, signed_by_user_b_name,
@@ -297,6 +300,8 @@ export async function GET(
           id: typedExchange.id,
           status: typedExchange.status,
           agreement_type: typedExchange.agreement_type,
+          coverage_start_time: typedExchange.coverage_start_time,
+          coverage_end_time: typedExchange.coverage_end_time,
           created_at: typedExchange.created_at,
           confirmed_at: typedExchange.confirmed_at,
           submitted_for_approval_at: typedExchange.submitted_for_approval_at,

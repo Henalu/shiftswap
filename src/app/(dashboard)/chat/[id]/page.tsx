@@ -106,7 +106,7 @@ export default async function ConversationPage({ params }: PageProps) {
   const { data: directShifts } = await supabase
     .from("shifts")
     .select(
-      "id, user_id, direct_recipient_id, date, start_time, end_time, shift_type, status, description, created_at",
+      "id, user_id, direct_recipient_id, date, start_time, end_time, coverage_start_time, coverage_end_time, shift_type, status, description, created_at",
     )
     .not("direct_recipient_id", "is", null)
     .or(`user_id.eq.${authUser.id},direct_recipient_id.eq.${authUser.id}`)

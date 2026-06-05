@@ -3,6 +3,8 @@ import {
   EXCHANGE_AGREEMENT_LABELS,
   SHIFT_DEBT_TRANSACTION_STATUS_LABELS,
 } from "@/lib/constants";
+import { formatHoursQuantity, getShiftDurationHours } from "@/lib/shifts";
+import { formatTimeRange } from "@/lib/utils";
 import type {
   ExchangeAgreementType,
   ExchangeStatus,
@@ -86,12 +88,16 @@ export function getAgreementSummary({
   agreementType,
   compensationShiftType,
   compensationShiftDate,
+  coverageStartTime,
+  coverageEndTime,
   ownerName,
   requesterName,
 }: {
   agreementType: ExchangeAgreementType | null | undefined;
   compensationShiftType?: ShiftType | "rest" | null;
   compensationShiftDate?: string | null;
+  coverageStartTime?: string | null;
+  coverageEndTime?: string | null;
   ownerName: string;
   requesterName: string;
 }): string {
@@ -100,7 +106,21 @@ export function getAgreementSummary({
   }
 
   if (agreementType === "hours_bank") {
-    return `${EXCHANGE_AGREEMENT_LABELS.hours_bank}: ${ownerName} quedara debiendo 1 turno a ${requesterName}.`;
+    if (coverageStartTime && coverageEndTime) {
+      const coverageHours = getShiftDurationHours(
+        coverageStartTime,
+        coverageEndTime,
+      );
+
+      return `${EXCHANGE_AGREEMENT_LABELS.hours_bank}: ${requesterName} cubrira la franja ${formatTimeRange(
+        coverageStartTime,
+        coverageEndTime,
+      )}. ${ownerName} quedara debiendo ${formatHoursQuantity(
+        coverageHours,
+      )} a ${requesterName}.`;
+    }
+
+    return `${EXCHANGE_AGREEMENT_LABELS.hours_bank}: ${ownerName} quedara debiendo el turno completo a ${requesterName}.`;
   }
 
   const shiftLabel = compensationShiftType
@@ -131,9 +151,9 @@ export function getHoursBankDescription(
   creditorName: string,
   units = 1,
 ): string {
-  return `${debtorName} queda debiendo ${units} hora${
-    units === 1 ? "" : "s"
-  } a ${creditorName} dentro de la bolsa de horas.`;
+  return `${debtorName} queda debiendo ${formatHoursQuantity(
+    units,
+  )} a ${creditorName} dentro de la bolsa de horas.`;
 }
 
 export function getShiftDebtStatusLabel(

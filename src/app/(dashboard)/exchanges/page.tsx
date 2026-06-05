@@ -25,7 +25,7 @@ import { pickFirstRelation } from "@/lib/supabase-relations";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import { cancelExchange } from "./actions";
-import type { ExchangeStatus, ShiftType } from "@/types";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 interface ExchangeRow {
   id: string;
@@ -33,7 +33,10 @@ interface ExchangeRow {
   user_a_id: string;
   user_b_id: string;
   status: ExchangeStatus;
+  agreement_type: ExchangeAgreementType | null;
   compensation_shift_date: string | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   confirmed_at: string | null;
   submitted_for_approval_at: string | null;
   department_reviewed_at: string | null;
@@ -63,6 +66,30 @@ function getFirstExchangeDate(
   }
 
   return compensationShiftDate < shiftDate ? compensationShiftDate : shiftDate;
+}
+
+function getCoverageTimeRange(exchange: ExchangeRow): string | null {
+  if (
+    exchange.agreement_type !== "hours_bank" ||
+    !exchange.coverage_start_time ||
+    !exchange.coverage_end_time
+  ) {
+    return null;
+  }
+
+  return formatTimeRange(exchange.coverage_start_time, exchange.coverage_end_time);
+}
+
+function CoverageBadge({ timeRange }: { timeRange: string | null }) {
+  if (!timeRange) {
+    return null;
+  }
+
+  return (
+    <Badge variant="outline" className="text-foreground">
+      Cobertura {timeRange}
+    </Badge>
+  );
 }
 
 function renderExchangeMessage(
@@ -124,7 +151,8 @@ export default async function ExchangesPage() {
     .from("exchanges")
     .select(
       `
-      id, shift_id, user_a_id, user_b_id, status, compensation_shift_date, confirmed_at,
+      id, shift_id, user_a_id, user_b_id, status, agreement_type,
+      compensation_shift_date, coverage_start_time, coverage_end_time, confirmed_at,
       submitted_for_approval_at, department_reviewed_at, department_decision_notes,
       signed_by_user_b_at,
       cancellation_requested_by, cancellation_requested_at, created_at,
@@ -231,6 +259,7 @@ export default async function ExchangesPage() {
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
+                  const coverageTimeRange = getCoverageTimeRange(exchange);
                   const canCancelBeforeFirstDate =
                     getMadridDateInputValue() <
                     getFirstExchangeDate(
@@ -261,6 +290,7 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
+                              <CoverageBadge timeRange={coverageTimeRange} />
                               {isRequester && !exchange.signed_by_user_b_at && (
                                 <Badge variant="outline">
                                   <FileSignature className="size-3.5" />
@@ -342,6 +372,7 @@ export default async function ExchangesPage() {
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
+                  const coverageTimeRange = getCoverageTimeRange(exchange);
 
                   return (
                     <Card key={exchange.id}>
@@ -366,6 +397,7 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
+                              <CoverageBadge timeRange={coverageTimeRange} />
                               <Badge variant="outline">
                                 <ShieldCheck className="size-3.5" />
                                 Estado antiguo
@@ -424,6 +456,7 @@ export default async function ExchangesPage() {
                     exchange.shift.start_time,
                     exchange.shift.end_time
                   );
+                  const coverageTimeRange = getCoverageTimeRange(exchange);
 
                   return (
                     <Card key={exchange.id}>
@@ -448,6 +481,7 @@ export default async function ExchangesPage() {
                               <Badge className={EXCHANGE_STATUS_STYLES[exchange.status]}>
                                 {EXCHANGE_STATUS_LABELS[exchange.status]}
                               </Badge>
+                              <CoverageBadge timeRange={coverageTimeRange} />
                             </div>
                           </div>
 

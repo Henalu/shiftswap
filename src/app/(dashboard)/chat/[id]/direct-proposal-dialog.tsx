@@ -27,7 +27,13 @@ import {
   type CalendarDay,
 } from "@/lib/calendar";
 import { getMinimumCompensationDate } from "@/lib/exchange-compensation";
-import { getShiftSchedule, isShiftType } from "@/lib/shifts";
+import {
+  formatHoursQuantity,
+  getShiftHalfHourOptions,
+  getShiftSchedule,
+  isShiftType,
+  validateShiftCoverageWindow,
+} from "@/lib/shifts";
 import {
   cn,
   FORM_CONTROL_CLASSNAME,
@@ -62,6 +68,9 @@ export function DirectProposalDialog({
     useState<ShiftType | "">("");
   const [agreementType, setAgreementType] =
     useState<ExchangeAgreementType>("hours_bank");
+  const [coverageEnabled, setCoverageEnabled] = useState(false);
+  const [coverageStartTime, setCoverageStartTime] = useState("");
+  const [coverageEndTime, setCoverageEndTime] = useState("");
   const minimumCompensationDate = useMemo(() => getMinimumCompensationDate(), []);
 
   const calendarMap = useMemo(() => {
@@ -107,6 +116,41 @@ export function DirectProposalDialog({
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
+  const coverageOptions = useMemo(
+    () =>
+      selectedSchedule
+        ? getShiftHalfHourOptions(
+            selectedSchedule.startTime,
+            selectedSchedule.endTime,
+          )
+        : [],
+    [selectedSchedule],
+  );
+  const coverageCheck =
+    coverageEnabled && selectedSchedule
+      ? validateShiftCoverageWindow({
+          shiftStartTime: selectedSchedule.startTime,
+          shiftEndTime: selectedSchedule.endTime,
+          coverageStartTime,
+          coverageEndTime,
+        })
+      : null;
+  const coverageEndOptions = selectedSchedule
+    ? coverageOptions.filter((option) =>
+        validateShiftCoverageWindow({
+          shiftStartTime: selectedSchedule.startTime,
+          shiftEndTime: selectedSchedule.endTime,
+          coverageStartTime,
+          coverageEndTime: option,
+        }).valid
+      )
+    : [];
+  const canSubmitCoverage =
+    agreementType !== "hours_bank" ||
+    !coverageEnabled ||
+    Boolean(coverageCheck && coverageCheck.valid);
+  const coverageDurationLabel =
+    coverageCheck?.valid ? formatHoursQuantity(coverageCheck.durationHours) : null;
   const isCalendarControlledDate = Boolean(calendarHint);
   const compensationCalendarHint =
     recipientCalendarMap?.get(compensationDate) ?? null;
@@ -149,7 +193,58 @@ export function DirectProposalDialog({
     Boolean(selectedDate && selectedShiftType) &&
     !calendarWarning &&
     !exchangeLockWarning &&
+    canSubmitCoverage &&
     canSubmitCompensation;
+
+  function applySelectedShiftType(nextShiftType: ShiftType | "") {
+    setSelectedShiftType(nextShiftType);
+
+    if (!coverageEnabled) {
+      return;
+    }
+
+    const nextSchedule = nextShiftType ? getShiftSchedule(nextShiftType) : null;
+    setCoverageStartTime(nextSchedule?.startTime ?? "");
+    setCoverageEndTime(nextSchedule?.endTime ?? "");
+  }
+
+  function handleCoverageToggle(enabled: boolean) {
+    setCoverageEnabled(enabled);
+
+    if (enabled) {
+      setAgreementType("hours_bank");
+      setCompensationDate("");
+      setCompensationShiftType("");
+      setCoverageStartTime(selectedSchedule?.startTime ?? "");
+      setCoverageEndTime(selectedSchedule?.endTime ?? "");
+      return;
+    }
+
+    setCoverageStartTime("");
+    setCoverageEndTime("");
+  }
+
+  function handleCoverageStartChange(nextStartTime: string) {
+    setCoverageStartTime(nextStartTime);
+
+    if (!selectedSchedule) {
+      setCoverageEndTime("");
+      return;
+    }
+
+    const nextEndOptions = coverageOptions.filter((option) =>
+      validateShiftCoverageWindow({
+        shiftStartTime: selectedSchedule.startTime,
+        shiftEndTime: selectedSchedule.endTime,
+        coverageStartTime: nextStartTime,
+        coverageEndTime: option,
+      }).valid
+    );
+
+    if (!nextEndOptions.includes(coverageEndTime)) {
+      setCoverageEndTime(nextEndOptions[0] ?? "");
+    }
+  }
 
   useEffect(() => {
     if (!state?.success) return;
@@ -161,6 +256,9 @@ export function DirectProposalDialog({
       setCompensationDate("");
       setCompensationShiftType("");
       setAgreementType("hours_bank");
+      setCoverageEnabled(false);
+      setCoverageStartTime("");
+      setCoverageEndTime("");
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -177,6 +275,9 @@ export function DirectProposalDialog({
           setCompensationDate("");
           setCompensationShiftType("");
           setAgreementType("hours_bank");
+          setCoverageEnabled(false);
+          setCoverageStartTime("");
+          setCoverageEndTime("");
         }
       }}
     >
@@ -232,7 +333,7 @@ export function DirectProposalDialog({
                   const nextShiftType = day
                     ? calendarDayTypeToShiftType(day.dayType)
                     : null;
-                  setSelectedShiftType(nextShiftType ?? "");
+                  applySelectedShiftType(nextShiftType ?? "");
                 }}
               />
               {calendarHint && calendarWarning && (
@@ -278,7 +379,9 @@ export function DirectProposalDialog({
                 disabled={isCalendarControlledDate}
                 onChange={(event) => {
                   const nextValue = event.target.value;
-                  setSelectedShiftType(isShiftType(nextValue) ? nextValue : "");
+                  applySelectedShiftType(
+                    isShiftType(nextValue) ? nextValue : "",
+                  );
                 }}
                 className={FORM_CONTROL_CLASSNAME}
               >
@@ -334,6 +437,8 @@ export function DirectProposalDialog({
                       if (value === "hours_bank") {
                         setCompensationDate("");
                         setCompensationShiftType("");
+                      } else {
+                        handleCoverageToggle(false);
                       }
                     }}
                     className="mt-1 size-4"
@@ -350,6 +455,82 @@ export function DirectProposalDialog({
               ))}
             </div>
           </div>
+
+          {agreementType === "hours_bank" && (
+            <div className="space-y-3 rounded-2xl border border-border/70 bg-secondary/25 px-4 py-4">
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={coverageEnabled}
+                  onChange={(event) => handleCoverageToggle(event.target.checked)}
+                  disabled={!selectedSchedule}
+                  className="mt-1 size-4 rounded border-border"
+                />
+                <span className="space-y-1">
+                  <span className="block font-semibold text-foreground">
+                    Cobertura parcial
+                  </span>
+                  <span className="block text-muted-foreground">
+                    Pide que {recipientName} cubra solo una franja de tu turno.
+                  </span>
+                </span>
+              </label>
+
+              {coverageEnabled && selectedSchedule ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="direct-coverage-start">
+                      Inicio de cobertura
+                    </Label>
+                    <select
+                      id="direct-coverage-start"
+                      name="coverage_start_time"
+                      value={coverageStartTime}
+                      onChange={(event) =>
+                        handleCoverageStartChange(event.target.value)
+                      }
+                      className={FORM_CONTROL_CLASSNAME}
+                    >
+                      {coverageOptions.slice(0, -1).map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="direct-coverage-end">
+                      Fin de cobertura
+                    </Label>
+                    <select
+                      id="direct-coverage-end"
+                      name="coverage_end_time"
+                      value={coverageEndTime}
+                      onChange={(event) =>
+                        setCoverageEndTime(event.target.value)
+                      }
+                      className={FORM_CONTROL_CLASSNAME}
+                    >
+                      {coverageEndOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground md:col-span-2">
+                    {coverageCheck?.valid
+                      ? `La bolsa de horas registrara ${coverageDurationLabel}.`
+                      : coverageCheck && !coverageCheck.valid
+                        ? coverageCheck.reason
+                        : "Selecciona una franja dentro del horario del turno."}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {agreementType === "shift_exchange" && (
             <div className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/35 p-4 md:grid-cols-2">

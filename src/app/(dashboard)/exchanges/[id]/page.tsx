@@ -40,6 +40,7 @@ import {
   SHIFT_TYPE_STYLES,
 } from "@/lib/constants";
 import { pickFirstRelation } from "@/lib/supabase-relations";
+import { formatHoursQuantity } from "@/lib/shifts";
 import {
   formatDate,
   formatShortDate,
@@ -71,6 +72,8 @@ interface ExchangeDetail {
   agreement_type: ExchangeAgreementType | null;
   compensation_shift_date: string | null;
   compensation_shift_type: ShiftType | "rest" | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   document_url: string | null;
   confirmed_at: string | null;
   signed_by_user_a_at: string | null;
@@ -216,6 +219,7 @@ export default async function ExchangeDetailPage({
         `
         id, shift_id, user_a_id, user_b_id, status, agreement_type,
         compensation_shift_date, compensation_shift_type, document_url, confirmed_at,
+        coverage_start_time, coverage_end_time,
         signed_by_user_a_at, signed_by_user_b_at,
         signed_by_user_a_name, signed_by_user_b_name,
         submitted_for_approval_at,
@@ -365,12 +369,18 @@ export default async function ExchangeDetailPage({
     agreementType: typed.agreement_type,
     compensationShiftType: typed.compensation_shift_type,
     compensationShiftDate: typed.compensation_shift_date,
+    coverageStartTime: typed.coverage_start_time,
+    coverageEndTime: typed.coverage_end_time,
     ownerName: typed.owner.full_name,
     requesterName: typed.requester.full_name,
   });
   const compensationDateLabel = formatCompensationDateLabel(
     typed.compensation_shift_date
   );
+  const coverageTimeRange =
+    typed.coverage_start_time && typed.coverage_end_time
+      ? formatTimeRange(typed.coverage_start_time, typed.coverage_end_time)
+      : null;
 
   const renderSignatureStatus = ({
     label,
@@ -528,9 +538,19 @@ export default async function ExchangeDetailPage({
               )}
 
               {typed.agreement_type === "hours_bank" && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="mt-4 space-y-3">
+                  {coverageTimeRange ? (
+                    <div className="rounded-2xl border border-border/70 bg-background/90 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Cobertura parcial
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">
+                        {coverageTimeRange}
+                      </p>
+                    </div>
+                  ) : null}
                   {typedDebtTransaction ? (
-                    <>
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         className={
                           SHIFT_DEBT_TRANSACTION_STATUS_STYLES[
@@ -545,15 +565,16 @@ export default async function ExchangeDetailPage({
                         }
                       </Badge>
                       <p className="text-sm text-muted-foreground">
-                        Se ha registrado una deuda de {typedDebtTransaction.units}{" "}
-                        turno de {typed.owner.full_name} hacia{" "}
+                        Se ha registrado una deuda de{" "}
+                        {formatHoursQuantity(typedDebtTransaction.units)} de{" "}
+                        {typed.owner.full_name} hacia{" "}
                         {typed.requester.full_name}.
                       </p>
-                    </>
+                    </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      La deuda de 1 turno quedara registrada en el ledger cuando
-                      ambas partes firmen el acuerdo.
+                      La deuda en horas quedara registrada cuando ambas partes
+                      firmen el acuerdo.
                     </p>
                   )}
                 </div>

@@ -15,6 +15,8 @@ export async function upsertHoursBankDebtTransaction({
   debtorName,
   creditorName,
   units,
+  coverageStartTime = null,
+  coverageEndTime = null,
 }: {
   exchangeId: string;
   exchangeStatus: ExchangeStatus;
@@ -23,10 +25,12 @@ export async function upsertHoursBankDebtTransaction({
   debtorName: string;
   creditorName: string;
   units: number;
+  coverageStartTime?: string | null;
+  coverageEndTime?: string | null;
 }): Promise<void> {
   const supabase = createAdminClient();
   const status = getHoursBankTransactionStatusForExchange(exchangeStatus);
-  const normalizedUnits = Math.max(1, Math.round(units));
+  const normalizedUnits = Math.max(0.5, Math.round(units * 2) / 2);
   const now = new Date().toISOString();
   const { error } = await supabase.from("shift_debt_transactions").upsert(
     {
@@ -44,6 +48,8 @@ export async function upsertHoursBankDebtTransaction({
       metadata: {
         agreement_type: "hours_bank",
         units_kind: "hours",
+        coverage_start_time: coverageStartTime,
+        coverage_end_time: coverageEndTime,
       },
       approved_at: status === "active" ? now : null,
       voided_at: status === "voided" ? now : null,

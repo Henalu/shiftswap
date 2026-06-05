@@ -31,6 +31,10 @@ export function ShiftCard({
 }: ShiftCardProps) {
   const isOwner = currentUserId === shift.user_id;
   const timeRange = formatTimeRange(shift.start_time, shift.end_time);
+  const coverageTimeRange =
+    shift.coverage_start_time && shift.coverage_end_time
+      ? formatTimeRange(shift.coverage_start_time, shift.coverage_end_time)
+      : null;
 
   return (
     <Card className="h-full border-border/75 transition-[border-color,box-shadow] hover:border-primary/20 hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_24px_40px_-26px_rgba(37,99,235,0.25)]">
@@ -52,6 +56,11 @@ export function ShiftCard({
           <Badge className={SHIFT_TYPE_STYLES[shift.shift_type as ShiftType]}>
             {SHIFT_TYPE_LABELS[shift.shift_type as ShiftType]}
           </Badge>
+          {coverageTimeRange ? (
+            <Badge variant="outline" className="text-foreground">
+              Cobertura {coverageTimeRange}
+            </Badge>
+          ) : null}
           <Badge variant="outline" className="text-foreground">
             {shift.department.name}
           </Badge>

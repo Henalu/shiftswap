@@ -124,6 +124,10 @@ export default async function ShiftDetailPage({ params }: PageProps) {
   }));
 
   const timeRange = formatTimeRange(shift.start_time, shift.end_time);
+  const coverageTimeRange =
+    shift.coverage_start_time && shift.coverage_end_time
+      ? formatTimeRange(shift.coverage_start_time, shift.coverage_end_time)
+      : null;
   const isOwner = authUser.id === shift.user_id;
   const myActiveProposal = typedRequests.find(
     (request) =>
@@ -224,12 +228,27 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               </div>
             )}
 
+            {coverageTimeRange ? (
+              <div className="rounded-2xl border border-border/70 bg-secondary/35 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Cobertura parcial
+                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {coverageTimeRange}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Esta publicacion solo acepta bolsa de horas para esa franja.
+                </p>
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-3">
               {canNegotiate && (
                 <ProposeExchangeDialog
                   shiftId={shift.id}
                   acceptedModalities={acceptedModalities}
                   calendarDays={calendarDays}
+                  coverageTimeRange={coverageTimeRange}
                 />
               )}
 
@@ -297,6 +316,10 @@ export default async function ShiftDetailPage({ params }: PageProps) {
                         {request.agreement_type && (
                           <p className="text-xs text-muted-foreground">
                             {EXCHANGE_AGREEMENT_LABELS[request.agreement_type as ExchangeAgreementType]}
+                            {request.agreement_type === "hours_bank" &&
+                              coverageTimeRange && (
+                                <> {" - "}Cobertura {coverageTimeRange}</>
+                              )}
                             {request.agreement_type === "shift_exchange" &&
                               request.compensation_shift_date && (
                                 <>

@@ -119,7 +119,7 @@ export default async function DashboardLayout({
         canAccessPlatformConsole={Boolean(platformAdmin)}
         role={role}
       />
-      <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-7xl flex-1 overflow-x-hidden">
+      <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-7xl flex-1 overflow-x-hidden pt-[calc(env(safe-area-inset-top)+3.5rem)] md:pt-0">
         <aside className="hidden h-full w-72 shrink-0 overflow-hidden border-r border-border/70 bg-sidebar/75 md:block">
           <SidebarNav role={role} />
         </aside>

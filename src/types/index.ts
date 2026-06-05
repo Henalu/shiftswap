@@ -315,6 +315,8 @@ export interface Shift {
   date: string;
   start_time: string;
   end_time: string;
+  coverage_start_time?: string | null;
+  coverage_end_time?: string | null;
   shift_type: ShiftType;
   department_id: string;
   direct_recipient_id?: string | null;
@@ -363,6 +365,8 @@ export interface Exchange {
   agreement_type?: ExchangeAgreementType | null;
   compensation_shift_date?: string | null;
   compensation_shift_type?: ShiftType | "rest" | null;
+  coverage_start_time?: string | null;
+  coverage_end_time?: string | null;
   document_url?: string;
   confirmed_at?: string;
   signed_by_user_a_at?: string;

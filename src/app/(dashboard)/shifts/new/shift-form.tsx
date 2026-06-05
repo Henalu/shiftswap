@@ -22,9 +22,15 @@ import {
   getCalendarDayBlockedShiftReason,
   type CalendarDay,
 } from "@/lib/calendar";
-import { getShiftSchedule, isShiftType } from "@/lib/shifts";
+import {
+  formatHoursQuantity,
+  getShiftHalfHourOptions,
+  getShiftSchedule,
+  isShiftType,
+  validateShiftCoverageWindow,
+} from "@/lib/shifts";
 import { formatTimeRange, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
-import type { ShiftType } from "@/types";
+import type { AcceptedModality, ShiftType } from "@/types";
 import { createShift } from "./actions";
 import { ShiftDatePicker } from "./shift-date-picker";
 
@@ -48,6 +54,12 @@ export function ShiftForm({
   const [selectedShiftType, setSelectedShiftType] = useState<ShiftType | "">(
     initialShiftType ?? "",
   );
+  const [acceptedModalities, setAcceptedModalities] = useState<
+    AcceptedModality[]
+  >(["hours_bank", "shift_exchange"]);
+  const [coverageEnabled, setCoverageEnabled] = useState(false);
+  const [coverageStartTime, setCoverageStartTime] = useState("");
+  const [coverageEndTime, setCoverageEndTime] = useState("");
 
   // Build a lookup map for calendar hints
   const calendarMap = useMemo(() => {
@@ -89,6 +101,103 @@ export function ShiftForm({
   const selectedSchedule = selectedShiftType
     ? getShiftSchedule(selectedShiftType)
     : null;
+  const coverageOptions = useMemo(
+    () =>
+      selectedSchedule
+        ? getShiftHalfHourOptions(
+            selectedSchedule.startTime,
+            selectedSchedule.endTime,
+          )
+        : [],
+    [selectedSchedule],
+  );
+  const coverageCheck =
+    coverageEnabled && selectedSchedule
+      ? validateShiftCoverageWindow({
+          shiftStartTime: selectedSchedule.startTime,
+          shiftEndTime: selectedSchedule.endTime,
+          coverageStartTime,
+          coverageEndTime,
+        })
+      : null;
+  const coverageEndOptions = selectedSchedule
+    ? coverageOptions.filter((option) =>
+        validateShiftCoverageWindow({
+          shiftStartTime: selectedSchedule.startTime,
+          shiftEndTime: selectedSchedule.endTime,
+          coverageStartTime,
+          coverageEndTime: option,
+        }).valid
+      )
+    : [];
+  const canSubmitCoverage =
+    !coverageEnabled || Boolean(coverageCheck && coverageCheck.valid);
+  const canSubmitModalities = acceptedModalities.length > 0;
+  const coverageDurationLabel =
+    coverageCheck?.valid ? formatHoursQuantity(coverageCheck.durationHours) : null;
+
+  function applySelectedShiftType(nextShiftType: ShiftType | "") {
+    setSelectedShiftType(nextShiftType);
+
+    if (!coverageEnabled) {
+      return;
+    }
+
+    const nextSchedule = nextShiftType ? getShiftSchedule(nextShiftType) : null;
+    setCoverageStartTime(nextSchedule?.startTime ?? "");
+    setCoverageEndTime(nextSchedule?.endTime ?? "");
+  }
+
+  function handleCoverageToggle(enabled: boolean) {
+    setCoverageEnabled(enabled);
+
+    if (enabled) {
+      setAcceptedModalities(["hours_bank"]);
+      setCoverageStartTime(selectedSchedule?.startTime ?? "");
+      setCoverageEndTime(selectedSchedule?.endTime ?? "");
+      return;
+    }
+
+    setCoverageStartTime("");
+    setCoverageEndTime("");
+  }
+
+  function handleModalityToggle(
+    modality: AcceptedModality,
+    checked: boolean,
+  ) {
+    if (coverageEnabled) {
+      return;
+    }
+
+    setAcceptedModalities((current) =>
+      checked
+        ? [...new Set([...current, modality])]
+        : current.filter((item) => item !== modality),
+    );
+  }
+
+  function handleCoverageStartChange(nextStartTime: string) {
+    setCoverageStartTime(nextStartTime);
+
+    if (!selectedSchedule) {
+      setCoverageEndTime("");
+      return;
+    }
+
+    const nextEndOptions = coverageOptions.filter((option) =>
+      validateShiftCoverageWindow({
+        shiftStartTime: selectedSchedule.startTime,
+        shiftEndTime: selectedSchedule.endTime,
+        coverageStartTime: nextStartTime,
+        coverageEndTime: option,
+      }).valid
+    );
+
+    if (!nextEndOptions.includes(coverageEndTime)) {
+      setCoverageEndTime(nextEndOptions[0] ?? "");
+    }
+  }
 
   return (
     <form action={formAction}>
@@ -134,9 +243,9 @@ export function ShiftForm({
                     const day = calendarMap.get(date);
                     if (day) {
                       const shiftType = calendarDayTypeToShiftType(day.dayType);
-                      setSelectedShiftType(shiftType ?? "");
+                      applySelectedShiftType(shiftType ?? "");
                     } else {
-                      setSelectedShiftType("");
+                      applySelectedShiftType("");
                     }
                   }
                 }}
@@ -181,7 +290,9 @@ export function ShiftForm({
                 value={selectedShiftType}
                 onChange={(event) => {
                   const nextValue = event.target.value;
-                  setSelectedShiftType(isShiftType(nextValue) ? nextValue : "");
+                  applySelectedShiftType(
+                    isShiftType(nextValue) ? nextValue : "",
+                  );
                 }}
                 className={FORM_CONTROL_CLASSNAME}
                 aria-describedby="shift-schedule-help shift-schedule-current"
@@ -257,13 +368,20 @@ export function ShiftForm({
             <p className="text-sm text-muted-foreground">
               Elige que tipo de propuestas quieres recibir para este turno.
             </p>
+            {coverageEnabled ? (
+              <input type="hidden" name="accepted_modalities" value="hours_bank" />
+            ) : null}
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  name="accepted_modalities"
+                  name={coverageEnabled ? undefined : "accepted_modalities"}
                   value="hours_bank"
-                  defaultChecked
+                  checked={acceptedModalities.includes("hours_bank")}
+                  onChange={(event) =>
+                    handleModalityToggle("hours_bank", event.target.checked)
+                  }
+                  disabled={coverageEnabled}
                   className="size-4 rounded border-border"
                 />
                 Bolsa de horas
@@ -271,14 +389,94 @@ export function ShiftForm({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  name="accepted_modalities"
+                  name={coverageEnabled ? undefined : "accepted_modalities"}
                   value="shift_exchange"
-                  defaultChecked
+                  checked={acceptedModalities.includes("shift_exchange")}
+                  onChange={(event) =>
+                    handleModalityToggle("shift_exchange", event.target.checked)
+                  }
+                  disabled={coverageEnabled}
                   className="size-4 rounded border-border"
                 />
                 Intercambio de turno
               </label>
             </div>
+            {!canSubmitModalities ? (
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                Selecciona al menos una modalidad para publicar el turno.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border/70 bg-secondary/25 px-4 py-4">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={coverageEnabled}
+                onChange={(event) => handleCoverageToggle(event.target.checked)}
+                disabled={!selectedSchedule}
+                className="mt-1 size-4 rounded border-border"
+              />
+              <span className="space-y-1">
+                <span className="block font-semibold text-foreground">
+                  Cobertura parcial
+                </span>
+                <span className="block text-muted-foreground">
+                  Pide que te cubran solo una franja del turno. Solo funciona
+                  con bolsa de horas.
+                </span>
+              </span>
+            </label>
+
+            {coverageEnabled && selectedSchedule ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="coverage_start_time">
+                    Inicio de cobertura
+                  </Label>
+                  <select
+                    id="coverage_start_time"
+                    name="coverage_start_time"
+                    value={coverageStartTime}
+                    onChange={(event) =>
+                      handleCoverageStartChange(event.target.value)
+                    }
+                    className={FORM_CONTROL_CLASSNAME}
+                  >
+                    {coverageOptions.slice(0, -1).map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="coverage_end_time">Fin de cobertura</Label>
+                  <select
+                    id="coverage_end_time"
+                    name="coverage_end_time"
+                    value={coverageEndTime}
+                    onChange={(event) => setCoverageEndTime(event.target.value)}
+                    className={FORM_CONTROL_CLASSNAME}
+                  >
+                    {coverageEndOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="text-sm text-muted-foreground md:col-span-2">
+                  {coverageCheck?.valid
+                    ? `La bolsa de horas registrara ${coverageDurationLabel}.`
+                    : coverageCheck && !coverageCheck.valid
+                      ? coverageCheck.reason
+                      : "Selecciona una franja dentro del horario del turno."}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -301,7 +499,14 @@ export function ShiftForm({
           <p className="text-sm text-muted-foreground">
             El turno se publicara listo para recibir propuestas.
           </p>
-          <Button type="submit" disabled={isPublishBlockedByCalendar}>
+          <Button
+            type="submit"
+            disabled={
+              isPublishBlockedByCalendar ||
+              !canSubmitCoverage ||
+              !canSubmitModalities
+            }
+          >
             Publicar turno
           </Button>
         </CardFooter>

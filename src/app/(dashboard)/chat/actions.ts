@@ -25,6 +25,7 @@ import {
   getShiftSchedule,
   isCompensationShiftType,
   isShiftType,
+  validateShiftCoverageWindow,
 } from "@/lib/shifts";
 import {
   expireStaleOpenShifts,
@@ -222,6 +223,12 @@ export async function sendDirectProposal(
   const date = ((formData.get("date") as string | null) ?? "").trim();
   const shiftTypeValue = ((formData.get("shift_type") as string | null) ?? "").trim();
   const agreementTypeValue = ((formData.get("agreement_type") as string | null) ?? "").trim();
+  const submittedCoverageStartTime =
+    ((formData.get("coverage_start_time") as string | null) ?? "").trim() ||
+    null;
+  const submittedCoverageEndTime =
+    ((formData.get("coverage_end_time") as string | null) ?? "").trim() ||
+    null;
   const description =
     ((formData.get("description") as string | null) ?? "").trim() || null;
 
@@ -419,6 +426,34 @@ export async function sendDirectProposal(
 
   const schedule = getShiftSchedule(shiftTypeValue);
   const validModalities: ExchangeAgreementType[] = [agreementTypeValue];
+  const hasCoverageWindow = Boolean(
+    submittedCoverageStartTime || submittedCoverageEndTime,
+  );
+  let coverageStartTime: string | null = null;
+  let coverageEndTime: string | null = null;
+
+  if (hasCoverageWindow) {
+    if (agreementTypeValue !== "hours_bank") {
+      return {
+        error:
+          "La cobertura parcial solo es compatible con bolsa de horas.",
+      };
+    }
+
+    const coverageCheck = validateShiftCoverageWindow({
+      shiftStartTime: schedule.startTime,
+      shiftEndTime: schedule.endTime,
+      coverageStartTime: submittedCoverageStartTime,
+      coverageEndTime: submittedCoverageEndTime,
+    });
+
+    if (!coverageCheck.valid) {
+      return { error: coverageCheck.reason };
+    }
+
+    coverageStartTime = coverageCheck.startTime;
+    coverageEndTime = coverageCheck.endTime;
+  }
 
   const { data: shift, error: shiftError } = await supabase
     .from("shifts")
@@ -429,6 +464,8 @@ export async function sendDirectProposal(
       date,
       start_time: schedule.startTime,
       end_time: schedule.endTime,
+      coverage_start_time: coverageStartTime,
+      coverage_end_time: coverageEndTime,
       shift_type: shiftTypeValue,
       description: description ?? undefined,
       accepted_modalities: validModalities,
@@ -516,7 +553,9 @@ export async function acceptDirectProposal(formData: FormData): Promise<void> {
 
   const { data: shift } = await admin
     .from("shifts")
-    .select("id, user_id, direct_recipient_id, status, department_id, date, shift_type")
+    .select(
+      "id, user_id, direct_recipient_id, status, department_id, date, shift_type, coverage_start_time, coverage_end_time",
+    )
     .eq("id", shiftId)
     .maybeSingle();
 
@@ -705,6 +744,14 @@ export async function acceptDirectProposal(formData: FormData): Promise<void> {
       agreement_type: request.agreement_type,
       compensation_shift_date: request.compensation_shift_date ?? null,
       compensation_shift_type: request.compensation_shift_type ?? null,
+      coverage_start_time:
+        request.agreement_type === "hours_bank"
+          ? shift.coverage_start_time ?? null
+          : null,
+      coverage_end_time:
+        request.agreement_type === "hours_bank"
+          ? shift.coverage_end_time ?? null
+          : null,
       confirmed_at: now,
       signed_by_user_a_at: now,
       signed_by_user_a_name: ownerName,
@@ -749,6 +796,12 @@ export async function acceptDirectProposal(formData: FormData): Promise<void> {
         | "rest"
         | null,
       compensationShiftDate: request.compensation_shift_date,
+      coverageStartTime:
+        request.agreement_type === "hours_bank"
+          ? shift.coverage_start_time
+          : null,
+      coverageEndTime:
+        request.agreement_type === "hours_bank" ? shift.coverage_end_time : null,
       ownerName,
       requesterName: recipientName,
     }),

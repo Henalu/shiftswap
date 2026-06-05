@@ -27,12 +27,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
-import type { ExchangeStatus, ShiftType } from "@/types";
+import type { ExchangeAgreementType, ExchangeStatus, ShiftType } from "@/types";
 
 interface ApprovalExchangeRow {
   id: string;
   shift_id: string;
   status: ExchangeStatus;
+  agreement_type: ExchangeAgreementType | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   submitted_for_approval_at: string | null;
   approved_at: string | null;
   department_reviewed_at: string | null;
@@ -57,6 +60,30 @@ interface ApprovalExchangeRow {
   };
 }
 
+function getCoverageTimeRange(exchange: ApprovalExchangeRow): string | null {
+  if (
+    exchange.agreement_type !== "hours_bank" ||
+    !exchange.coverage_start_time ||
+    !exchange.coverage_end_time
+  ) {
+    return null;
+  }
+
+  return formatTimeRange(exchange.coverage_start_time, exchange.coverage_end_time);
+}
+
+function CoverageBadge({ timeRange }: { timeRange: string | null }) {
+  if (!timeRange) {
+    return null;
+  }
+
+  return (
+    <Badge variant="outline" className="text-foreground">
+      Cobertura {timeRange}
+    </Badge>
+  );
+}
+
 export default async function AdminExchangesPage() {
   const supabase = await createClient();
   const {
@@ -77,7 +104,8 @@ export default async function AdminExchangesPage() {
     .from("exchanges")
     .select(
       `
-      id, shift_id, status, submitted_for_approval_at, approved_at, department_reviewed_at,
+      id, shift_id, status, agreement_type, coverage_start_time, coverage_end_time,
+      submitted_for_approval_at, approved_at, department_reviewed_at,
       department_decision_notes, signed_by_user_a_at, signed_by_user_b_at,
       user_a_id, user_b_id,
       owner:user_profiles!user_a_id(id, full_name),
@@ -196,6 +224,7 @@ export default async function AdminExchangesPage() {
                 exchange.shift.start_time,
                 exchange.shift.end_time
               );
+              const coverageTimeRange = getCoverageTimeRange(exchange);
 
               return (
                 <Card key={exchange.id}>
@@ -216,6 +245,7 @@ export default async function AdminExchangesPage() {
                           <Badge variant="outline" className="text-foreground">
                             {exchange.shift.department.name}
                           </Badge>
+                          <CoverageBadge timeRange={coverageTimeRange} />
                         </div>
 
                         <div className="space-y-1">
@@ -316,6 +346,7 @@ export default async function AdminExchangesPage() {
                         <Badge variant="outline" className="text-foreground">
                           {exchange.shift.department.name}
                         </Badge>
+                        <CoverageBadge timeRange={getCoverageTimeRange(exchange)} />
                       </div>
                       <p className="text-sm font-semibold text-foreground">
                         {exchange.owner.full_name} · {exchange.requester.full_name}

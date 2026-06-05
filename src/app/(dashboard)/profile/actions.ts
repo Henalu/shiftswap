@@ -37,6 +37,10 @@ export interface SuperAdminLaborScopeMutationResult {
   error?: string;
 }
 
+function areProfileChangeApprovalsEnabled() {
+  return false;
+}
+
 interface DepartmentRow {
   id: string;
   company_id: string;
@@ -351,6 +355,8 @@ export async function updateSuperAdminLaborScope(
 export async function updateLaborPreferences(
   formData: FormData
 ): Promise<LaborPreferencesMutationResult> {
+  const employeeId =
+    (formData.get("employee_id") as string | null)?.trim() || null;
   const areaDepartmentId = (
     formData.get("area_department_id") as string | null
   )?.trim();
@@ -503,6 +509,7 @@ export async function updateLaborPreferences(
   const { error: profileUpdateError } = await adminClient
     .from("user_profiles")
     .update({
+      employee_id: employeeId,
       department_id: departmentId,
       job_position_id: jobPositionId,
     })
@@ -605,6 +612,13 @@ export async function updateLaborPreferences(
 export async function requestDepartmentChange(
   formData: FormData
 ): Promise<DepartmentChangeMutationResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las solicitudes de cambio de departamento estan desactivadas. Actualiza tus datos laborales desde Mi perfil.",
+    };
+  }
+
   const requestedDepartmentId = (
     formData.get("requested_department_id") as string | null
   )?.trim();
@@ -777,6 +791,13 @@ export async function requestDepartmentChange(
 export async function requestJobPositionChange(
   formData: FormData
 ): Promise<JobPositionChangeMutationResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las solicitudes de cambio de puesto estan desactivadas. Actualiza tus datos laborales desde Mi perfil.",
+    };
+  }
+
   const requestedJobPositionId = (
     formData.get("requested_job_position_id") as string | null
   )?.trim();

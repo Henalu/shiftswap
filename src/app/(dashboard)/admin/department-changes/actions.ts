@@ -17,6 +17,10 @@ export interface DepartmentChangeReviewResult {
   error?: string;
 }
 
+function areProfileChangeApprovalsEnabled() {
+  return false;
+}
+
 interface DepartmentChangeTarget {
   id: string;
   user_id: string;
@@ -121,6 +125,13 @@ function revalidateDepartmentChangeViews() {
 export async function approveDepartmentChangeRequest(
   formData: FormData
 ): Promise<DepartmentChangeReviewResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las aprobaciones de cambios de departamento estan desactivadas. Los usuarios actualizan estos datos desde Mi perfil.",
+    };
+  }
+
   const requestId = (formData.get("request_id") as string | null)?.trim();
   const reviewNotes =
     (formData.get("review_notes") as string | null)?.trim() || null;
@@ -183,6 +194,13 @@ export async function approveDepartmentChangeRequest(
 export async function rejectDepartmentChangeRequest(
   formData: FormData
 ): Promise<DepartmentChangeReviewResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las aprobaciones de cambios de departamento estan desactivadas. Los usuarios actualizan estos datos desde Mi perfil.",
+    };
+  }
+
   const requestId = (formData.get("request_id") as string | null)?.trim();
   const reviewNotes = (formData.get("review_notes") as string | null)?.trim();
 

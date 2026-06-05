@@ -39,6 +39,8 @@ interface ExchangeParticipantRow {
   agreement_type?: ExchangeAgreementType | null;
   compensation_shift_date?: string | null;
   compensation_shift_type?: ShiftType | "rest" | null;
+  coverage_start_time?: string | null;
+  coverage_end_time?: string | null;
   cancellation_requested_by: string | null;
   cancellation_requested_at: string | null;
   signed_by_user_b_at?: string | null;
@@ -192,6 +194,7 @@ export async function signAsInterested(
       `id, shift_id, user_a_id, user_b_id, status,
        signed_by_user_b_at, agreement_type,
        compensation_shift_date, compensation_shift_type,
+       coverage_start_time, coverage_end_time,
        shift:shifts!shift_id(start_time, end_time)`,
     )
     .eq("id", exchangeId)
@@ -249,6 +252,8 @@ export async function signAsInterested(
     agreementType: exchange.agreement_type,
     compensationShiftType: exchange.compensation_shift_type,
     compensationShiftDate: exchange.compensation_shift_date,
+    coverageStartTime: exchange.coverage_start_time,
+    coverageEndTime: exchange.coverage_end_time,
     ownerName,
     requesterName: signerName,
   });
@@ -274,8 +279,8 @@ export async function signAsInterested(
   if (exchange.agreement_type === "hours_bank") {
     const shift = pickFirstRelation(exchange.shift);
     const debtUnits = getShiftDurationHours(
-      shift?.start_time,
-      shift?.end_time,
+      exchange.coverage_start_time ?? shift?.start_time,
+      exchange.coverage_end_time ?? shift?.end_time,
     );
 
     await upsertHoursBankDebtTransaction({
@@ -286,6 +291,8 @@ export async function signAsInterested(
       debtorName: ownerName,
       creditorName: signerName,
       units: debtUnits,
+      coverageStartTime: exchange.coverage_start_time,
+      coverageEndTime: exchange.coverage_end_time,
     });
   }
 

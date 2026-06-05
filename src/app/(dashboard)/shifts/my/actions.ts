@@ -60,7 +60,9 @@ export async function acceptProposal(formData: FormData): Promise<void> {
 
   const { data: shift } = await supabase
     .from("shifts")
-    .select("user_id, status, department_id, date, shift_type")
+    .select(
+      "user_id, status, department_id, date, shift_type, coverage_start_time, coverage_end_time",
+    )
     .eq("id", shiftId)
     .single();
 
@@ -247,6 +249,14 @@ export async function acceptProposal(formData: FormData): Promise<void> {
       agreement_type: request.agreement_type,
       compensation_shift_date: request.compensation_shift_date ?? null,
       compensation_shift_type: request.compensation_shift_type ?? null,
+      coverage_start_time:
+        request.agreement_type === "hours_bank"
+          ? shift.coverage_start_time ?? null
+          : null,
+      coverage_end_time:
+        request.agreement_type === "hours_bank"
+          ? shift.coverage_end_time ?? null
+          : null,
       confirmed_at: now,
       signed_by_user_a_at: now,
       signed_by_user_a_name: ownerName,
@@ -359,6 +369,14 @@ export async function acceptProposal(formData: FormData): Promise<void> {
           | "rest"
           | null,
         compensationShiftDate: request.compensation_shift_date,
+        coverageStartTime:
+          request.agreement_type === "hours_bank"
+            ? shift.coverage_start_time
+            : null,
+        coverageEndTime:
+          request.agreement_type === "hours_bank"
+            ? shift.coverage_end_time
+            : null,
         ownerName,
         requesterName,
       }),

@@ -138,10 +138,10 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     }
   );
 
-  const monthLabel = new Date(year, monthNum - 1).toLocaleDateString("es-ES", {
+  const monthName = new Date(year, monthNum - 1).toLocaleDateString("es-ES", {
     month: "long",
-    year: "numeric",
   });
+  const monthLabel = `${monthName} ${year}`;
 
   // Navigation months
   const prevDate = new Date(year, monthNum - 2);

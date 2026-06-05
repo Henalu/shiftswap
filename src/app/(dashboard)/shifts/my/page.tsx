@@ -52,6 +52,8 @@ interface ShiftWithProposals {
   date: string;
   start_time: string;
   end_time: string;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   shift_type: string;
   direct_recipient_id: string | null;
   status: string;
@@ -90,7 +92,8 @@ export default async function MyShiftsPage() {
     .from("shifts")
     .select(
       `
-      id, date, start_time, end_time, shift_type, direct_recipient_id, status, description,
+      id, date, start_time, end_time, coverage_start_time, coverage_end_time,
+      shift_type, direct_recipient_id, status, description,
       department:departments!department_id(id, name),
       shift_requests(
         id, shift_id, interested_user_id, agreement_type,
@@ -166,6 +169,13 @@ export default async function MyShiftsPage() {
           {typedShifts.map((shift) => {
             const activeExchange = activeExchangeByShiftId.get(shift.id);
             const timeRange = formatTimeRange(shift.start_time, shift.end_time);
+            const coverageTimeRange =
+              shift.coverage_start_time && shift.coverage_end_time
+                ? formatTimeRange(
+                    shift.coverage_start_time,
+                    shift.coverage_end_time,
+                  )
+                : null;
             const detailHref = activeExchange
               ? `/exchanges/${activeExchange.id}`
               : `/shifts/${shift.id}`;
@@ -224,6 +234,11 @@ export default async function MyShiftsPage() {
                         <Badge variant="outline" className="text-foreground">
                           {shift.department.name}
                         </Badge>
+                        {coverageTimeRange && (
+                          <Badge variant="outline" className="text-foreground">
+                            Cobertura {coverageTimeRange}
+                          </Badge>
+                        )}
                         {shift.direct_recipient_id && (
                           <Badge variant="outline" className="text-foreground">
                             Directa
@@ -391,6 +406,11 @@ export default async function MyShiftsPage() {
                                             proposal.agreement_type as ExchangeAgreementType
                                           ]
                                         }
+                                        {proposal.agreement_type ===
+                                          "hours_bank" &&
+                                          coverageTimeRange && (
+                                            <> {" - "}Cobertura {coverageTimeRange}</>
+                                          )}
                                         {proposal.agreement_type ===
                                           "shift_exchange" &&
                                           proposal.compensation_shift_date && (

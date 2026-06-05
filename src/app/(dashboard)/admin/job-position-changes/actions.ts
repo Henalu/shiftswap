@@ -17,6 +17,10 @@ export interface JobPositionChangeReviewResult {
   error?: string;
 }
 
+function areProfileChangeApprovalsEnabled() {
+  return false;
+}
+
 interface JobPositionChangeTarget {
   id: string;
   user_id: string;
@@ -119,6 +123,13 @@ function revalidateJobPositionChangeViews() {
 export async function approveJobPositionChangeRequest(
   formData: FormData
 ): Promise<JobPositionChangeReviewResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las aprobaciones de cambios de puesto estan desactivadas. Los usuarios actualizan estos datos desde Mi perfil.",
+    };
+  }
+
   const requestId = (formData.get("request_id") as string | null)?.trim();
   const reviewNotes =
     (formData.get("review_notes") as string | null)?.trim() || null;
@@ -179,6 +190,13 @@ export async function approveJobPositionChangeRequest(
 export async function rejectJobPositionChangeRequest(
   formData: FormData
 ): Promise<JobPositionChangeReviewResult> {
+  if (!areProfileChangeApprovalsEnabled()) {
+    return {
+      error:
+        "Las aprobaciones de cambios de puesto estan desactivadas. Los usuarios actualizan estos datos desde Mi perfil.",
+    };
+  }
+
   const requestId = (formData.get("request_id") as string | null)?.trim();
   const reviewNotes = (formData.get("review_notes") as string | null)?.trim();
 

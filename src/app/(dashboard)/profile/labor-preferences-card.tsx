@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  BriefcaseBusiness,
   Building2,
   CalendarCog,
   IdCard,
   Loader2,
-  Repeat,
+  Pencil,
   Workflow,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SCHEDULE_TYPE_LABELS } from "@/lib/constants";
 import {
@@ -39,8 +42,6 @@ export interface ProfileRotationGroupOption {
   id: string;
   code: string;
   label: string;
-  patternLabel: string;
-  sequenceLabel: string;
 }
 
 interface LaborPreferencesCardProps {
@@ -197,17 +198,29 @@ export function LaborPreferencesCard({
     initialAreaId,
     currentDepartmentId
   );
+  const initialJobPositionId = getInitialJobPositionId(
+    jobPositions,
+    initialDepartmentId,
+    currentJobPositionId
+  );
+  const initialScheduleType = getInitialScheduleType(
+    areaScheduleConfigs,
+    initialAreaId,
+    currentScheduleType
+  );
+  const initialRotationGroupId = getInitialRotationGroupId(
+    rotationGroups,
+    currentRotationGroupId
+  );
+  const initialEmployeeId = employeeId?.trim() ?? "";
+  const [isEditing, setIsEditing] = useState(false);
+  const [employeeIdValue, setEmployeeIdValue] = useState(initialEmployeeId);
   const [areaDepartmentId, setAreaDepartmentId] = useState(initialAreaId);
   const [departmentId, setDepartmentId] = useState(initialDepartmentId);
-  const [jobPositionId, setJobPositionId] = useState(() =>
-    getInitialJobPositionId(jobPositions, initialDepartmentId, currentJobPositionId)
-  );
-  const [scheduleType, setScheduleType] = useState<ScheduleTypeCode>(() =>
-    getInitialScheduleType(areaScheduleConfigs, initialAreaId, currentScheduleType)
-  );
-  const [rotationGroupId, setRotationGroupId] = useState(
-    getInitialRotationGroupId(rotationGroups, currentRotationGroupId)
-  );
+  const [jobPositionId, setJobPositionId] = useState(initialJobPositionId);
+  const [scheduleType, setScheduleType] =
+    useState<ScheduleTypeCode>(initialScheduleType);
+  const [rotationGroupId, setRotationGroupId] = useState(initialRotationGroupId);
   const [submitting, setSubmitting] = useState(false);
 
   const availableDepartments = useMemo(
@@ -227,16 +240,40 @@ export function LaborPreferencesCard({
       ),
     [departmentId, jobPositions]
   );
-  const selectedRotationGroup = rotationGroups.find(
-    (group) => group.id === rotationGroupId
-  );
+  const selectedArea =
+    availableAreas.find((area) => area.id === areaDepartmentId) ?? null;
+  const selectedDepartment =
+    departments.find((department) => department.id === departmentId) ?? null;
+  const selectedJobPosition =
+    jobPositions.find((jobPosition) => jobPosition.id === jobPositionId) ?? null;
   const selectedAreaDefault = getAreaScheduleType(
     areaScheduleConfigs,
     areaDepartmentId
   );
+  const effectiveInitialRotationGroupId =
+    initialScheduleType === "3t5" ? initialRotationGroupId : "";
+  const effectiveRotationGroupId =
+    scheduleType === "3t5" ? rotationGroupId : "";
+  const hasChanges =
+    employeeIdValue.trim() !== initialEmployeeId ||
+    areaDepartmentId !== initialAreaId ||
+    departmentId !== initialDepartmentId ||
+    jobPositionId !== initialJobPositionId ||
+    scheduleType !== initialScheduleType ||
+    effectiveRotationGroupId !== effectiveInitialRotationGroupId;
   const canSave =
     Boolean(companyId && areaDepartmentId && departmentId) &&
-    (scheduleType !== "3t5" || Boolean(rotationGroupId));
+    (scheduleType !== "3t5" || Boolean(rotationGroupId)) &&
+    hasChanges;
+
+  function resetForm() {
+    setEmployeeIdValue(initialEmployeeId);
+    setAreaDepartmentId(initialAreaId);
+    setDepartmentId(initialDepartmentId);
+    setJobPositionId(initialJobPositionId);
+    setScheduleType(initialScheduleType);
+    setRotationGroupId(initialRotationGroupId);
+  }
 
   function handleAreaChange(nextAreaDepartmentId: string) {
     const nextDepartments = getOperationalDepartmentsForArea(
@@ -290,6 +327,7 @@ export function LaborPreferencesCard({
     setSubmitting(true);
 
     const formData = new FormData();
+    formData.set("employee_id", employeeIdValue.trim());
     formData.set("area_department_id", areaDepartmentId);
     formData.set("department_id", departmentId);
     formData.set("schedule_type", scheduleType);
@@ -311,6 +349,7 @@ export function LaborPreferencesCard({
       }
 
       toast.success("Configuracion laboral guardada.");
+      setIsEditing(false);
       router.refresh();
     } catch {
       toast.error("No se pudo guardar la configuracion laboral.");
@@ -324,186 +363,227 @@ export function LaborPreferencesCard({
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
-            <CardTitle>Configuracion laboral</CardTitle>
+            <CardTitle>Datos laborales</CardTitle>
             <CardDescription>
-              Ajusta tu departamento, puesto, jornada y grupo de rotacion cuando
-              cambie tu situacion real.
+              Estos datos se usan para calendario, publicaciones y documentos.
+              Los cambios se aplican directamente en {companyName}.
             </CardDescription>
           </div>
-          <Badge className="border-emerald-500/15 bg-emerald-500/10 text-emerald-700">
-            Cambio inmediato
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-emerald-500/15 bg-emerald-500/10 text-emerald-700">
+              Cambio inmediato
+            </Badge>
+            {isEditing ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  resetForm();
+                  setIsEditing(false);
+                }}
+                disabled={submitting}
+              >
+                <X className="size-4" />
+                Cancelar
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil className="size-4" />
+                Editar
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <InfoTile
             icon={<Building2 className="size-4" />}
-            label="Empresa"
-            value={companyName}
+            label="Area o taller"
+            value={selectedArea?.name ?? "Sin area asignada"}
           />
           <InfoTile
             icon={<IdCard className="size-4" />}
-            label="ID empleado"
-            value={employeeId?.trim() || "No disponible"}
+            label="ID de empleado"
+            value={employeeIdValue.trim() || "No disponible"}
+          />
+          <InfoTile
+            icon={<Workflow className="size-4" />}
+            label="Departamento"
+            value={selectedDepartment?.name ?? "Sin departamento asignado"}
+          />
+          <InfoTile
+            icon={<BriefcaseBusiness className="size-4" />}
+            label="Puesto de trabajo"
+            value={selectedJobPosition?.name ?? "Sin puesto asignado"}
           />
           <InfoTile
             icon={<CalendarCog className="size-4" />}
-            label="Jornada actual"
+            label="Tipo de jornada"
             value={SCHEDULE_TYPE_LABELS[scheduleType]}
-          />
-          <InfoTile
-            icon={<Repeat className="size-4" />}
-            label="Grupo actual"
-            value={
-              scheduleType === "3t5"
-                ? selectedRotationGroup?.label ?? "Sin grupo"
-                : "No aplica"
-            }
           />
         </div>
 
-        <div className="space-y-5 rounded-2xl border border-border/70 bg-secondary/20 p-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="labor-area-department">Area o taller</Label>
-              <select
-                id="labor-area-department"
-                value={areaDepartmentId}
-                onChange={(event) => handleAreaChange(event.target.value)}
-                disabled={submitting || availableAreas.length === 0}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                {availableAreas.length === 0 ? (
-                  <option value="">Sin areas disponibles</option>
-                ) : null}
-                {availableAreas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {isEditing ? (
+          <div className="space-y-5 rounded-2xl border border-border/70 bg-secondary/20 p-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="labor-employee-id">ID de empleado</Label>
+                <Input
+                  id="labor-employee-id"
+                  value={employeeIdValue}
+                  onChange={(event) => setEmployeeIdValue(event.target.value)}
+                  disabled={submitting}
+                  placeholder="No disponible"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="labor-department">Departamento operativo</Label>
-              <select
-                id="labor-department"
-                value={departmentId}
-                onChange={(event) => handleDepartmentChange(event.target.value)}
-                disabled={submitting || availableDepartments.length === 0}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                {availableDepartments.length === 0 ? (
-                  <option value="">Sin departamentos disponibles</option>
-                ) : null}
-                {availableDepartments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="labor-job-position">Puesto de trabajo</Label>
-              <select
-                id="labor-job-position"
-                value={jobPositionId}
-                onChange={(event) => setJobPositionId(event.target.value)}
-                disabled={submitting}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                <option value="">Sin puesto asignado</option>
-                {availableJobPositions.map((jobPosition) => (
-                  <option key={jobPosition.id} value={jobPosition.id}>
-                    {jobPosition.name}
-                  </option>
-                ))}
-              </select>
-              {availableJobPositions.length === 0 ? (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  No hay puestos activos para este departamento.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="labor-schedule-type">Tipo de jornada</Label>
-              <select
-                id="labor-schedule-type"
-                value={scheduleType}
-                onChange={(event) =>
-                  handleScheduleTypeChange(event.target.value as ScheduleTypeCode)
-                }
-                disabled={submitting}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                <option value="3t5">3T5 (turnos rotativos)</option>
-                <option value="jornada_normal">Jornada normal</option>
-              </select>
-              {selectedAreaDefault ? (
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Predeterminado del area: {SCHEDULE_TYPE_LABELS[selectedAreaDefault]}.
-                </p>
-              ) : null}
-            </div>
-
-            {scheduleType === "3t5" ? (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="labor-rotation-group">Grupo de rotacion</Label>
+              <div className="space-y-2">
+                <Label htmlFor="labor-area-department">Area o taller</Label>
                 <select
-                  id="labor-rotation-group"
-                  value={rotationGroupId}
-                  onChange={(event) => setRotationGroupId(event.target.value)}
-                  disabled={submitting || rotationGroups.length === 0}
+                  id="labor-area-department"
+                  value={areaDepartmentId}
+                  onChange={(event) => handleAreaChange(event.target.value)}
+                  disabled={submitting || availableAreas.length === 0}
                   className={FORM_CONTROL_CLASSNAME}
                 >
-                  {rotationGroups.length === 0 ? (
-                    <option value="">Sin grupos disponibles</option>
+                  {availableAreas.length === 0 ? (
+                    <option value="">Sin areas disponibles</option>
                   ) : null}
-                  {rotationGroups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.label} - {group.patternLabel}
+                  {availableAreas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
                     </option>
                   ))}
                 </select>
-                {selectedRotationGroup ? (
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="labor-department">Departamento</Label>
+                <select
+                  id="labor-department"
+                  value={departmentId}
+                  onChange={(event) => handleDepartmentChange(event.target.value)}
+                  disabled={submitting || availableDepartments.length === 0}
+                  className={FORM_CONTROL_CLASSNAME}
+                >
+                  {availableDepartments.length === 0 ? (
+                    <option value="">Sin departamentos disponibles</option>
+                  ) : null}
+                  {availableDepartments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="labor-job-position">Puesto de trabajo</Label>
+                <select
+                  id="labor-job-position"
+                  value={jobPositionId}
+                  onChange={(event) => setJobPositionId(event.target.value)}
+                  disabled={submitting}
+                  className={FORM_CONTROL_CLASSNAME}
+                >
+                  <option value="">Sin puesto asignado</option>
+                  {availableJobPositions.map((jobPosition) => (
+                    <option key={jobPosition.id} value={jobPosition.id}>
+                      {jobPosition.name}
+                    </option>
+                  ))}
+                </select>
+                {availableJobPositions.length === 0 ? (
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Secuencia: {selectedRotationGroup.sequenceLabel}.
+                    No hay puestos activos para este departamento.
                   </p>
                 ) : null}
               </div>
-            ) : (
-              <div className={cn(PANEL_CLASSNAME, "md:col-span-2 px-4 py-4")}>
-                <div className="flex items-start gap-3">
-                  <Workflow className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      Jornada normal
-                    </p>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      No necesita grupo de rotacion. El calendario usara jornada
-                      completa de lunes a jueves y reducida los viernes.
-                    </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="labor-schedule-type">Tipo de jornada</Label>
+                <select
+                  id="labor-schedule-type"
+                  value={scheduleType}
+                  onChange={(event) =>
+                    handleScheduleTypeChange(event.target.value as ScheduleTypeCode)
+                  }
+                  disabled={submitting}
+                  className={FORM_CONTROL_CLASSNAME}
+                >
+                  <option value="3t5">3T5 (turnos rotativos)</option>
+                  <option value="jornada_normal">Jornada normal</option>
+                </select>
+                {selectedAreaDefault ? (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Predeterminado del area:{" "}
+                    {SCHEDULE_TYPE_LABELS[selectedAreaDefault]}.
+                  </p>
+                ) : null}
+              </div>
+
+              {scheduleType === "3t5" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="labor-rotation-group">
+                    Grupo de rotacion
+                  </Label>
+                  <select
+                    id="labor-rotation-group"
+                    value={rotationGroupId}
+                    onChange={(event) => setRotationGroupId(event.target.value)}
+                    disabled={submitting || rotationGroups.length === 0}
+                    className={FORM_CONTROL_CLASSNAME}
+                  >
+                    {rotationGroups.length === 0 ? (
+                      <option value="">Sin grupos disponibles</option>
+                    ) : null}
+                    {rotationGroups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Solo se usa para calcular tu calendario 3T5.
+                  </p>
+                </div>
+              ) : (
+                <div className={cn(PANEL_CLASSNAME, "px-4 py-4")}>
+                  <div className="flex items-start gap-3">
+                    <Workflow className="mt-0.5 size-4 shrink-0 text-primary" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        Jornada normal
+                      </p>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        No necesita grupo de rotacion para calcular el calendario.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSave || submitting}
-            >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {submitting ? "Guardando..." : "Guardar configuracion laboral"}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSave || submitting}
+              >
+                {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+                {submitting ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </CardContent>
     </Card>
   );

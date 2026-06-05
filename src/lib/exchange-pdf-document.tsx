@@ -20,6 +20,7 @@ import {
   formatTime,
   formatTimeRange,
 } from "@/lib/utils";
+import { formatHoursQuantity, getShiftDurationHours } from "@/lib/shifts";
 import type {
   ExchangeAgreementType,
   ExchangeStatus,
@@ -63,6 +64,8 @@ export interface ExchangePdfData {
   id: string;
   status: ExchangeStatus;
   agreement_type: ExchangeAgreementType | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   created_at: string;
   confirmed_at: string | null;
   submitted_for_approval_at: string | null;
@@ -529,15 +532,49 @@ function getFieldValue(value: string | null | undefined) {
   return value?.trim() ? value.trim() : "No informado en ShiftSwap";
 }
 
+function getCoverageTimeRange(exchange: ExchangePdfData): string | null {
+  if (
+    exchange.agreement_type !== "hours_bank" ||
+    !exchange.coverage_start_time ||
+    !exchange.coverage_end_time
+  ) {
+    return null;
+  }
+
+  return formatTimeRange(exchange.coverage_start_time, exchange.coverage_end_time);
+}
+
+function getHoursBankQuantity(exchange: ExchangePdfData): string {
+  const coverageHours =
+    exchange.coverage_start_time && exchange.coverage_end_time
+      ? getShiftDurationHours(
+          exchange.coverage_start_time,
+          exchange.coverage_end_time,
+        )
+      : null;
+  const fullShiftHours = getShiftDurationHours(
+    exchange.shift.start_time,
+    exchange.shift.end_time,
+  );
+
+  return formatHoursQuantity(coverageHours ?? fullShiftHours);
+}
+
 function getAgreementNarrative(
   exchange: ExchangePdfData,
   sourceShiftLabel: string,
   sourceShiftTime: string
 ) {
   const sourceShiftDate = formatShortDate(exchange.shift.date);
+  const coverageTimeRange = getCoverageTimeRange(exchange);
+  const hoursBankQuantity = getHoursBankQuantity(exchange);
 
   if (exchange.agreement_type === "hours_bank") {
-    return `${exchange.requester.full_name} realizara el turno de ${sourceShiftLabel} del ${sourceShiftDate} (${sourceShiftTime}) por ${exchange.owner.full_name}. La compensacion se registra como bolsa de horas y deja una deuda de 1 turno a favor de ${exchange.requester.full_name}.`;
+    if (coverageTimeRange) {
+      return `${exchange.requester.full_name} cubrira la franja ${coverageTimeRange} del turno de ${sourceShiftLabel} del ${sourceShiftDate} por ${exchange.owner.full_name}. La compensacion se registra como bolsa de horas y deja una deuda de ${hoursBankQuantity} a favor de ${exchange.requester.full_name}.`;
+    }
+
+    return `${exchange.requester.full_name} realizara el turno de ${sourceShiftLabel} del ${sourceShiftDate} (${sourceShiftTime}) por ${exchange.owner.full_name}. La compensacion se registra como bolsa de horas y deja una deuda de ${hoursBankQuantity} a favor de ${exchange.requester.full_name}.`;
   }
 
   if (exchange.agreement_type === "shift_exchange") {
@@ -560,11 +597,18 @@ function getAgreementNarrative(
 
 function getCompensationCardLines(exchange: ExchangePdfData) {
   if (exchange.agreement_type === "hours_bank") {
+    const coverageTimeRange = getCoverageTimeRange(exchange);
+    const hoursBankQuantity = getHoursBankQuantity(exchange);
+    const coverageLine = coverageTimeRange
+      ? `Franja cubierta: ${coverageTimeRange}.`
+      : "Cobertura del turno completo.";
+
     return {
       label: "Compensacion acordada",
       value: EXCHANGE_AGREEMENT_LABELS.hours_bank,
       secondaryLines: [
-        `${exchange.owner.full_name} queda debiendo 1 turno a ${exchange.requester.full_name}.`,
+        coverageLine,
+        `${exchange.owner.full_name} queda debiendo ${hoursBankQuantity} a ${exchange.requester.full_name}.`,
         exchange.hours_bank_status
           ? `Estado de la deuda: ${SHIFT_DEBT_TRANSACTION_STATUS_LABELS[exchange.hours_bank_status]}.`
           : "La deuda se registra dentro del expediente actual.",

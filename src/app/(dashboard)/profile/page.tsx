@@ -6,7 +6,6 @@ import {
   type ProfileRotationGroupOption,
 } from "./labor-preferences-card";
 import { getDepartmentArea, getDepartmentById } from "@/lib/departments";
-import { ROTATION_SEQUENCE_LABELS } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
@@ -43,14 +42,6 @@ interface RotationGroupRow {
   id: string;
   code: string;
   label: string;
-  rotation_pattern_id: string;
-  reference_date: string;
-}
-
-interface RotationPatternRow {
-  id: string;
-  label: string;
-  sequence: string[];
 }
 
 interface UserSchedulePreferenceRow {
@@ -59,16 +50,6 @@ interface UserSchedulePreferenceRow {
 
 interface UserRotationAssignmentRow {
   rotation_group_id: string;
-}
-
-function formatRotationSequence(sequence: string[] | null | undefined) {
-  if (!sequence?.length) {
-    return "Sin secuencia configurada";
-  }
-
-  return sequence
-    .map((letter) => ROTATION_SEQUENCE_LABELS[letter] ?? letter)
-    .join(", ");
 }
 
 export default async function ProfilePage() {
@@ -142,7 +123,6 @@ export default async function ProfilePage() {
     { data: userSchedulePreference },
     { data: userRotationAssignment },
     { data: rotationGroups },
-    { data: rotationPatterns },
   ] = await Promise.all([
     isSuperAdminProfile
       ? adminClient
@@ -204,11 +184,8 @@ export default async function ProfilePage() {
       .maybeSingle(),
     adminClient
       .from("rotation_groups")
-      .select("id, code, label, rotation_pattern_id, reference_date")
+      .select("id, code, label")
       .order("code", { ascending: true }),
-    adminClient
-      .from("rotation_patterns")
-      .select("id, label, sequence"),
   ]);
 
   const typedCompanies = (companies ?? []) as Pick<Company, "id" | "name">[];
@@ -229,22 +206,12 @@ export default async function ProfilePage() {
   const typedUserRotationAssignment =
     (userRotationAssignment as UserRotationAssignmentRow | null) ?? null;
   const typedRotationGroups = (rotationGroups ?? []) as RotationGroupRow[];
-  const typedRotationPatterns = (rotationPatterns ?? []) as RotationPatternRow[];
-  const rotationPatternMap = new Map(
-    typedRotationPatterns.map((pattern) => [pattern.id, pattern])
-  );
   const rotationGroupOptions: ProfileRotationGroupOption[] =
-    typedRotationGroups.map((group) => {
-      const pattern = rotationPatternMap.get(group.rotation_pattern_id);
-
-      return {
-        id: group.id,
-        code: group.code,
-        label: group.label,
-        patternLabel: pattern?.label ?? "Secuencia sin configurar",
-        sequenceLabel: formatRotationSequence(pattern?.sequence),
-      };
-    });
+    typedRotationGroups.map((group) => ({
+      id: group.id,
+      code: group.code,
+      label: group.label,
+    }));
   const profileAreaScheduleConfigs: ProfileAreaScheduleConfig[] =
     typedAreaScheduleConfigs.map((config) => ({
       department_id: config.department_id,

@@ -75,6 +75,8 @@ interface HomeShift {
   date: string;
   start_time: string;
   end_time: string;
+  coverage_start_time?: string | null;
+  coverage_end_time?: string | null;
   shift_type: ShiftType;
   status: ShiftStatus;
   department?: HomeDepartment | HomeDepartment[] | null;
@@ -104,6 +106,9 @@ interface MyRequestRow {
 interface ExchangeRow {
   id: string;
   status: ExchangeStatus;
+  agreement_type: string | null;
+  coverage_start_time: string | null;
+  coverage_end_time: string | null;
   user_a_id: string;
   user_b_id: string;
   signed_by_user_b_at: string | null;
@@ -175,6 +180,22 @@ function isNormalizedHomeShift(
   shift: ReturnType<typeof normalizeShift>,
 ): shift is NormalizedHomeShift {
   return Boolean(shift);
+}
+
+function getCoverageTimeRange(
+  value:
+    | {
+        coverage_start_time?: string | null;
+        coverage_end_time?: string | null;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!value?.coverage_start_time || !value.coverage_end_time) {
+    return null;
+  }
+
+  return formatTimeRange(value.coverage_start_time, value.coverage_end_time);
 }
 
 function MetricCard({
@@ -252,6 +273,8 @@ function ShiftSummaryRow({
     return null;
   }
 
+  const coverageTimeRange = getCoverageTimeRange(shift);
+
   return (
     <Link
       className="group flex min-w-0 max-w-full items-start gap-3 rounded-2xl border border-border/70 px-3 py-3 transition-colors hover:bg-secondary/45 sm:items-center sm:justify-between sm:gap-4 sm:px-4"
@@ -266,6 +289,11 @@ function ShiftSummaryRow({
             {formatShortDate(shift.date)} -{" "}
             {formatTimeRange(shift.start_time, shift.end_time)}
           </span>
+          {coverageTimeRange ? (
+            <Badge variant="outline" className="text-foreground">
+              Cobertura {coverageTimeRange}
+            </Badge>
+          ) : null}
         </div>
         <p className="truncate text-sm font-medium text-foreground">
           {shift.user?.full_name ?? shift.department?.name ?? "Turno publicado"}
@@ -344,7 +372,8 @@ export default async function HomePage() {
       .from("shifts")
       .select(
         `
-        id, date, start_time, end_time, shift_type, status,
+        id, date, start_time, end_time, coverage_start_time, coverage_end_time,
+        shift_type, status,
         department:departments!department_id(id, company_id, name, parent_department_id, is_assignable),
         user:user_profiles!user_id(id, full_name)
       `,
@@ -397,7 +426,8 @@ export default async function HomePage() {
       .from("shifts")
       .select(
         `
-        id, date, start_time, end_time, shift_type, status,
+        id, date, start_time, end_time, coverage_start_time, coverage_end_time,
+        shift_type, status,
         shift_requests(id, status)
       `,
       )
@@ -412,7 +442,10 @@ export default async function HomePage() {
         `
         id, created_at, agreement_type, status,
         requester:user_profiles!interested_user_id(id, full_name),
-        shift:shifts!inner(id, date, start_time, end_time, shift_type, status, user_id)
+        shift:shifts!inner(
+          id, date, start_time, end_time, coverage_start_time,
+          coverage_end_time, shift_type, status, user_id
+        )
       `,
       )
       .eq("status", "pending")
@@ -425,7 +458,8 @@ export default async function HomePage() {
         `
         id, status, created_at,
         shift:shifts!shift_id(
-          id, date, start_time, end_time, shift_type, status,
+          id, date, start_time, end_time, coverage_start_time,
+          coverage_end_time, shift_type, status,
           user:user_profiles!user_id(id, full_name)
         )
       `,
@@ -438,8 +472,12 @@ export default async function HomePage() {
       .from("exchanges")
       .select(
         `
-        id, status, user_a_id, user_b_id, signed_by_user_b_at, created_at,
-        shift:shifts!shift_id(id, date, start_time, end_time, shift_type, status),
+        id, status, agreement_type, coverage_start_time, coverage_end_time,
+        user_a_id, user_b_id, signed_by_user_b_at, created_at,
+        shift:shifts!shift_id(
+          id, date, start_time, end_time, coverage_start_time,
+          coverage_end_time, shift_type, status
+        ),
         owner:user_profiles!user_a_id(id, full_name),
         requester:user_profiles!user_b_id(id, full_name)
       `,
@@ -753,6 +791,7 @@ export default async function HomePage() {
                       shift.shift_requests?.filter(
                         (request) => request.status === "pending",
                       ).length ?? 0;
+                    const coverageTimeRange = getCoverageTimeRange(shift);
 
                     return (
                       <Link
@@ -765,6 +804,9 @@ export default async function HomePage() {
                           {SHIFT_TYPE_LABELS[shift.shift_type]}
                         </p>
                         <p className="text-xs text-muted-foreground">
+                          {coverageTimeRange
+                            ? `Cobertura ${coverageTimeRange} - `
+                            : ""}
                           {pendingCount} propuesta{pendingCount === 1 ? "" : "s"}
                         </p>
                       </Link>
@@ -789,6 +831,7 @@ export default async function HomePage() {
                 {typedMyRequests.length > 0 ? (
                   typedMyRequests.slice(0, 3).map((request) => {
                     const shift = normalizeShift(request.shift);
+                    const coverageTimeRange = getCoverageTimeRange(shift);
 
                     return (
                       <Link
@@ -806,6 +849,11 @@ export default async function HomePage() {
                             ? `${formatShortDate(shift.date)} - ${shift.user?.full_name ?? "Turno solicitado"}`
                             : "Solicitud enviada"}
                         </p>
+                        {coverageTimeRange ? (
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            Cobertura {coverageTimeRange}
+                          </p>
+                        ) : null}
                       </Link>
                     );
                   })
@@ -832,6 +880,15 @@ export default async function HomePage() {
                       exchange.user_a_id === authUser.id
                         ? exchange.requester
                         : exchange.owner;
+                    const coverageTimeRange =
+                      exchange.agreement_type === "hours_bank" &&
+                      exchange.coverage_start_time &&
+                      exchange.coverage_end_time
+                        ? formatTimeRange(
+                            exchange.coverage_start_time,
+                            exchange.coverage_end_time,
+                          )
+                        : null;
 
                     return (
                       <Link
@@ -847,6 +904,11 @@ export default async function HomePage() {
                             ? `${formatShortDate(shift.date)} - ${otherUser?.full_name ?? "Intercambio"}`
                             : otherUser?.full_name ?? "Intercambio"}
                         </p>
+                        {coverageTimeRange ? (
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            Cobertura {coverageTimeRange}
+                          </p>
+                        ) : null}
                       </Link>
                     );
                   })
