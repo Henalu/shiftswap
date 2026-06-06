@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ShieldCheck, Workflow } from "lucide-react";
+import {
+  Building2,
+  Loader2,
+  Pencil,
+  ShieldCheck,
+  Workflow,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +17,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -25,6 +33,15 @@ import { FORM_CONTROL_CLASSNAME, PANEL_CLASSNAME, cn } from "@/lib/utils";
 import type { Company, Department } from "@/types";
 import { updateSuperAdminLaborScope } from "./actions";
 
+interface ScopeFieldProps {
+  controlId: string;
+  editControl: ReactNode;
+  icon: ReactNode;
+  isEditing: boolean;
+  label: string;
+  value: string;
+}
+
 interface SuperAdminLaborScopeCardProps {
   companies: Pick<Company, "id" | "name">[];
   departments: Department[];
@@ -33,6 +50,50 @@ interface SuperAdminLaborScopeCardProps {
   currentCompanyName: string;
   currentAreaName: string;
   currentDepartmentName: string;
+}
+
+function ScopeField({
+  controlId,
+  editControl,
+  icon,
+  isEditing,
+  label,
+  value,
+}: ScopeFieldProps) {
+  return (
+    <div
+      className={cn(
+        PANEL_CLASSNAME,
+        "flex min-w-0 items-start gap-3 px-4 py-4 transition-colors",
+        isEditing && "bg-secondary/20"
+      )}
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        {isEditing ? (
+          <Label
+            htmlFor={controlId}
+            className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+          >
+            {label}
+          </Label>
+        ) : (
+          <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {label}
+          </span>
+        )}
+        {isEditing ? (
+          editControl
+        ) : (
+          <span className="block break-words text-sm font-medium text-foreground">
+            {value}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function getSelectionForCompany({
@@ -99,6 +160,7 @@ export function SuperAdminLaborScopeCard({
   const [departmentId, setDepartmentId] = useState(
     initialSelection.departmentId
   );
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const availableAreas = getTopLevelDepartmentsForCompany(
@@ -110,7 +172,26 @@ export function SuperAdminLaborScopeCard({
     companyId,
     areaDepartmentId
   );
+  const selectedCompany =
+    companies.find((company) => company.id === companyId) ?? null;
+  const selectedArea = getDepartmentById(departments, areaDepartmentId);
+  const selectedDepartment = getDepartmentById(departments, departmentId);
+  const hasChanges =
+    companyId !== initialCompanyId ||
+    areaDepartmentId !== initialSelection.areaDepartmentId ||
+    departmentId !== initialSelection.departmentId;
   const canSave = Boolean(companyId && areaDepartmentId && departmentId);
+
+  function resetForm() {
+    setCompanyId(initialCompanyId);
+    setAreaDepartmentId(initialSelection.areaDepartmentId);
+    setDepartmentId(initialSelection.departmentId);
+  }
+
+  function handleCancelEdit() {
+    resetForm();
+    setIsEditing(false);
+  }
 
   function handleCompanyChange(nextCompanyId: string) {
     const nextSelection = getSelectionForCompany({
@@ -137,7 +218,7 @@ export function SuperAdminLaborScopeCard({
   }
 
   async function handleSave() {
-    if (!canSave) {
+    if (!canSave || !hasChanges) {
       return;
     }
 
@@ -157,6 +238,7 @@ export function SuperAdminLaborScopeCard({
     }
 
     toast.success("Asignacion laboral actualizada.");
+    setIsEditing(false);
     router.refresh();
   }
 
@@ -171,44 +253,31 @@ export function SuperAdminLaborScopeCard({
               departamento operativo concreto. Este cambio se aplica al instante.
             </CardDescription>
           </div>
-          <Badge className="w-fit border-sky-500/15 bg-sky-500/10 text-sky-700">
-            <ShieldCheck className="size-3.5" />
-            Permiso directo
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="w-fit border-sky-500/15 bg-sky-500/10 text-sky-700">
+              <ShieldCheck className="size-3.5" />
+              Permiso directo
+            </Badge>
+            {!isEditing ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil className="size-4" />
+                Editar
+              </Button>
+            ) : null}
+          </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent>
         <div className="grid gap-4 md:grid-cols-3">
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Building2 className="size-4 text-primary" />
-              Empresa actual
-            </div>
-            <p className="text-sm text-muted-foreground">{currentCompanyName}</p>
-          </div>
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Workflow className="size-4 text-primary" />
-              Area actual
-            </div>
-            <p className="text-sm text-muted-foreground">{currentAreaName}</p>
-          </div>
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Workflow className="size-4 text-primary" />
-              Departamento actual
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {currentDepartmentName}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-5 rounded-2xl border border-border/70 bg-secondary/20 p-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-company">Empresa</Label>
+          <ScopeField
+            controlId="super-admin-company"
+            editControl={
               <select
                 id="super-admin-company"
                 value={companyId}
@@ -225,10 +294,15 @@ export function SuperAdminLaborScopeCard({
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-area">Area o taller</Label>
+            }
+            icon={<Building2 className="size-4" />}
+            isEditing={isEditing}
+            label="Empresa"
+            value={selectedCompany?.name ?? currentCompanyName}
+          />
+          <ScopeField
+            controlId="super-admin-area"
+            editControl={
               <select
                 id="super-admin-area"
                 value={areaDepartmentId}
@@ -245,12 +319,15 @@ export function SuperAdminLaborScopeCard({
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-department">
-                Departamento operativo
-              </Label>
+            }
+            icon={<Workflow className="size-4" />}
+            isEditing={isEditing}
+            label="Area o taller"
+            value={selectedArea?.name ?? currentAreaName}
+          />
+          <ScopeField
+            controlId="super-admin-department"
+            editControl={
               <select
                 id="super-admin-department"
                 value={departmentId}
@@ -267,20 +344,41 @@ export function SuperAdminLaborScopeCard({
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Al cambiar de departamento se limpia el puesto de trabajo asignado
-              para evitar datos cruzados entre areas.
-            </p>
-            <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
+            }
+            icon={<Workflow className="size-4" />}
+            isEditing={isEditing}
+            label="Departamento operativo"
+            value={selectedDepartment?.name ?? currentDepartmentName}
+          />
+        </div>
+      </CardContent>
+      {isEditing ? (
+        <CardFooter className="flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm leading-6 text-muted-foreground">
+            Al cambiar de departamento se limpia el puesto de trabajo asignado
+            para evitar datos cruzados entre areas.
+          </p>
+          <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              <X className="size-4" />
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={!canSave || !hasChanges || saving}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? "Guardando..." : "Guardar asignacion"}
             </Button>
           </div>
-        </div>
-      </CardContent>
+        </CardFooter>
+      ) : null}
     </Card>
   );
 }
