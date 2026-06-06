@@ -3,7 +3,6 @@
 import {
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
   useRef,
   useState,
 } from "react";
@@ -11,24 +10,25 @@ import { toast } from "sonner";
 import {
   Camera,
   Loader2,
-  Mail,
-  Phone,
+  Pencil,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SignaturePad } from "@/components/profile/signature-pad";
-import { PANEL_CLASSNAME, cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfile } from "./actions";
 import type { UserProfile } from "@/types";
@@ -41,39 +41,15 @@ interface ProfileFormProps {
   userId: string;
 }
 
-interface ReadonlyFieldProps {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  className?: string;
-}
-
-function ReadonlyField({ icon, label, value, className }: ReadonlyFieldProps) {
-  return (
-    <div
-      className={cn(
-        PANEL_CLASSNAME,
-        "flex h-full items-start gap-3 px-4 py-4",
-        className
-      )}
-    >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
-        {icon}
-      </div>
-      <div className="min-w-0 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="break-words text-sm font-medium text-foreground">{value}</p>
-      </div>
-    </div>
-  );
-}
-
 export function ProfileForm({
   profile,
   userId,
 }: ProfileFormProps) {
+  const [savedPersonalDetails, setSavedPersonalDetails] = useState({
+    fullName: profile.full_name ?? "",
+    phone: profile.phone ?? "",
+    email: profile.email ?? "",
+  });
   const [fullName, setFullName] = useState(profile.full_name ?? "");
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [email, setEmail] = useState(profile.email ?? "");
@@ -84,9 +60,13 @@ export function ProfileForm({
     profile.signature_url ?? null
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const readOnlyInputClassName = !isEditingPersonal
+    ? "cursor-default bg-secondary/45 shadow-none focus-visible:border-border focus-visible:bg-secondary/45 focus-visible:ring-0"
+    : undefined;
 
   const initials =
     fullName
@@ -112,12 +92,20 @@ export function ProfileForm({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
-    if (!fullName.trim()) {
+    if (!isEditingPersonal && !pendingFile) {
+      return;
+    }
+
+    const normalizedFullName = fullName.trim();
+    const normalizedPhone = phone.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedFullName) {
       toast.error("El nombre completo es obligatorio.");
       return;
     }
 
-    if (!email.trim()) {
+    if (!normalizedEmail) {
       toast.error("El email de contacto es obligatorio.");
       return;
     }
@@ -145,13 +133,12 @@ export function ProfileForm({
       } = supabase.storage.from("avatars").getPublicUrl(path);
 
       avatarUrl = `${publicUrl}?t=${Date.now()}`;
-      setPendingFile(null);
     }
 
     const formData = new FormData();
-    formData.set("full_name", fullName.trim());
-    formData.set("phone", phone.trim());
-    formData.set("email", email.trim());
+    formData.set("full_name", normalizedFullName);
+    formData.set("phone", normalizedPhone);
+    formData.set("email", normalizedEmail);
 
     if (avatarUrl !== undefined) {
       formData.set("avatar_url", avatarUrl);
@@ -165,7 +152,27 @@ export function ProfileForm({
       return;
     }
 
+    setSavedPersonalDetails({
+      fullName: normalizedFullName,
+      phone: normalizedPhone,
+      email: normalizedEmail,
+    });
+    setFullName(normalizedFullName);
+    setPhone(normalizedPhone);
+    setEmail(normalizedEmail);
+    if (avatarUrl) {
+      setAvatarPreview(avatarUrl);
+      setPendingFile(null);
+    }
+    setIsEditingPersonal(false);
     toast.success("Perfil actualizado correctamente.");
+  }
+
+  function handleCancelPersonalEdit() {
+    setFullName(savedPersonalDetails.fullName);
+    setPhone(savedPersonalDetails.phone);
+    setEmail(savedPersonalDetails.email);
+    setIsEditingPersonal(false);
   }
 
   return (
@@ -218,6 +225,7 @@ export function ProfileForm({
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={saving}
               >
                 Cambiar imagen
               </Button>
@@ -232,6 +240,14 @@ export function ProfileForm({
             />
           </div>
         </CardContent>
+        {pendingFile && !isEditingPersonal ? (
+          <CardFooter className="justify-end">
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
+              {saving ? "Guardando..." : "Guardar imagen"}
+            </Button>
+          </CardFooter>
+        ) : null}
       </Card>
 
       <Card>
@@ -253,12 +269,26 @@ export function ProfileForm({
       </Card>
 
       <Card>
-        <CardHeader className="gap-2">
-          <CardTitle>Informacion personal</CardTitle>
-          <CardDescription>
-            Actualiza los datos con los que el equipo te identifica y contacta
-            dentro de ShiftSwap.
-          </CardDescription>
+        <CardHeader className="gap-3">
+          <div className="space-y-2">
+            <CardTitle>Informacion personal</CardTitle>
+            <CardDescription>
+              Datos que el equipo usa para identificarte y contactar contigo.
+            </CardDescription>
+          </div>
+          {!isEditingPersonal ? (
+            <CardAction>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingPersonal(true)}
+              >
+                <Pencil className="size-4" />
+                Editar
+              </Button>
+            </CardAction>
+          ) : null}
         </CardHeader>
 
         <CardContent className="space-y-5">
@@ -269,6 +299,10 @@ export function ProfileForm({
                 id="full_name"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
+                readOnly={!isEditingPersonal}
+                aria-readonly={!isEditingPersonal}
+                tabIndex={isEditingPersonal ? undefined : -1}
+                className={readOnlyInputClassName}
                 required
                 placeholder="Tu nombre completo"
                 autoComplete="name"
@@ -281,6 +315,10 @@ export function ProfileForm({
                 type="tel"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
+                readOnly={!isEditingPersonal}
+                aria-readonly={!isEditingPersonal}
+                tabIndex={isEditingPersonal ? undefined : -1}
+                className={readOnlyInputClassName}
                 placeholder="+34 600 000 000"
                 autoComplete="tel"
               />
@@ -294,35 +332,34 @@ export function ProfileForm({
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              readOnly={!isEditingPersonal}
+              aria-readonly={!isEditingPersonal}
+              tabIndex={isEditingPersonal ? undefined : -1}
+              className={readOnlyInputClassName}
               required
               placeholder="tu@empresa.com"
               autoComplete="email"
             />
           </div>
         </CardContent>
+        {isEditingPersonal ? (
+          <CardFooter className="flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelPersonalEdit}
+              disabled={saving}
+            >
+              <X className="size-4" />
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </CardFooter>
+        ) : null}
       </Card>
-
-      <Card size="sm">
-        <CardContent className="grid gap-4 pt-1 sm:grid-cols-2">
-          <ReadonlyField
-            icon={<Phone className="size-4" />}
-            label="Canal de contacto"
-            value={phone.trim() || "Sin telefono configurado"}
-          />
-          <ReadonlyField
-            icon={<Mail className="size-4" />}
-            label="Correo visible"
-            value={email.trim() || "Sin email configurado"}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button type="submit" disabled={saving}>
-          {saving && <Loader2 className="size-4 animate-spin" />}
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </Button>
-      </div>
     </form>
   );
 }

@@ -21,7 +21,7 @@ import type { UserRole } from "@/types";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CREATABLE_USER_ROLES: readonly UserRole[] = [
   "member",
   "department_admin",
@@ -194,7 +194,11 @@ export async function updatePlatformCompanyThemeAction(formData: FormData) {
   const rawAccentColor = getString(formData, "accentColor");
   const accentColor = rawAccentColor ? normalizeHexColor(rawAccentColor) : null;
 
-  if (!isUuid(companyId) || (rawAccentColor && !accentColor)) {
+  if (!isUuid(companyId)) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  if (rawAccentColor && !accentColor) {
     redirect(getPlatformFeedbackPath(returnTo, { error: "invalid-company-theme" }));
   }
 
