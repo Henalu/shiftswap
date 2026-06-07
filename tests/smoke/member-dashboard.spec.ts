@@ -53,4 +53,46 @@ test.describe("member dashboard smoke", () => {
       overflow.mainClientWidth + 1
     );
   });
+
+  test("help suggestions form fits the mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginAs(page, memberCredentials!);
+
+    await page.goto("/help", { waitUntil: "domcontentloaded" });
+    await expectNoFrameworkError(page);
+    await expect(page.getByRole("heading", { name: "Ayuda" })).toBeVisible();
+    await expect(page.getByText("Sugerencias")).toBeVisible();
+
+    const suggestionField = page.getByLabel("Tu sugerencia");
+    await expect(suggestionField).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Enviar sugerencia" })
+    ).toBeDisabled();
+
+    await suggestionField.fill(
+      "Me ayudaria poder filtrar turnos por prioridad operativa."
+    );
+    await expect(
+      page.getByRole("button", { name: "Enviar sugerencia" })
+    ).toBeEnabled();
+
+    const overflow = await page.evaluate(() => {
+      const root = document.documentElement;
+      const main = document.querySelector("main");
+
+      return {
+        viewportWidth: root.clientWidth,
+        documentWidth: root.scrollWidth,
+        mainClientWidth: main?.clientWidth ?? 0,
+        mainScrollWidth: main?.scrollWidth ?? 0,
+      };
+    });
+
+    expect(overflow.documentWidth).toBeLessThanOrEqual(
+      overflow.viewportWidth + 1
+    );
+    expect(overflow.mainScrollWidth).toBeLessThanOrEqual(
+      overflow.mainClientWidth + 1
+    );
+  });
 });
