@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { OnboardingModal } from "@/components/layout/onboarding-modal";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { TransientScrollbarMain } from "@/components/layout/transient-scrollbar";
 import { AlertTriangle } from "lucide-react";
 import { resolveBillingGateState } from "@/lib/billing";
 import {
@@ -125,7 +126,7 @@ export default async function DashboardLayout({
         <aside className="hidden h-full w-72 shrink-0 overflow-hidden border-r border-border/70 bg-sidebar/75 md:block">
           <SidebarNav role={role} />
         </aside>
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <TransientScrollbarMain className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           <div className="flex min-h-full min-w-0 max-w-full flex-col gap-8 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 md:pb-6 lg:px-8">
             {billingState.enabled && billingState.state === "past_due" ? (
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
@@ -151,7 +152,7 @@ export default async function DashboardLayout({
             ) : null}
             {children}
           </div>
-        </main>
+        </TransientScrollbarMain>
       </div>
       <MobileBottomNav />
       {showOnboarding && <OnboardingModal />}

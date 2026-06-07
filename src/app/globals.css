@@ -155,3 +155,44 @@
     font: inherit;
   }
 }
+
+@layer utilities {
+  .scrollbar-fade {
+    scrollbar-color: transparent transparent;
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-fade[data-scrolling="true"] {
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 52%,
+        transparent
+      )
+      transparent;
+  }
+
+  .scrollbar-fade::-webkit-scrollbar {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+
+  .scrollbar-fade::-webkit-scrollbar-track,
+  .scrollbar-fade::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .scrollbar-fade::-webkit-scrollbar-thumb {
+    background-clip: content-box;
+    background-color: transparent;
+    border: 0.25rem solid transparent;
+    border-radius: 999px;
+  }
+
+  .scrollbar-fade[data-scrolling="true"]::-webkit-scrollbar-thumb {
+    background-color: color-mix(
+      in oklab,
+      var(--muted-foreground) 52%,
+      transparent
+    );
+  }
+}
