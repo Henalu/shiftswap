@@ -267,11 +267,6 @@ export default async function ProfilePage() {
           departments={typedDepartments}
           currentCompanyId={profile.company_id}
           currentDepartmentId={profile.department_id}
-          currentCompanyName={company?.name ?? "Sin empresa asignada"}
-          currentAreaName={currentArea?.name ?? "Sin area asignada"}
-          currentDepartmentName={
-            currentDepartment?.name ?? "Sin departamento asignado"
-          }
         />
       ) : null}
     </div>
