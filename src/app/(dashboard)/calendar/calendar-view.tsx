@@ -138,9 +138,9 @@ export function CalendarView({
       </div>
 
       {/* Calendar grid with ARIA table semantics */}
-      <div role="grid" aria-label={monthLabel} className="gap-px bg-border/30 p-px">
+      <div role="grid" aria-label={monthLabel} className="bg-muted/20">
         {/* Weekday header row */}
-        <div role="row" className="grid grid-cols-7 border-b border-border/40 bg-muted/30">
+        <div role="row" className="grid grid-cols-7 border-b border-border/40 bg-background/80 px-1 py-1 sm:px-1.5">
           {WEEKDAY_LABELS.map((label, i) => (
             <div
               key={label}
@@ -154,54 +154,56 @@ export function CalendarView({
         </div>
 
         {/* Day cells grouped by week */}
-        {(() => {
-          const allCells: (CalendarDay | null)[] = [
-            ...Array.from({ length: leadingBlanks }, () => null),
-            ...days,
-            ...Array.from(
-              { length: (7 - ((leadingBlanks + days.length) % 7)) % 7 },
-              () => null
-            ),
-          ];
-          const weeks: (CalendarDay | null)[][] = [];
-          for (let i = 0; i < allCells.length; i += 7) {
-            weeks.push(allCells.slice(i, i + 7));
-          }
-          return weeks.map((week, wi) => (
-            <div key={wi} role="row" className="grid grid-cols-7 gap-px">
-              {week.map((day, di) => {
-                if (!day) {
+        <div role="rowgroup" className="space-y-1 p-1 sm:space-y-1.5 sm:p-1.5">
+          {(() => {
+            const allCells: (CalendarDay | null)[] = [
+              ...Array.from({ length: leadingBlanks }, () => null),
+              ...days,
+              ...Array.from(
+                { length: (7 - ((leadingBlanks + days.length) % 7)) % 7 },
+                () => null
+              ),
+            ];
+            const weeks: (CalendarDay | null)[][] = [];
+            for (let i = 0; i < allCells.length; i += 7) {
+              weeks.push(allCells.slice(i, i + 7));
+            }
+            return weeks.map((week, wi) => (
+              <div key={wi} role="row" className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                {week.map((day, di) => {
+                  if (!day) {
+                    return (
+                      <div
+                        key={`empty-${wi}-${di}`}
+                        role="gridcell"
+                        aria-hidden="true"
+                        className="min-h-[3.5rem] rounded-lg bg-background/50 sm:min-h-[4.5rem]"
+                      />
+                    );
+                  }
+
+                  const publicationMarker = publicationMarkerByDate.get(day.date);
+
                   return (
-                    <div
-                      key={`empty-${wi}-${di}`}
-                      role="gridcell"
-                      aria-hidden="true"
-                      className="min-h-[3.5rem] bg-background sm:min-h-[4.5rem]"
-                    />
+                    <div key={day.date} role="gridcell" className="min-w-0">
+                      <CalendarDayCell
+                        day={day}
+                        isToday={day.date === today}
+                        onPublish={
+                          publicationScope && day.date >= today
+                            ? () => setPublishDay(day)
+                            : undefined
+                        }
+                        publicationMarker={publicationMarker}
+                        boardHref={publicationMarker?.boardHref}
+                      />
+                    </div>
                   );
-                }
-
-                const publicationMarker = publicationMarkerByDate.get(day.date);
-
-                return (
-                  <div key={day.date} role="gridcell" className="bg-background">
-                    <CalendarDayCell
-                      day={day}
-                      isToday={day.date === today}
-                      onPublish={
-                        publicationScope && day.date >= today
-                          ? () => setPublishDay(day)
-                          : undefined
-                      }
-                      publicationMarker={publicationMarker}
-                      boardHref={publicationMarker?.boardHref}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ));
-        })()}
+                })}
+              </div>
+            ));
+          })()}
+        </div>
       </div>
 
       {/* Legend */}
