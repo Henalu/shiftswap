@@ -20,6 +20,8 @@ import {
 import { getActivePlatformAdminForUser } from "@/lib/platform-console";
 import type { Notification } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 type CompanyThemeStyle = CSSProperties & CompanyThemeCssVariables;
 
 export default async function DashboardLayout({
