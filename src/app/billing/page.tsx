@@ -34,6 +34,8 @@ const BILLING_STATE_LABELS = {
   blocked: "Bloqueada",
 } as const;
 
+export const dynamic = "force-dynamic";
+
 interface BillingPageProps {
   searchParams: Promise<{
     checkout?: string;
