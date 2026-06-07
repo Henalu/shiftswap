@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, SearchX } from "lucide-react";
+import { SearchX } from "lucide-react";
+import { PublishShiftDialog } from "@/app/(dashboard)/shifts/publish-shift-dialog";
 import { ShiftCard } from "@/components/shifts/shift-card";
 import { ShiftFilters } from "@/components/shifts/shift-filters";
 import { Button } from "@/components/ui/button";
@@ -183,12 +184,7 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
             : `Este tablon muestra solo los turnos abiertos de tu departamento${scopeLabel ? `: ${scopeLabel}.` : "."}`
         }
         action={
-          <Link href="/shifts/new">
-            <Button>
-              <Plus className="size-4" />
-              Publicar turno
-            </Button>
-          </Link>
+          <PublishShiftDialog />
         }
       />
 
@@ -240,9 +236,10 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
                 <Link href="/shifts">Ver todos los turnos</Link>
               </Button>
             ) : (
-              <Link href="/shifts/new">
-                <Button variant="outline">Publicar el primer turno</Button>
-              </Link>
+              <PublishShiftDialog
+                label="Publicar el primer turno"
+                variant="outline"
+              />
             )
           }
         />

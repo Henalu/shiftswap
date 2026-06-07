@@ -66,11 +66,11 @@ export function CalendarDayCell({
   const isInteractive = Boolean(onPublish || boardHref);
   const ariaLabel = `${dayNum}, ${label}${exchangeLabel ? `, ${exchangeLabel.toLowerCase()}` : ""}${publicationSummary ? `, ${publicationSummary.toLowerCase()}` : ""}${day.isOverride ? ", modificado por administrador" : ""}${isToday ? ", hoy" : ""}${boardHref ? ", clic para ver publicaciones del dia en el tablon" : ""}${onPublish ? ", doble clic para publicar desde este dia" : ""}`;
   const className = cn(
-    "group relative flex min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl border p-1.5 text-center transition-colors sm:min-h-[4.5rem] sm:items-start sm:justify-start sm:p-2",
+    "group relative flex h-full min-h-[3.5rem] w-full flex-col items-center justify-center gap-1 rounded-lg border p-1.5 text-center transition-colors sm:min-h-[4.5rem] sm:items-start sm:justify-start sm:p-2",
     style,
-    isToday && "ring-2 ring-primary ring-offset-1",
+    isToday && "ring-2 ring-inset ring-primary",
     isInteractive &&
-      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
   );
 
   useEffect(() => {
