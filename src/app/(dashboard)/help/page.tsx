@@ -233,6 +233,10 @@ export default async function HelpPage() {
             ))}
           </>
         )}
+
+        <section className="scroll-mt-24" id="sugerencias">
+          <SuggestionForm />
+        </section>
       </div>
     </>
   );
