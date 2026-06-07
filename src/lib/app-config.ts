@@ -79,3 +79,7 @@ export function getResendApiKey() {
 export function getResendFromEmail() {
   return process.env.RESEND_FROM_EMAIL?.trim() || "";
 }
+
+export function getSuggestionsToEmail() {
+  return process.env.SUGGESTIONS_TO_EMAIL?.trim() || "";
+}
