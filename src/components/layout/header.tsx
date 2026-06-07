@@ -86,7 +86,7 @@ export function Header({
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 shrink-0 border-b border-border/70 bg-background/92 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/88 md:sticky md:inset-x-auto md:pt-0">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 md:h-16 lg:px-8">
+      <div className="flex h-14 w-full items-center gap-4 px-4 sm:px-6 md:h-16 lg:px-8">
         <Link href="/home" className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Repeat className="size-4" />
