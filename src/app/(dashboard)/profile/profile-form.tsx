@@ -3,7 +3,6 @@
 import {
   type ChangeEvent,
   type FormEvent,
-  type ReactNode,
   useRef,
   useState,
 } from "react";
@@ -11,8 +10,6 @@ import { toast } from "sonner";
 import {
   Camera,
   Loader2,
-  Mail,
-  Phone,
   ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +25,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SignaturePad } from "@/components/profile/signature-pad";
-import { PANEL_CLASSNAME, cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfile } from "./actions";
 import type { UserProfile } from "@/types";
@@ -39,35 +35,6 @@ interface ProfileFormProps {
     "full_name" | "email" | "phone" | "avatar_url" | "signature_url"
   >;
   userId: string;
-}
-
-interface ReadonlyFieldProps {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  className?: string;
-}
-
-function ReadonlyField({ icon, label, value, className }: ReadonlyFieldProps) {
-  return (
-    <div
-      className={cn(
-        PANEL_CLASSNAME,
-        "flex h-full items-start gap-3 px-4 py-4",
-        className
-      )}
-    >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
-        {icon}
-      </div>
-      <div className="min-w-0 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="break-words text-sm font-medium text-foreground">{value}</p>
-      </div>
-    </div>
-  );
 }
 
 export function ProfileForm({
@@ -299,21 +266,6 @@ export function ProfileForm({
               autoComplete="email"
             />
           </div>
-        </CardContent>
-      </Card>
-
-      <Card size="sm">
-        <CardContent className="grid gap-4 pt-1 sm:grid-cols-2">
-          <ReadonlyField
-            icon={<Phone className="size-4" />}
-            label="Canal de contacto"
-            value={phone.trim() || "Sin telefono configurado"}
-          />
-          <ReadonlyField
-            icon={<Mail className="size-4" />}
-            label="Correo visible"
-            value={email.trim() || "Sin email configurado"}
-          />
         </CardContent>
       </Card>
 

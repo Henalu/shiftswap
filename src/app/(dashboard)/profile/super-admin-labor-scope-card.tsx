@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, ShieldCheck, Workflow } from "lucide-react";
 import { toast } from "sonner";
@@ -30,9 +30,37 @@ interface SuperAdminLaborScopeCardProps {
   departments: Department[];
   currentCompanyId: string | null;
   currentDepartmentId: string | null;
-  currentCompanyName: string;
-  currentAreaName: string;
-  currentDepartmentName: string;
+}
+
+interface ScopeFieldTileProps {
+  children: ReactNode;
+  fieldId: string;
+  icon: ReactNode;
+  label: string;
+}
+
+function ScopeFieldTile({
+  children,
+  fieldId,
+  icon,
+  label,
+}: ScopeFieldTileProps) {
+  return (
+    <div className={cn(PANEL_CLASSNAME, "flex min-w-0 items-start gap-3 px-4 py-4")}>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <Label
+          htmlFor={fieldId}
+          className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        >
+          {label}
+        </Label>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function getSelectionForCompany({
@@ -80,9 +108,6 @@ export function SuperAdminLaborScopeCard({
   departments,
   currentCompanyId,
   currentDepartmentId,
-  currentCompanyName,
-  currentAreaName,
-  currentDepartmentName,
 }: SuperAdminLaborScopeCardProps) {
   const router = useRouter();
   const initialCompanyId = currentCompanyId ?? companies[0]?.id ?? "";
@@ -180,105 +205,84 @@ export function SuperAdminLaborScopeCard({
 
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Building2 className="size-4 text-primary" />
-              Empresa actual
-            </div>
-            <p className="text-sm text-muted-foreground">{currentCompanyName}</p>
-          </div>
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Workflow className="size-4 text-primary" />
-              Area actual
-            </div>
-            <p className="text-sm text-muted-foreground">{currentAreaName}</p>
-          </div>
-          <div className={cn(PANEL_CLASSNAME, "space-y-2 px-4 py-4")}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Workflow className="size-4 text-primary" />
-              Departamento actual
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {currentDepartmentName}
-            </p>
-          </div>
+          <ScopeFieldTile
+            fieldId="super-admin-company"
+            icon={<Building2 className="size-4" />}
+            label="Empresa"
+          >
+            <select
+              id="super-admin-company"
+              value={companyId}
+              onChange={(event) => handleCompanyChange(event.target.value)}
+              disabled={saving || companies.length === 0}
+              className={FORM_CONTROL_CLASSNAME}
+            >
+              {companies.length === 0 ? (
+                <option value="">Sin empresas disponibles</option>
+              ) : null}
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </ScopeFieldTile>
+
+          <ScopeFieldTile
+            fieldId="super-admin-area"
+            icon={<Workflow className="size-4" />}
+            label="Area o taller"
+          >
+            <select
+              id="super-admin-area"
+              value={areaDepartmentId}
+              onChange={(event) => handleAreaChange(event.target.value)}
+              disabled={saving || availableAreas.length === 0}
+              className={FORM_CONTROL_CLASSNAME}
+            >
+              {availableAreas.length === 0 ? (
+                <option value="">Sin areas disponibles</option>
+              ) : null}
+              {availableAreas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </ScopeFieldTile>
+
+          <ScopeFieldTile
+            fieldId="super-admin-department"
+            icon={<Workflow className="size-4" />}
+            label="Departamento operativo"
+          >
+            <select
+              id="super-admin-department"
+              value={departmentId}
+              onChange={(event) => setDepartmentId(event.target.value)}
+              disabled={saving || availableDepartments.length === 0}
+              className={FORM_CONTROL_CLASSNAME}
+            >
+              {availableDepartments.length === 0 ? (
+                <option value="">Sin departamentos disponibles</option>
+              ) : null}
+              {availableDepartments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </ScopeFieldTile>
         </div>
 
-        <div className="space-y-5 rounded-2xl border border-border/70 bg-secondary/20 p-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-company">Empresa</Label>
-              <select
-                id="super-admin-company"
-                value={companyId}
-                onChange={(event) => handleCompanyChange(event.target.value)}
-                disabled={saving || companies.length === 0}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                {companies.length === 0 ? (
-                  <option value="">Sin empresas disponibles</option>
-                ) : null}
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-area">Area o taller</Label>
-              <select
-                id="super-admin-area"
-                value={areaDepartmentId}
-                onChange={(event) => handleAreaChange(event.target.value)}
-                disabled={saving || availableAreas.length === 0}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                {availableAreas.length === 0 ? (
-                  <option value="">Sin areas disponibles</option>
-                ) : null}
-                {availableAreas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="super-admin-department">
-                Departamento operativo
-              </Label>
-              <select
-                id="super-admin-department"
-                value={departmentId}
-                onChange={(event) => setDepartmentId(event.target.value)}
-                disabled={saving || availableDepartments.length === 0}
-                className={FORM_CONTROL_CLASSNAME}
-              >
-                {availableDepartments.length === 0 ? (
-                  <option value="">Sin departamentos disponibles</option>
-                ) : null}
-                {availableDepartments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Al cambiar de departamento se limpia el puesto de trabajo asignado
-              para evitar datos cruzados entre areas.
-            </p>
-            <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
-              {saving ? "Guardando..." : "Guardar asignacion"}
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            Al cambiar de departamento se limpia el puesto de trabajo asignado
+            para evitar datos cruzados entre areas.
+          </p>
+          <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
+            {saving ? "Guardando..." : "Guardar asignacion"}
+          </Button>
         </div>
       </CardContent>
     </Card>
