@@ -5,6 +5,7 @@ import { getAccountGateState } from "@/lib/user-profiles";
 import { hasAdminPanelAccess } from "@/lib/user-roles";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/types";
+import { SuggestionForm } from "./suggestion-form";
 
 interface HelpSection {
   title: string;
