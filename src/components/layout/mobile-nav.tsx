@@ -6,7 +6,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GuidedHelpLaunchButton } from "@/components/layout/guided-help-tour";
-import { ChevronRight, LogOut, ShieldCheck, X } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { ChevronRight, Lightbulb, LogOut, ShieldCheck, X } from "lucide-react";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import { cn } from "@/lib/utils";
 import type { UserProfile, UserRole } from "@/types";
@@ -233,6 +234,18 @@ export function MobileNav({
                       label="Guia inicial"
                       onLaunch={() => setIsOpen(false)}
                     />
+                    <DialogPrimitive.Close asChild>
+                      <Link
+                        className={cn(
+                          buttonVariants({ variant: "outline" }),
+                          "min-h-11 w-full justify-start rounded-[1.6rem] py-3.5"
+                        )}
+                        href="/help#sugerencias"
+                      >
+                        <Lightbulb aria-hidden="true" />
+                        Sugerencias
+                      </Link>
+                    </DialogPrimitive.Close>
                   </div>
                 </section>
 

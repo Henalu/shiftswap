@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GuidedHelpLaunchButton } from "@/components/layout/guided-help-tour";
 import { TransientScrollbarNav } from "@/components/layout/transient-scrollbar";
+import { buttonVariants } from "@/components/ui/button";
 import type { UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +15,7 @@ import {
   type NavigationItem,
   PRIMARY_NAVIGATION_ITEMS,
 } from "@/components/layout/navigation-items";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Lightbulb, Search, X } from "lucide-react";
 
 interface SidebarNavProps {
   role: UserRole;
@@ -276,7 +277,19 @@ function SidebarNavContent({ adminItems, pathname }: SidebarNavContentProps) {
                   <div className="space-y-1 pb-2">
                     {section.items.map(renderItem)}
                     {section.id === "account" && (
-                      <GuidedHelpLaunchButton className="w-full justify-start" />
+                      <>
+                        <GuidedHelpLaunchButton className="w-full justify-start" />
+                        <Link
+                          className={cn(
+                            buttonVariants({ variant: "outline" }),
+                            "w-full justify-start"
+                          )}
+                          href="/help#sugerencias"
+                        >
+                          <Lightbulb aria-hidden="true" />
+                          Sugerencias
+                        </Link>
+                      </>
                     )}
                   </div>
                 )}

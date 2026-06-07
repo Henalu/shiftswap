@@ -177,8 +177,6 @@ export default async function HelpPage() {
       />
 
       <div className="space-y-8">
-        <SuggestionForm />
-
         {memberSections.map((section) => (
           <Card key={section.title}>
             <CardHeader>
@@ -236,6 +234,10 @@ export default async function HelpPage() {
             ))}
           </>
         )}
+
+        <section className="scroll-mt-24" id="sugerencias">
+          <SuggestionForm />
+        </section>
       </div>
     </>
   );
