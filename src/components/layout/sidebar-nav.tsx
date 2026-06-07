@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GuidedHelpLaunchButton } from "@/components/layout/guided-help-tour";
+import { TransientScrollbarNav } from "@/components/layout/transient-scrollbar";
 import type { UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 import {
@@ -168,7 +169,7 @@ function SidebarNavContent({ adminItems, pathname }: SidebarNavContentProps) {
   );
 
   return (
-    <nav
+    <TransientScrollbarNav
       aria-label="Navegacion lateral"
       className="flex h-full flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-4"
     >
@@ -284,6 +285,6 @@ function SidebarNavContent({ adminItems, pathname }: SidebarNavContentProps) {
           </section>
         );
       })}
-    </nav>
+    </TransientScrollbarNav>
   );
 }
