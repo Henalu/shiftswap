@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, UserRound } from "lucide-react";
+import { ArrowRight, CalendarDays, MessageSquare, UserRound } from "lucide-react";
+import { startConversation } from "@/app/(dashboard)/chat/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,12 +98,26 @@ export function ShiftCard({
       </CardContent>
 
       <CardFooter className="mt-auto flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/shifts/${shift.id}`}>
-          <Button variant="ghost" size="sm">
-            Ver detalle
-            <ArrowRight className="size-4" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/shifts/${shift.id}`}>
+              Ver detalle
+              <ArrowRight className="size-4" />
+            </Link>
           </Button>
-        </Link>
+
+          {!isOwner && (
+            <form action={startConversation}>
+              <input type="hidden" name="shift_id" value={shift.id} />
+              <input type="hidden" name="other_user_id" value={shift.user_id} />
+              <Button type="submit" variant="outline" size="sm">
+                <MessageSquare className="size-4" />
+                Abrir chat
+              </Button>
+            </form>
+          )}
+        </div>
+
         {!isOwner && hasActiveProposal && (
           <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
             Propuesta enviada
