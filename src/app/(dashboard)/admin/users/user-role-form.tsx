@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { FORM_CONTROL_CLASSNAME } from "@/lib/utils";
+import { FORM_CONTROL_CLASSNAME, cn } from "@/lib/utils";
 import { USER_ROLE_LABELS } from "@/lib/user-roles";
 import type { UserRole } from "@/types";
 import { changeUserRole } from "./actions";
@@ -52,20 +52,13 @@ export function UserRoleForm({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Rol asignado
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Ajusta el alcance administrativo sin salir de esta vista.
-        </p>
-      </div>
+    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
       <select
         value={role}
         onChange={(event) => setRole(event.target.value as UserRole)}
         disabled={isSubmitting}
-        className={FORM_CONTROL_CLASSNAME}
+        aria-label={`Rol asignado a ${fullName}`}
+        className={cn(FORM_CONTROL_CLASSNAME, "h-10 sm:w-56")}
       >
         {ROLE_OPTIONS.map((roleOption) => (
           <option key={roleOption} value={roleOption}>
@@ -76,11 +69,12 @@ export function UserRoleForm({
 
       <Button
         type="button"
+        size="sm"
         onClick={handleSubmit}
         disabled={isSubmitting || role === currentRole}
-        className="w-full"
+        className="w-full sm:w-auto"
       >
-        {isSubmitting ? "Guardando..." : "Guardar cambios"}
+        {isSubmitting ? "Guardando..." : "Guardar"}
       </Button>
     </div>
   );

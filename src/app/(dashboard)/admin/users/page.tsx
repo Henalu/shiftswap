@@ -3,18 +3,12 @@ import { redirect } from "next/navigation";
 import { ShieldCheck, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountGateState } from "@/lib/user-profiles";
 import { isSuperAdmin, USER_ROLE_LABELS } from "@/lib/user-roles";
+import { PANEL_CLASSNAME, cn } from "@/lib/utils";
 import type { UserRole } from "@/types";
 import { UserFilters } from "./user-filters";
 import { UserRoleForm } from "./user-role-form";
@@ -146,7 +140,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           }
         />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {approvedUsers.map((profile) => {
             const companyLabel = profile.company_id
               ? companyMap.get(profile.company_id) ?? "Sin empresa"
@@ -156,51 +150,55 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               : "Sin departamento";
 
             return (
-              <Card key={profile.id}>
-                <CardHeader className="gap-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <CardTitle>{profile.full_name}</CardTitle>
-                        <Badge className="border-sky-500/15 bg-sky-500/10 text-sky-700">
-                          <ShieldCheck className="size-3.5" />
-                          {USER_ROLE_LABELS[profile.role]}
-                        </Badge>
-                      </div>
-                      <CardDescription>{profile.email}</CardDescription>
-                    </div>
+              <div
+                key={profile.id}
+                className={cn(
+                  PANEL_CLASSNAME,
+                  "grid gap-3 px-4 py-3 lg:grid-cols-[minmax(14rem,1.25fr)_minmax(9rem,0.8fr)_minmax(10rem,0.9fr)_auto] lg:items-center",
+                )}
+              >
+                <div className="min-w-0 space-y-1">
+                  <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                    <h2
+                      title={profile.full_name}
+                      className="min-w-0 truncate text-base font-semibold leading-6 tracking-[-0.02em] text-foreground"
+                    >
+                      {profile.full_name}
+                    </h2>
+                    <Badge className="shrink-0 border-sky-500/15 bg-sky-500/10 text-sky-700">
+                      <ShieldCheck className="size-3.5" />
+                      {USER_ROLE_LABELS[profile.role]}
+                    </Badge>
                   </div>
-                </CardHeader>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {profile.email}
+                  </p>
+                </div>
 
-                <CardContent className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        Empresa
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        {companyLabel}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border/75 bg-secondary/35 px-4 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        Departamento
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        {departmentLabel}
-                      </p>
-                    </div>
-                  </div>
+                <div className="min-w-0 rounded-xl border border-border/60 bg-secondary/25 px-3 py-2 lg:border-transparent lg:bg-transparent lg:px-0 lg:py-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Empresa
+                  </p>
+                  <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                    {companyLabel}
+                  </p>
+                </div>
 
-                  <div className="rounded-2xl border border-border/75 bg-background/90 px-4 py-4">
-                    <UserRoleForm
-                      userId={profile.id}
-                      fullName={profile.full_name}
-                      currentRole={profile.role}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                <div className="min-w-0 rounded-xl border border-border/60 bg-secondary/25 px-3 py-2 lg:border-transparent lg:bg-transparent lg:px-0 lg:py-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Departamento
+                  </p>
+                  <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                    {departmentLabel}
+                  </p>
+                </div>
+
+                <UserRoleForm
+                  userId={profile.id}
+                  fullName={profile.full_name}
+                  currentRole={profile.role}
+                />
+              </div>
             );
           })}
         </div>
