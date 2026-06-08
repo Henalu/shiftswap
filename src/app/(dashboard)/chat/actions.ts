@@ -160,17 +160,16 @@ export async function startConversation(formData: FormData): Promise<void> {
   if (shiftId) {
     const { data: shift } = await supabase
       .from("shifts")
-      .select("id, user_id")
+      .select("id, user_id, status, direct_recipient_id")
       .eq("id", shiftId)
       .maybeSingle();
 
     if (!shift) return;
 
     const isShiftOwner = shift.user_id === user.id;
-    const expectedOtherUserId = isShiftOwner ? otherUserId : shift.user_id;
     const requesterId = isShiftOwner ? otherUserId : user.id;
 
-    if (expectedOtherUserId !== otherUserId) {
+    if (!isShiftOwner && shift.user_id !== otherUserId) {
       return;
     }
 
@@ -182,7 +181,12 @@ export async function startConversation(formData: FormData): Promise<void> {
       .in("status", ["pending", "accepted"])
       .maybeSingle();
 
-    if (!activeRequest) {
+    const canOpenPreProposalShiftChat =
+      !isShiftOwner &&
+      shift.status === "open" &&
+      shift.direct_recipient_id === null;
+
+    if (!activeRequest && !canOpenPreProposalShiftChat) {
       return;
     }
   } else {
