@@ -33,13 +33,17 @@ import {
   createPlatformJobPositionAction,
   createPlatformUserAction,
   updatePlatformCompanyThemeAction,
-  updatePlatformScheduleConfigAction,
 } from "@/lib/platform-console-actions";
 import { ConsoleUsersTable } from "@/app/(console)/console/console-users-table";
 import {
   ConsoleCompanyAreaFields,
   ConsoleCompanyDepartmentFields,
 } from "@/app/(console)/console/company-scoped-selects";
+import {
+  ManagedDepartmentsList,
+  ManagedJobPositionsList,
+  ManagedScheduleConfigsList,
+} from "@/app/(console)/console/console-structure-management";
 import {
   canManagePlatform,
   canOperatePlatformUsers,
@@ -119,6 +123,12 @@ const errorCopy: Record<string, string> = {
   "company-not-found": "No se encontro la empresa.",
   "company-theme-save-failed": "No se pudo guardar el color corporativo.",
   "department-create-failed": "No se pudo crear el departamento.",
+  "department-delete-blocked":
+    "No se puede eliminar ese departamento porque tiene usuarios, turnos, puestos o solicitudes asociadas.",
+  "department-delete-failed": "No se pudo eliminar el departamento.",
+  "department-update-blocked":
+    "No se puede cambiar ese departamento a area raiz porque ya tiene datos operativos asociados.",
+  "department-update-failed": "No se pudo actualizar el departamento.",
   forbidden: "Tu usuario no tiene rol activo de plataforma.",
   "invalid-company-theme":
     "Usa un color hexadecimal valido, por ejemplo #2563eb.",
@@ -136,6 +146,10 @@ const errorCopy: Record<string, string> = {
   "invalid-user-role": "Ese rol no se puede asignar desde Console.",
   "invalid-user-scope": "Empresa o departamento no validos.",
   "job-position-create-failed": "No se pudo crear el puesto.",
+  "job-position-delete-blocked":
+    "No se puede eliminar ese puesto porque esta en uso. Puedes dejarlo inactivo.",
+  "job-position-delete-failed": "No se pudo eliminar el puesto.",
+  "job-position-update-failed": "No se pudo actualizar el puesto.",
   "password-mismatch": "Las contrasenas temporales no coinciden.",
   "password-missing-letter": "La contrasena debe incluir al menos una letra.",
   "password-missing-number": "La contrasena debe incluir al menos un numero.",
@@ -146,6 +160,8 @@ const errorCopy: Record<string, string> = {
     "La cuenta Auth se creo, pero no se pudo crear el perfil operativo.",
   "schedule-config-save-failed":
     "No se pudo guardar la configuracion de turnos.",
+  "schedule-config-delete-failed":
+    "No se pudo eliminar la configuracion de turnos.",
   "user-not-found": "No se encontro el usuario operativo.",
 };
 
@@ -153,10 +169,15 @@ const successCopy: Record<string, string> = {
   "company-created": "Empresa creada con area y departamento inicial.",
   "company-theme-updated": "Color corporativo actualizado.",
   "department-created": "Departamento creado.",
+  "department-deleted": "Departamento eliminado.",
+  "department-updated": "Departamento actualizado.",
   "job-position-created": "Puesto creado.",
+  "job-position-deleted": "Puesto eliminado.",
+  "job-position-updated": "Puesto actualizado.",
   "password-reset":
     "Contrasena temporal asignada. En el proximo login debera cambiarla.",
   "schedule-config-saved": "Tipo de turno actualizado.",
+  "schedule-config-deleted": "Tipo de turno eliminado.",
   "user-created":
     "Usuario creado con contrasena temporal y cambio obligatorio.",
 };
@@ -168,17 +189,6 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeZone: "Europe/Madrid",
   }).format(new Date(value));
-}
-
-function scheduleTypeLabel(value: string | null | undefined) {
-  switch (value) {
-    case "3t5":
-      return "3 turnos / 5 grupos";
-    case "jornada_normal":
-      return "Jornada normal";
-    default:
-      return "Sin configurar";
-  }
 }
 
 function AccessDeniedState({ message }: { message: string }) {
@@ -381,9 +391,6 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
   );
   const jobPositionMap = new Map(
     jobPositionRows.map((position) => [position.id, position])
-  );
-  const scheduleConfigMap = new Map(
-    scheduleConfigRows.map((config) => [config.department_id, config])
   );
   const areas = departmentRows.filter((department) => !department.parent_department_id);
   const operationalDepartments = departmentRows.filter(
@@ -843,23 +850,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                 <CardTitle>Departamentos</CardTitle>
                 <CardDescription>Areas raiz y equipos operativos.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {departmentRows.map((department) => (
-                  <div
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-3 py-2"
-                    key={department.id}
-                  >
-                    <div>
-                      <p className="font-medium">{department.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {companyMap.get(department.company_id)?.name}
-                      </p>
-                    </div>
-                    <Badge variant="outline">
-                      {department.is_assignable ? "Operativo" : "Area"}
-                    </Badge>
-                  </div>
-                ))}
+              <CardContent>
+                <ManagedDepartmentsList
+                  canManage={canManage}
+                  companies={companyRows}
+                  departments={departmentRows}
+                />
               </CardContent>
             </Card>
 
@@ -868,23 +864,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                 <CardTitle>Puestos</CardTitle>
                 <CardDescription>Catalogo laboral activo.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {jobPositionRows.map((position) => (
-                  <div
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-3 py-2"
-                    key={position.id}
-                  >
-                    <div>
-                      <p className="font-medium">{position.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {departmentMap.get(position.department_id)?.name ?? "Sin depto"}
-                      </p>
-                    </div>
-                    <Badge variant="outline">
-                      {position.active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </div>
-                ))}
+              <CardContent>
+                <ManagedJobPositionsList
+                  canManage={canManage}
+                  departments={operationalDepartments}
+                  jobPositions={jobPositionRows}
+                />
               </CardContent>
             </Card>
           </div>
@@ -898,42 +883,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
           icon={CalendarCog}
           title="Tipos de turno"
         >
-          <div className="grid gap-3">
-            {areas.map((area) => {
-              const config = scheduleConfigMap.get(area.id);
-
-              return (
-                <form
-                  action={updatePlatformScheduleConfigAction}
-                  className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 p-4 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end"
-                  key={area.id}
-                >
-                  <input name="departmentId" type="hidden" value={area.id} />
-                  <div>
-                    <p className="font-medium">{area.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {companyMap.get(area.company_id)?.name} · Actual:{" "}
-                      {scheduleTypeLabel(config?.schedule_type)}
-                    </p>
-                  </div>
-                  <Field label="Tipo">
-                    <select
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                      defaultValue={config?.schedule_type ?? "3t5"}
-                      disabled={!canManage}
-                      name="scheduleType"
-                    >
-                      <option value="3t5">3 turnos / 5 grupos</option>
-                      <option value="jornada_normal">Jornada normal</option>
-                    </select>
-                  </Field>
-                  <Button disabled={!canManage} type="submit" variant="outline">
-                    Guardar
-                  </Button>
-                </form>
-              );
-            })}
-          </div>
+          <ManagedScheduleConfigsList
+            areas={areas}
+            canManage={canManage}
+            companies={companyRows}
+            scheduleConfigs={scheduleConfigRows}
+          />
         </SectionDetails>
       </section>
     </div>

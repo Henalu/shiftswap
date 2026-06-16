@@ -28,6 +28,25 @@ const CREATABLE_USER_ROLES: readonly UserRole[] = [
   "hr_admin",
 ];
 
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+interface ConsoleDepartmentRow {
+  company_id: string;
+  id: string;
+  is_assignable: boolean;
+  name: string;
+  parent_department_id: string | null;
+}
+
+interface ConsoleJobPositionRow {
+  active: boolean;
+  code: string | null;
+  company_id: string;
+  department_id: string;
+  id: string;
+  name: string;
+}
+
 function getConsolePath(params: { error?: string; status?: string } = {}) {
   return getPlatformFeedbackPath("/console", params);
 }
@@ -121,6 +140,151 @@ async function ensureDepartmentInCompany(input: {
   }
 
   return true;
+}
+
+async function getConsoleDepartment(
+  admin: AdminClient,
+  departmentId: string
+) {
+  const { data, error } = await admin
+    .from("departments")
+    .select("id, company_id, name, parent_department_id, is_assignable")
+    .eq("id", departmentId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as ConsoleDepartmentRow;
+}
+
+async function getConsoleJobPosition(
+  admin: AdminClient,
+  jobPositionId: string
+) {
+  const { data, error } = await admin
+    .from("job_positions")
+    .select("id, company_id, department_id, name, code, active")
+    .eq("id", jobPositionId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as ConsoleJobPositionRow;
+}
+
+async function tableHasRows(
+  admin: AdminClient,
+  table: string,
+  column: string,
+  value: string
+) {
+  const { data, error } = await admin
+    .from(table)
+    .select("id")
+    .eq(column, value)
+    .limit(1);
+
+  if (error) {
+    console.error("[platform-console] Failed dependency check", {
+      column,
+      message: error.message,
+      table,
+    });
+    return true;
+  }
+
+  return (data ?? []).length > 0;
+}
+
+async function departmentHasBlockingReferences(
+  admin: AdminClient,
+  departmentId: string
+) {
+  const checks = await Promise.all([
+    tableHasRows(admin, "departments", "parent_department_id", departmentId),
+    tableHasRows(admin, "user_profiles", "department_id", departmentId),
+    tableHasRows(admin, "shifts", "department_id", departmentId),
+    tableHasRows(admin, "job_positions", "department_id", departmentId),
+    tableHasRows(
+      admin,
+      "department_change_requests",
+      "current_department_id",
+      departmentId
+    ),
+    tableHasRows(
+      admin,
+      "department_change_requests",
+      "requested_department_id",
+      departmentId
+    ),
+    tableHasRows(
+      admin,
+      "job_position_change_requests",
+      "current_department_id",
+      departmentId
+    ),
+  ]);
+
+  return checks.some(Boolean);
+}
+
+async function departmentHasOperationalReferences(
+  admin: AdminClient,
+  departmentId: string
+) {
+  const checks = await Promise.all([
+    tableHasRows(admin, "user_profiles", "department_id", departmentId),
+    tableHasRows(admin, "shifts", "department_id", departmentId),
+    tableHasRows(admin, "job_positions", "department_id", departmentId),
+    tableHasRows(
+      admin,
+      "department_change_requests",
+      "current_department_id",
+      departmentId
+    ),
+    tableHasRows(
+      admin,
+      "department_change_requests",
+      "requested_department_id",
+      departmentId
+    ),
+    tableHasRows(
+      admin,
+      "job_position_change_requests",
+      "current_department_id",
+      departmentId
+    ),
+  ]);
+
+  return checks.some(Boolean);
+}
+
+async function jobPositionHasBlockingReferences(
+  admin: AdminClient,
+  jobPositionId: string
+) {
+  const checks = await Promise.all([
+    tableHasRows(admin, "user_profiles", "job_position_id", jobPositionId),
+    tableHasRows(admin, "shifts", "job_position_id", jobPositionId),
+    tableHasRows(
+      admin,
+      "job_position_change_requests",
+      "current_job_position_id",
+      jobPositionId
+    ),
+    tableHasRows(
+      admin,
+      "job_position_change_requests",
+      "requested_job_position_id",
+      jobPositionId
+    ),
+  ]);
+
+  return checks.some(Boolean);
 }
 
 async function ensureJobPositionInDepartment(input: {
@@ -269,6 +433,7 @@ export async function createPlatformDepartmentAction(formData: FormData) {
   const companyId = getString(formData, "companyId");
   const parentDepartmentId = getString(formData, "parentDepartmentId");
   const name = getString(formData, "departmentName");
+  const admin = createAdminClient();
 
   if (!isUuid(companyId) || !name || name.length > 120) {
     redirect(getConsolePath({ error: "invalid-department" }));
@@ -278,17 +443,18 @@ export async function createPlatformDepartmentAction(formData: FormData) {
     redirect(getConsolePath({ error: "invalid-department" }));
   }
 
-  if (
-    parentDepartmentId &&
-    !(await ensureDepartmentInCompany({
-      companyId,
-      departmentId: parentDepartmentId,
-    }))
-  ) {
-    redirect(getConsolePath({ error: "invalid-department-scope" }));
+  if (parentDepartmentId) {
+    const parentDepartment = await getConsoleDepartment(admin, parentDepartmentId);
+
+    if (
+      !parentDepartment ||
+      parentDepartment.company_id !== companyId ||
+      parentDepartment.parent_department_id
+    ) {
+      redirect(getConsolePath({ error: "invalid-department-scope" }));
+    }
   }
 
-  const admin = createAdminClient();
   const { data, error } = await admin
     .from("departments")
     .insert({
@@ -315,6 +481,136 @@ export async function createPlatformDepartmentAction(formData: FormData) {
 
   revalidatePath("/console");
   redirect(getConsolePath({ status: "department-created" }));
+}
+
+export async function updatePlatformDepartmentAction(formData: FormData) {
+  const access = await requirePlatformAccess({ write: true });
+  const departmentId = getString(formData, "departmentId");
+  const parentDepartmentId = getString(formData, "parentDepartmentId");
+  const name = getString(formData, "departmentName");
+
+  if (!isUuid(departmentId) || !name || name.length > 120) {
+    redirect(getConsolePath({ error: "invalid-department" }));
+  }
+
+  if (parentDepartmentId && !isUuid(parentDepartmentId)) {
+    redirect(getConsolePath({ error: "invalid-department" }));
+  }
+
+  const admin = createAdminClient();
+  const department = await getConsoleDepartment(admin, departmentId);
+
+  if (!department) {
+    redirect(getConsolePath({ error: "invalid-department" }));
+  }
+
+  if (parentDepartmentId === departmentId) {
+    redirect(getConsolePath({ error: "invalid-department-scope" }));
+  }
+
+  let nextParentDepartmentId: string | null = null;
+  let nextIsAssignable = false;
+
+  if (parentDepartmentId) {
+    const parentDepartment = await getConsoleDepartment(admin, parentDepartmentId);
+
+    if (
+      !parentDepartment ||
+      parentDepartment.company_id !== department.company_id ||
+      parentDepartment.parent_department_id
+    ) {
+      redirect(getConsolePath({ error: "invalid-department-scope" }));
+    }
+
+    if (
+      !department.parent_department_id &&
+      (await tableHasRows(admin, "departments", "parent_department_id", departmentId))
+    ) {
+      redirect(getConsolePath({ error: "department-update-blocked" }));
+    }
+
+    nextParentDepartmentId = parentDepartmentId;
+    nextIsAssignable = true;
+  } else if (
+    department.is_assignable &&
+    (await departmentHasOperationalReferences(admin, departmentId))
+  ) {
+    redirect(getConsolePath({ error: "department-update-blocked" }));
+  }
+
+  const { error } = await admin
+    .from("departments")
+    .update({
+      is_assignable: nextIsAssignable,
+      name,
+      parent_department_id: nextParentDepartmentId,
+    })
+    .eq("id", departmentId);
+
+  if (error) {
+    redirect(getConsolePath({ error: "department-update-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "department.update",
+    actor: access.admin,
+    companyId: department.company_id,
+    metadata: {
+      name,
+      parentDepartmentId: nextParentDepartmentId,
+      previousName: department.name,
+      previousParentDepartmentId: department.parent_department_id,
+    },
+    targetId: departmentId,
+    targetType: "department",
+  });
+
+  revalidatePath("/console");
+  redirect(getConsolePath({ status: "department-updated" }));
+}
+
+export async function deletePlatformDepartmentAction(formData: FormData) {
+  const access = await requirePlatformAccess({ write: true });
+  const departmentId = getString(formData, "departmentId");
+
+  if (!isUuid(departmentId)) {
+    redirect(getConsolePath({ error: "invalid-department" }));
+  }
+
+  const admin = createAdminClient();
+  const department = await getConsoleDepartment(admin, departmentId);
+
+  if (!department) {
+    redirect(getConsolePath({ error: "invalid-department" }));
+  }
+
+  if (await departmentHasBlockingReferences(admin, departmentId)) {
+    redirect(getConsolePath({ error: "department-delete-blocked" }));
+  }
+
+  const { error } = await admin
+    .from("departments")
+    .delete()
+    .eq("id", departmentId);
+
+  if (error) {
+    redirect(getConsolePath({ error: "department-delete-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "department.delete",
+    actor: access.admin,
+    companyId: department.company_id,
+    metadata: {
+      name: department.name,
+      parentDepartmentId: department.parent_department_id,
+    },
+    targetId: departmentId,
+    targetType: "department",
+  });
+
+  revalidatePath("/console");
+  redirect(getConsolePath({ status: "department-deleted" }));
 }
 
 export async function createPlatformJobPositionAction(formData: FormData) {
@@ -367,6 +663,122 @@ export async function createPlatformJobPositionAction(formData: FormData) {
   redirect(getConsolePath({ status: "job-position-created" }));
 }
 
+export async function updatePlatformJobPositionAction(formData: FormData) {
+  const access = await requirePlatformAccess({ write: true });
+  const jobPositionId = getString(formData, "jobPositionId");
+  const departmentId = getString(formData, "departmentId");
+  const name = getString(formData, "jobPositionName");
+  const code = getString(formData, "jobPositionCode");
+  const active = getString(formData, "jobPositionActive") !== "false";
+
+  if (
+    !isUuid(jobPositionId) ||
+    !isUuid(departmentId) ||
+    !name ||
+    name.length > 120 ||
+    code.length > 64
+  ) {
+    redirect(getConsolePath({ error: "invalid-job-position" }));
+  }
+
+  const admin = createAdminClient();
+  const jobPosition = await getConsoleJobPosition(admin, jobPositionId);
+
+  if (!jobPosition) {
+    redirect(getConsolePath({ error: "invalid-job-position" }));
+  }
+
+  if (
+    !(await ensureDepartmentInCompany({
+      companyId: jobPosition.company_id,
+      departmentId,
+      requireAssignable: true,
+    }))
+  ) {
+    redirect(getConsolePath({ error: "invalid-department-scope" }));
+  }
+
+  const { error } = await admin
+    .from("job_positions")
+    .update({
+      active,
+      code: code || null,
+      department_id: departmentId,
+      name,
+    })
+    .eq("id", jobPositionId);
+
+  if (error) {
+    redirect(getConsolePath({ error: "job-position-update-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "job_position.update",
+    actor: access.admin,
+    companyId: jobPosition.company_id,
+    metadata: {
+      active,
+      code: code || null,
+      departmentId,
+      name,
+      previousActive: jobPosition.active,
+      previousCode: jobPosition.code,
+      previousDepartmentId: jobPosition.department_id,
+      previousName: jobPosition.name,
+    },
+    targetId: jobPositionId,
+    targetType: "job_position",
+  });
+
+  revalidatePath("/console");
+  redirect(getConsolePath({ status: "job-position-updated" }));
+}
+
+export async function deletePlatformJobPositionAction(formData: FormData) {
+  const access = await requirePlatformAccess({ write: true });
+  const jobPositionId = getString(formData, "jobPositionId");
+
+  if (!isUuid(jobPositionId)) {
+    redirect(getConsolePath({ error: "invalid-job-position" }));
+  }
+
+  const admin = createAdminClient();
+  const jobPosition = await getConsoleJobPosition(admin, jobPositionId);
+
+  if (!jobPosition) {
+    redirect(getConsolePath({ error: "invalid-job-position" }));
+  }
+
+  if (await jobPositionHasBlockingReferences(admin, jobPositionId)) {
+    redirect(getConsolePath({ error: "job-position-delete-blocked" }));
+  }
+
+  const { error } = await admin
+    .from("job_positions")
+    .delete()
+    .eq("id", jobPositionId);
+
+  if (error) {
+    redirect(getConsolePath({ error: "job-position-delete-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "job_position.delete",
+    actor: access.admin,
+    companyId: jobPosition.company_id,
+    metadata: {
+      code: jobPosition.code,
+      departmentId: jobPosition.department_id,
+      name: jobPosition.name,
+    },
+    targetId: jobPositionId,
+    targetType: "job_position",
+  });
+
+  revalidatePath("/console");
+  redirect(getConsolePath({ status: "job-position-deleted" }));
+}
+
 export async function updatePlatformScheduleConfigAction(formData: FormData) {
   const access = await requirePlatformAccess({ write: true });
   const departmentId = getString(formData, "departmentId");
@@ -382,11 +794,14 @@ export async function updatePlatformScheduleConfigAction(formData: FormData) {
   const admin = createAdminClient();
   const { data: department } = await admin
     .from("departments")
-    .select("id, company_id")
+    .select("id, company_id, parent_department_id")
     .eq("id", departmentId)
     .maybeSingle();
 
-  if (!department) {
+  if (
+    !department ||
+    (department as { parent_department_id: string | null }).parent_department_id
+  ) {
     redirect(getConsolePath({ error: "invalid-schedule-config" }));
   }
 
@@ -414,6 +829,43 @@ export async function updatePlatformScheduleConfigAction(formData: FormData) {
 
   revalidatePath("/console");
   redirect(getConsolePath({ status: "schedule-config-saved" }));
+}
+
+export async function deletePlatformScheduleConfigAction(formData: FormData) {
+  const access = await requirePlatformAccess({ write: true });
+  const departmentId = getString(formData, "departmentId");
+
+  if (!isUuid(departmentId)) {
+    redirect(getConsolePath({ error: "invalid-schedule-config" }));
+  }
+
+  const admin = createAdminClient();
+  const department = await getConsoleDepartment(admin, departmentId);
+
+  if (!department || department.parent_department_id) {
+    redirect(getConsolePath({ error: "invalid-schedule-config" }));
+  }
+
+  const { error } = await admin
+    .from("area_schedule_configs")
+    .delete()
+    .eq("department_id", departmentId);
+
+  if (error) {
+    redirect(getConsolePath({ error: "schedule-config-delete-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "schedule_config.delete",
+    actor: access.admin,
+    companyId: department.company_id,
+    metadata: { departmentName: department.name },
+    targetId: departmentId,
+    targetType: "department",
+  });
+
+  revalidatePath("/console");
+  redirect(getConsolePath({ status: "schedule-config-deleted" }));
 }
 
 export async function createPlatformUserAction(formData: FormData) {
