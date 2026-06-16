@@ -80,13 +80,16 @@ export function ConsoleCompanyAreaFields({
 
       <Field htmlFor={`${idPrefix}-parent-department`} label="Area padre opcional">
         <select
+          key={companyId || "no-company"}
           className={SELECT_CLASSNAME}
           disabled={!companyId}
           id={`${idPrefix}-parent-department`}
           name="parentDepartmentId"
         >
           <option value="">
-            {companyId ? "Crear area raiz" : "Selecciona empresa primero"}
+            {companyId
+              ? "Crear area raiz en esta empresa"
+              : "Selecciona empresa primero"}
           </option>
           {filteredAreas.map((area) => (
             <option key={area.id} value={area.id}>
@@ -167,6 +170,7 @@ export function ConsoleCompanyDepartmentFields({
 
       <Field htmlFor={`${idPrefix}-department`} label={departmentLabel}>
         <select
+          key={companyId || "no-company"}
           className={SELECT_CLASSNAME}
           disabled={!companyId}
           id={`${idPrefix}-department`}
@@ -193,6 +197,7 @@ export function ConsoleCompanyDepartmentFields({
       {jobPositions ? (
         <Field htmlFor={`${idPrefix}-job-position`} label={jobPositionLabel}>
           <select
+            key={departmentId || "no-department"}
             className={SELECT_CLASSNAME}
             disabled={!departmentId}
             id={`${idPrefix}-job-position`}
