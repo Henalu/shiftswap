@@ -37,6 +37,10 @@ import {
 } from "@/lib/platform-console-actions";
 import { ConsoleUsersTable } from "@/app/(console)/console/console-users-table";
 import {
+  ConsoleCompanyAreaFields,
+  ConsoleCompanyDepartmentFields,
+} from "@/app/(console)/console/company-scoped-selects";
+import {
   canManagePlatform,
   canOperatePlatformUsers,
   getCurrentPlatformAccess,
@@ -125,7 +129,8 @@ const errorCopy: Record<string, string> = {
   "invalid-department-name": "El nombre de area o departamento no es valido.",
   "invalid-department-scope":
     "El departamento elegido no pertenece a esa empresa.",
-  "invalid-job-position": "Revisa los datos del puesto.",
+  "invalid-job-position":
+    "El puesto elegido no pertenece a la empresa y departamento seleccionados.",
   "invalid-schedule-config": "La configuracion de turno no es valida.",
   "invalid-user": "Revisa nombre y email del usuario.",
   "invalid-user-role": "Ese rol no se puede asignar desde Console.",
@@ -728,49 +733,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                   ))}
                 </select>
               </Field>
-              <Field label="Empresa">
-                <select
-                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                  name="companyId"
-                  required
-                >
-                  <option value="">Selecciona empresa</option>
-                  {companyRows.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Departamento operativo">
-                <select
-                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                  name="departmentId"
-                  required
-                >
-                  <option value="">Selecciona departamento</option>
-                  {operationalDepartments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {companyMap.get(department.company_id)?.name} /{" "}
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Puesto">
-                <select
-                  className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                  name="jobPositionId"
-                >
-                  <option value="">Sin puesto</option>
-                  {jobPositionRows.map((position) => (
-                    <option key={position.id} value={position.id}>
-                      {companyMap.get(position.company_id)?.name} /{" "}
-                      {position.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <ConsoleCompanyDepartmentFields
+                companies={companyRows}
+                departments={operationalDepartments}
+                idPrefix="console-create-user"
+                jobPositions={jobPositionRows}
+              />
               <Field label="Contrasena temporal">
                 <Input
                   autoComplete="new-password"
@@ -825,33 +793,11 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                     operativo.
                   </p>
                 </div>
-                <Field label="Empresa">
-                  <select
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    name="companyId"
-                    required
-                  >
-                    <option value="">Selecciona empresa</option>
-                    {companyRows.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Area padre opcional">
-                  <select
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    name="parentDepartmentId"
-                  >
-                    <option value="">Crear area raiz</option>
-                    {areas.map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {companyMap.get(area.company_id)?.name} / {area.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <ConsoleCompanyAreaFields
+                  areas={areas}
+                  companies={companyRows}
+                  idPrefix="console-create-department"
+                />
                 <Field label="Nombre">
                   <Input name="departmentName" required />
                 </Field>
@@ -871,35 +817,12 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
                     Los puestos solo pueden pertenecer a departamentos operativos.
                   </p>
                 </div>
-                <Field label="Empresa">
-                  <select
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    name="companyId"
-                    required
-                  >
-                    <option value="">Selecciona empresa</option>
-                    {companyRows.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Departamento">
-                  <select
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    name="departmentId"
-                    required
-                  >
-                    <option value="">Selecciona departamento</option>
-                    {operationalDepartments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {companyMap.get(department.company_id)?.name} /{" "}
-                        {department.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <ConsoleCompanyDepartmentFields
+                  companies={companyRows}
+                  departmentLabel="Departamento"
+                  departments={operationalDepartments}
+                  idPrefix="console-create-job-position"
+                />
                 <Field label="Nombre del puesto">
                   <Input name="jobPositionName" required />
                 </Field>

@@ -123,6 +123,24 @@ async function ensureDepartmentInCompany(input: {
   return true;
 }
 
+async function ensureJobPositionInDepartment(input: {
+  companyId: string;
+  departmentId: string;
+  jobPositionId: string;
+}) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("job_positions")
+    .select("id")
+    .eq("id", input.jobPositionId)
+    .eq("company_id", input.companyId)
+    .eq("department_id", input.departmentId)
+    .eq("active", true)
+    .maybeSingle();
+
+  return !error && Boolean(data);
+}
+
 export async function createPlatformCompanyAction(formData: FormData) {
   const access = await requirePlatformAccess({ write: true });
   const name = getString(formData, "companyName");
@@ -430,6 +448,17 @@ export async function createPlatformUserAction(formData: FormData) {
   }
 
   if (jobPositionId && !isUuid(jobPositionId)) {
+    redirect(getConsolePath({ error: "invalid-job-position" }));
+  }
+
+  if (
+    jobPositionId &&
+    !(await ensureJobPositionInDepartment({
+      companyId,
+      departmentId,
+      jobPositionId,
+    }))
+  ) {
     redirect(getConsolePath({ error: "invalid-job-position" }));
   }
 
