@@ -36,6 +36,8 @@ export function ShiftCard({
     shift.coverage_start_time && shift.coverage_end_time
       ? formatTimeRange(shift.coverage_start_time, shift.coverage_end_time)
       : null;
+  const jobPositionName =
+    shift.job_position?.name ?? shift.custom_job_position_name?.trim() ?? null;
 
   return (
     <Card className="h-full border-border/75 transition-[border-color,box-shadow] hover:border-primary/20 hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_24px_40px_-26px_rgba(37,99,235,0.25)]">
@@ -65,9 +67,9 @@ export function ShiftCard({
           <Badge variant="outline" className="text-foreground">
             {shift.department.name}
           </Badge>
-          {shift.job_position ? (
+          {jobPositionName ? (
             <Badge variant="outline" className="text-foreground">
-              {shift.job_position.name}
+              {jobPositionName}
             </Badge>
           ) : null}
         </div>
@@ -85,7 +87,7 @@ export function ShiftCard({
               </p>
               <p className="truncate text-sm text-muted-foreground">
                 Publicado en {shift.department.name}
-                {shift.job_position ? ` - ${shift.job_position.name}` : ""}
+                {jobPositionName ? ` - ${jobPositionName}` : ""}
               </p>
             </div>
           </div>

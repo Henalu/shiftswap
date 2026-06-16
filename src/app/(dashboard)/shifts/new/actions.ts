@@ -172,6 +172,7 @@ export async function createShift(
     user_id: user.id,
     department_id: publicationScope.departmentId,
     job_position_id: publicationScope.jobPositionId,
+    custom_job_position_name: publicationScope.customJobPositionName,
     date,
     // The stored schedule is derived from shift_type to prevent invalid mixes.
     start_time: schedule.startTime,

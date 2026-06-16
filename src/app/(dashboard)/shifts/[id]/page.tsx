@@ -130,6 +130,8 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     shift.coverage_start_time && shift.coverage_end_time
       ? formatTimeRange(shift.coverage_start_time, shift.coverage_end_time)
       : null;
+  const jobPositionName =
+    shift.job_position?.name ?? shift.custom_job_position_name?.trim() ?? null;
   const isOwner = authUser.id === shift.user_id;
   const myActiveProposal = typedRequests.find(
     (request) =>
@@ -185,9 +187,9 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               <Badge variant="outline" className="text-foreground">
                 {shift.department.name}
               </Badge>
-              {shift.job_position ? (
+              {jobPositionName ? (
                 <Badge variant="outline" className="text-foreground">
-                  {shift.job_position.name}
+                  {jobPositionName}
                 </Badge>
               ) : null}
             </div>
@@ -207,7 +209,7 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {shift.user.email} · {shift.department.name}
-                {shift.job_position ? ` - ${shift.job_position.name}` : ""}
+                {jobPositionName ? ` - ${jobPositionName}` : ""}
               </p>
             </div>
 

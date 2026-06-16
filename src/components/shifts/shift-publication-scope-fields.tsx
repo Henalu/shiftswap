@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  CUSTOM_JOB_POSITION_INPUT_PATTERN,
+  CUSTOM_JOB_POSITION_MAX_LENGTH,
+  CUSTOM_JOB_POSITION_MIN_LENGTH,
+  getCustomJobPositionNameError,
+  normalizeCustomJobPositionName,
+} from "@/lib/custom-job-position";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   getDepartmentArea,
   getDepartmentById,
@@ -20,6 +28,8 @@ interface ShiftPublicationScopeFieldsProps {
   className?: string;
   summaryPrefix?: string;
 }
+
+const OTHER_JOB_POSITION_VALUE = "__other__";
 
 function getCompanyId(departments: Department[], departmentId: string) {
   return (
@@ -121,6 +131,7 @@ export function ShiftPublicationScopeFields({
       defaultJobPositionId,
     ),
   );
+  const [customJobPositionName, setCustomJobPositionName] = useState("");
 
   const availableAreas = useMemo(
     () => getTopLevelDepartmentsForCompany(departments, companyId),
@@ -149,6 +160,19 @@ export function ShiftPublicationScopeFields({
     availableJobPositions.find(
       (jobPosition) => jobPosition.id === jobPositionId,
     ) ?? null;
+  const isCustomJobPosition = jobPositionId === OTHER_JOB_POSITION_VALUE;
+  const normalizedCustomJobPositionName = normalizeCustomJobPositionName(
+    customJobPositionName,
+  );
+  const customJobPositionError =
+    isCustomJobPosition && customJobPositionName
+      ? getCustomJobPositionNameError(customJobPositionName)
+      : null;
+  const summaryJobPositionName =
+    selectedJobPosition?.name ??
+    (isCustomJobPosition && normalizedCustomJobPositionName
+      ? normalizedCustomJobPositionName
+      : null);
 
   function handleAreaChange(nextAreaDepartmentId: string) {
     const nextDepartments = getOperationalDepartmentsForArea(
@@ -161,11 +185,13 @@ export function ShiftPublicationScopeFields({
     setAreaDepartmentId(nextAreaDepartmentId);
     setDepartmentId(nextDepartmentId);
     setJobPositionId("");
+    setCustomJobPositionName("");
   }
 
   function handleDepartmentChange(nextDepartmentId: string) {
     setDepartmentId(nextDepartmentId);
     setJobPositionId("");
+    setCustomJobPositionName("");
   }
 
   return (
@@ -222,26 +248,72 @@ export function ShiftPublicationScopeFields({
 
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-job-position`}>Puesto de trabajo</Label>
+          {selectedJobPosition ? (
+            <input
+              type="hidden"
+              name="job_position_id"
+              value={selectedJobPosition.id}
+            />
+          ) : null}
           <select
             id={`${idPrefix}-job-position`}
-            name="job_position_id"
             value={jobPositionId}
-            onChange={(event) => setJobPositionId(event.target.value)}
-            disabled={availableJobPositions.length === 0}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setJobPositionId(nextValue);
+
+              if (nextValue !== OTHER_JOB_POSITION_VALUE) {
+                setCustomJobPositionName("");
+              }
+            }}
+            disabled={!departmentId}
             className={FORM_CONTROL_CLASSNAME}
           >
-            <option value="">
-              {availableJobPositions.length === 0
-                ? "Sin puestos disponibles"
-                : "Sin puesto especifico"}
-            </option>
+            <option value="">Sin puesto especifico</option>
             {availableJobPositions.map((jobPosition) => (
               <option key={jobPosition.id} value={jobPosition.id}>
                 {jobPosition.name}
               </option>
             ))}
+            <option value={OTHER_JOB_POSITION_VALUE}>Otro</option>
           </select>
         </div>
+
+        {isCustomJobPosition ? (
+          <div className="space-y-2 md:col-span-3">
+            <Label htmlFor={`${idPrefix}-custom-job-position`}>
+              Nombre del puesto
+            </Label>
+            <Input
+              id={`${idPrefix}-custom-job-position`}
+              name="custom_job_position_name"
+              value={customJobPositionName}
+              onChange={(event) => setCustomJobPositionName(event.target.value)}
+              onBlur={() =>
+                setCustomJobPositionName(normalizedCustomJobPositionName)
+              }
+              required
+              minLength={CUSTOM_JOB_POSITION_MIN_LENGTH}
+              maxLength={CUSTOM_JOB_POSITION_MAX_LENGTH}
+              pattern={CUSTOM_JOB_POSITION_INPUT_PATTERN}
+              placeholder="Ej. Gruista"
+              aria-invalid={Boolean(customJobPositionError)}
+              aria-describedby={`${idPrefix}-custom-job-position-help`}
+            />
+            <p
+              id={`${idPrefix}-custom-job-position-help`}
+              className={cn(
+                "text-xs leading-5",
+                customJobPositionError
+                  ? "font-medium text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              {customJobPositionError ??
+                "Solo letras y espacios. Usa un nombre profesional del puesto."}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <p className="text-sm leading-6 text-muted-foreground">
@@ -258,14 +330,16 @@ export function ShiftPublicationScopeFields({
             </span>
           </>
         ) : null}
-        {selectedJobPosition ? (
+        {summaryJobPositionName ? (
           <>
             {" "}
             para el puesto{" "}
             <span className="font-semibold text-foreground">
-              {selectedJobPosition.name}
+              {summaryJobPositionName}
             </span>
           </>
+        ) : isCustomJobPosition ? (
+          " para otro puesto"
         ) : (
           " sin puesto especifico"
         )}

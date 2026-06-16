@@ -465,6 +465,7 @@ export async function sendDirectProposal(
       direct_recipient_id: recipientId,
       department_id: publicationScope.departmentId,
       job_position_id: publicationScope.jobPositionId,
+      custom_job_position_name: publicationScope.customJobPositionName,
       date,
       start_time: schedule.startTime,
       end_time: schedule.endTime,

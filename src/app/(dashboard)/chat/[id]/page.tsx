@@ -114,7 +114,7 @@ export default async function ConversationPage({ params }: PageProps) {
       `
       id, user_id, direct_recipient_id, date, start_time, end_time,
       coverage_start_time, coverage_end_time, shift_type, status,
-      description, created_at,
+      description, custom_job_position_name, created_at,
       department:departments!department_id(id, name),
       job_position:job_positions!job_position_id(id, name)
     `,

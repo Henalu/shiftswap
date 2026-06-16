@@ -2,6 +2,10 @@ import {
   getDepartmentById,
   isOperationalDepartment,
 } from "@/lib/departments";
+import {
+  getCustomJobPositionNameError,
+  normalizeCustomJobPositionName,
+} from "@/lib/custom-job-position";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Department, JobPosition } from "@/types";
 
@@ -27,6 +31,7 @@ type ResolvedShiftPublicationScope =
       success: true;
       departmentId: string;
       jobPositionId: string | null;
+      customJobPositionName: string | null;
     }
   | { success: false; error: string };
 
@@ -135,6 +140,9 @@ export async function resolveShiftPublicationScope(
   const { defaultDepartmentId, departments, jobPositions } = scopeResult.data;
   const submittedDepartmentId = getFormValue(formData, "department_id");
   const submittedJobPositionId = getFormValue(formData, "job_position_id");
+  const submittedCustomJobPositionName = normalizeCustomJobPositionName(
+    getFormValue(formData, "custom_job_position_name"),
+  );
   const departmentId = submittedDepartmentId || defaultDepartmentId;
   const department = getDepartmentById(departments, departmentId);
 
@@ -145,11 +153,39 @@ export async function resolveShiftPublicationScope(
     };
   }
 
+  if (submittedJobPositionId && submittedCustomJobPositionName) {
+    return {
+      success: false,
+      error: "Elige un puesto existente o escribe otro, pero no ambos.",
+    };
+  }
+
+  if (submittedCustomJobPositionName) {
+    const customJobPositionError = getCustomJobPositionNameError(
+      submittedCustomJobPositionName,
+    );
+
+    if (customJobPositionError) {
+      return {
+        success: false,
+        error: customJobPositionError,
+      };
+    }
+
+    return {
+      success: true,
+      departmentId,
+      jobPositionId: null,
+      customJobPositionName: submittedCustomJobPositionName,
+    };
+  }
+
   if (!submittedJobPositionId) {
     return {
       success: true,
       departmentId,
       jobPositionId: null,
+      customJobPositionName: null,
     };
   }
 
@@ -174,5 +210,6 @@ export async function resolveShiftPublicationScope(
     success: true,
     departmentId,
     jobPositionId: jobPosition.id,
+    customJobPositionName: null,
   };
 }

@@ -58,6 +58,7 @@ interface ShiftWithProposals {
   direct_recipient_id: string | null;
   status: string;
   description: string | null;
+  custom_job_position_name: string | null;
   department: { id: string; name: string };
   job_position: { id: string; name: string } | null;
   shift_requests: ProposalWithUser[];
@@ -94,7 +95,7 @@ export default async function MyShiftsPage() {
     .select(
       `
       id, date, start_time, end_time, coverage_start_time, coverage_end_time,
-      shift_type, direct_recipient_id, status, description,
+      shift_type, direct_recipient_id, status, description, custom_job_position_name,
       department:departments!department_id(id, name),
       job_position:job_positions!job_position_id(id, name),
       shift_requests(
@@ -171,6 +172,10 @@ export default async function MyShiftsPage() {
           {typedShifts.map((shift) => {
             const activeExchange = activeExchangeByShiftId.get(shift.id);
             const timeRange = formatTimeRange(shift.start_time, shift.end_time);
+            const jobPositionName =
+              shift.job_position?.name ??
+              shift.custom_job_position_name?.trim() ??
+              null;
             const coverageTimeRange =
               shift.coverage_start_time && shift.coverage_end_time
                 ? formatTimeRange(
@@ -236,9 +241,9 @@ export default async function MyShiftsPage() {
                         <Badge variant="outline" className="text-foreground">
                           {shift.department.name}
                         </Badge>
-                        {shift.job_position && (
+                        {jobPositionName && (
                           <Badge variant="outline" className="text-foreground">
-                            {shift.job_position.name}
+                            {jobPositionName}
                           </Badge>
                         )}
                         {coverageTimeRange && (

@@ -39,6 +39,7 @@ export interface DirectChatProposal {
   shift_type: string;
   status: string;
   description: string | null;
+  custom_job_position_name?: string | null;
   department?: { id: string; name: string } | null;
   job_position?: { id: string; name: string } | null;
   request: {
@@ -160,6 +161,10 @@ export function DirectProposalsPanel({
             const statusLabel = proposal.request
               ? REQUEST_STATUS_LABELS[proposal.request.status as RequestStatus]
               : SHIFT_STATUS_LABELS[proposal.status as ShiftStatus];
+            const jobPositionName =
+              proposal.job_position?.name ??
+              proposal.custom_job_position_name?.trim() ??
+              null;
 
             return (
               <li
@@ -182,9 +187,9 @@ export function DirectProposalsPanel({
                           {proposal.department.name}
                         </Badge>
                       )}
-                      {proposal.job_position && (
+                      {jobPositionName && (
                         <Badge variant="outline" className="text-foreground">
-                          {proposal.job_position.name}
+                          {jobPositionName}
                         </Badge>
                       )}
                       <Badge className={statusClassName}>{statusLabel}</Badge>

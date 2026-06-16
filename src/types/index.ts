@@ -320,6 +320,7 @@ export interface Shift {
   shift_type: ShiftType;
   department_id: string;
   job_position_id?: string | null;
+  custom_job_position_name?: string | null;
   direct_recipient_id?: string | null;
   description?: string;
   status: ShiftStatus;
