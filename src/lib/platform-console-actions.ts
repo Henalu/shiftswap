@@ -38,6 +38,13 @@ interface ConsoleDepartmentRow {
   parent_department_id: string | null;
 }
 
+interface ConsoleCompanyRow {
+  id: string;
+  name: string;
+  slug: string;
+  theme_config: Record<string, unknown> | null;
+}
+
 interface ConsoleJobPositionRow {
   active: boolean;
   code: string | null;
@@ -159,6 +166,20 @@ async function getConsoleDepartment(
   return data as ConsoleDepartmentRow;
 }
 
+async function getConsoleCompany(admin: AdminClient, companyId: string) {
+  const { data, error } = await admin
+    .from("companies")
+    .select("id, name, slug, theme_config")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as ConsoleCompanyRow;
+}
+
 async function getConsoleJobPosition(
   admin: AdminClient,
   jobPositionId: string
@@ -230,6 +251,52 @@ async function departmentHasBlockingReferences(
   ]);
 
   return checks.some(Boolean);
+}
+
+async function companyHasBlockingReferences(
+  admin: AdminClient,
+  companyId: string
+) {
+  const { data: companyDepartments, error: departmentsError } = await admin
+    .from("departments")
+    .select("id")
+    .eq("company_id", companyId);
+
+  if (departmentsError) {
+    console.error("[platform-console] Failed company department check", {
+      companyId,
+      message: departmentsError.message,
+    });
+    return true;
+  }
+
+  const departmentIds = (companyDepartments ?? []).map(
+    (department) => (department as { id: string }).id
+  );
+  const { data: companyShifts, error: shiftsError } = departmentIds.length
+    ? await admin
+        .from("shifts")
+        .select("id")
+        .in("department_id", departmentIds)
+        .limit(1)
+    : { data: [], error: null };
+
+  if (shiftsError) {
+    console.error("[platform-console] Failed company shift check", {
+      companyId,
+      message: shiftsError.message,
+    });
+    return true;
+  }
+
+  const checks = await Promise.all([
+    tableHasRows(admin, "user_profiles", "company_id", companyId),
+    tableHasRows(admin, "billing_accounts", "owner_company_id", companyId),
+    tableHasRows(admin, "department_change_requests", "company_id", companyId),
+    tableHasRows(admin, "job_position_change_requests", "company_id", companyId),
+  ]);
+
+  return checks.some(Boolean) || (companyShifts ?? []).length > 0;
 }
 
 async function departmentHasOperationalReferences(
@@ -367,6 +434,109 @@ export async function createPlatformCompanyAction(formData: FormData) {
 
   revalidatePath("/console");
   redirect(getConsolePath({ status: "company-created" }));
+}
+
+export async function updatePlatformCompanyAction(formData: FormData) {
+  const returnTo = getReturnPath(formData);
+  const access = await requirePlatformAccess({ write: true }, returnTo);
+  const companyId = getString(formData, "companyId");
+  const name = getString(formData, "companyName");
+  const slug = getString(formData, "companySlug").toLowerCase();
+
+  if (!isUuid(companyId)) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  if (!name || name.length > 120) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "invalid-company-name" }));
+  }
+
+  if (!SLUG_PATTERN.test(slug) || slug.length > 64) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "invalid-company-slug" }));
+  }
+
+  const admin = createAdminClient();
+  const company = await getConsoleCompany(admin, companyId);
+
+  if (!company) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  const { error } = await admin
+    .from("companies")
+    .update({ name, slug })
+    .eq("id", companyId);
+
+  if (error) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-update-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "company.update",
+    actor: access.admin,
+    companyId,
+    metadata: {
+      name,
+      previousName: company.name,
+      previousSlug: company.slug,
+      slug,
+    },
+    targetId: companyId,
+    targetType: "company",
+  });
+
+  revalidatePath("/admin/platform");
+  revalidatePath("/console");
+  revalidatePath("/home", "layout");
+  redirect(getPlatformFeedbackPath(returnTo, { status: "company-updated" }));
+}
+
+export async function deletePlatformCompanyAction(formData: FormData) {
+  const returnTo = getReturnPath(formData);
+  const access = await requirePlatformAccess({ write: true }, returnTo);
+  const companyId = getString(formData, "companyId");
+
+  if (!isUuid(companyId)) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  const admin = createAdminClient();
+  const company = await getConsoleCompany(admin, companyId);
+
+  if (!company) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-not-found" }));
+  }
+
+  if (await companyHasBlockingReferences(admin, companyId)) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-delete-blocked" }));
+  }
+
+  const { error } = await admin
+    .from("companies")
+    .delete()
+    .eq("id", companyId);
+
+  if (error) {
+    redirect(getPlatformFeedbackPath(returnTo, { error: "company-delete-failed" }));
+  }
+
+  await recordPlatformAuditEvent({
+    action: "company.delete",
+    actor: access.admin,
+    companyId: null,
+    metadata: {
+      deletedCompanyId: companyId,
+      name: company.name,
+      slug: company.slug,
+    },
+    targetId: companyId,
+    targetType: "company",
+  });
+
+  revalidatePath("/admin/platform");
+  revalidatePath("/console");
+  revalidatePath("/home", "layout");
+  redirect(getPlatformFeedbackPath(returnTo, { status: "company-deleted" }));
 }
 
 export async function updatePlatformCompanyThemeAction(formData: FormData) {

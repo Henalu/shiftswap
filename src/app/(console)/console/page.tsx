@@ -36,6 +36,10 @@ import {
 } from "@/lib/platform-console-actions";
 import { ConsoleUsersTable } from "@/app/(console)/console/console-users-table";
 import {
+  ManagedCompaniesTable,
+  type CompanyManagementRow,
+} from "@/app/(console)/console/console-company-management";
+import {
   ConsoleCompanyAreaFields,
   ConsoleCompanyDepartmentFields,
 } from "@/app/(console)/console/company-scoped-selects";
@@ -120,8 +124,12 @@ const errorCopy: Record<string, string> = {
   "auth-user-not-found": "No se encontro la cuenta Auth del usuario.",
   "authentication-required": "Inicia sesion para abrir Console.",
   "company-create-failed": "No se pudo crear la empresa. Revisa el slug.",
+  "company-delete-blocked":
+    "No se puede eliminar esa empresa porque tiene usuarios, turnos, billing o solicitudes asociadas.",
+  "company-delete-failed": "No se pudo eliminar la empresa.",
   "company-not-found": "No se encontro la empresa.",
   "company-theme-save-failed": "No se pudo guardar el color corporativo.",
+  "company-update-failed": "No se pudo actualizar la empresa. Revisa el slug.",
   "department-create-failed": "No se pudo crear el departamento.",
   "department-delete-blocked":
     "No se puede eliminar ese departamento porque tiene usuarios, turnos, puestos o solicitudes asociadas.",
@@ -167,7 +175,9 @@ const errorCopy: Record<string, string> = {
 
 const successCopy: Record<string, string> = {
   "company-created": "Empresa creada con area y departamento inicial.",
+  "company-deleted": "Empresa eliminada.",
   "company-theme-updated": "Color corporativo actualizado.",
+  "company-updated": "Empresa actualizada.",
   "department-created": "Departamento creado.",
   "department-deleted": "Departamento eliminado.",
   "department-updated": "Departamento actualizado.",
@@ -425,6 +435,32 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
       validationStatus: user.validation_status,
     };
   });
+  const companyManagementRows: CompanyManagementRow[] = companyRows.map(
+    (company) => {
+      const companyUsers = userRows.filter(
+        (user) => user.company_id === company.id
+      );
+      const companyBilling = billingRows.find(
+        (billing) => billing.owner_company_id === company.id
+      );
+
+      return {
+        accentColor: getCompanyThemeAccentColor(company.theme_config),
+        billingState: companyBilling?.current_billing_state ?? "sin cuenta",
+        createdAtLabel: formatDate(company.created_at),
+        departmentCount: departmentRows.filter(
+          (department) => department.company_id === company.id
+        ).length,
+        id: company.id,
+        name: company.name,
+        pendingUserCount: companyUsers.filter(
+          (user) => user.validation_status === "pending"
+        ).length,
+        slug: company.slug,
+        userCount: companyUsers.length,
+      };
+    }
+  );
 
   return (
     <div className="space-y-6">
@@ -544,83 +580,10 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
           open
           title="Empresas"
         >
-          <div className="overflow-x-auto rounded-2xl border border-border/70">
-            <table className="w-full min-w-[780px] text-left text-sm">
-              <thead className="border-b border-border/70 bg-secondary/35 text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Empresa</th>
-                  <th className="px-4 py-3 font-semibold">Usuarios</th>
-                  <th className="px-4 py-3 font-semibold">Pendientes</th>
-                  <th className="px-4 py-3 font-semibold">Departamentos</th>
-                  <th className="px-4 py-3 font-semibold">Color</th>
-                  <th className="px-4 py-3 font-semibold">Billing</th>
-                  <th className="px-4 py-3 font-semibold">Alta</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {companyRows.map((company) => {
-                  const companyUsers = userRows.filter(
-                    (user) => user.company_id === company.id
-                  );
-                  const companyBilling = billingRows.find(
-                    (billing) => billing.owner_company_id === company.id
-                  );
-                  const accentColor = getCompanyThemeAccentColor(
-                    company.theme_config
-                  );
-
-                  return (
-                    <tr key={company.id}>
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{company.name}</p>
-                        <p className="font-mono text-xs text-muted-foreground">
-                          {company.slug}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">{companyUsers.length}</td>
-                      <td className="px-4 py-3">
-                        {
-                          companyUsers.filter(
-                            (user) => user.validation_status === "pending"
-                          ).length
-                        }
-                      </td>
-                      <td className="px-4 py-3">
-                        {
-                          departmentRows.filter(
-                            (department) => department.company_id === company.id
-                          ).length
-                        }
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="size-4 rounded-full border border-border"
-                            style={
-                              accentColor
-                                ? { backgroundColor: accentColor }
-                                : undefined
-                            }
-                          />
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {accentColor ?? "por defecto"}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">
-                          {companyBilling?.current_billing_state ?? "sin cuenta"}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatDate(company.created_at)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ManagedCompaniesTable
+            canManage={canManage}
+            companies={companyManagementRows}
+          />
 
           {canManage ? (
             <div className="mt-5 grid gap-3">
