@@ -17,6 +17,7 @@ import {
   matchesShiftSchedule,
   validateShiftCoverageWindow,
 } from "@/lib/shifts";
+import { resolveShiftPublicationScope } from "@/lib/shift-publication-scope-server";
 import { requireSignature } from "@/lib/user-profiles";
 import { createClient } from "@/lib/supabase/server";
 
@@ -125,48 +126,9 @@ export async function createShift(
   const signatureCheck = await requireSignature(user.id);
   if (signatureCheck.error) return { error: signatureCheck.error };
 
-  const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("department_id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    return { error: "No se pudo validar tu departamento actual." };
-  }
-
-  if (!profile?.department_id) {
-    return {
-      error:
-        "Tu perfil no tiene un departamento operativo asignado. Revisa tu perfil antes de publicar un turno.",
-    };
-  }
-
-  const [
-    { data: department, error: departmentError },
-    { data: childDepartments, error: childDepartmentsError },
-  ] = await Promise.all([
-    supabase
-      .from("departments")
-      .select("id, is_assignable")
-      .eq("id", profile.department_id)
-      .maybeSingle(),
-    supabase
-      .from("departments")
-      .select("id")
-      .eq("parent_department_id", profile.department_id)
-      .limit(1),
-  ]);
-
-  if (departmentError || childDepartmentsError) {
-    return { error: "No se pudo validar tu departamento operativo." };
-  }
-
-  if (!department?.is_assignable || (childDepartments?.length ?? 0) > 0) {
-    return {
-      error:
-        "Tu cuenta sigue asociada a un area general. Necesitas un departamento operativo final para publicar turnos.",
-    };
+  const publicationScope = await resolveShiftPublicationScope(user.id, formData);
+  if (!publicationScope.success) {
+    return { error: publicationScope.error };
   }
 
   // Calendar validation: check if the user can work this shift on this date
@@ -208,7 +170,8 @@ export async function createShift(
 
   const { error } = await supabase.from("shifts").insert({
     user_id: user.id,
-    department_id: profile.department_id,
+    department_id: publicationScope.departmentId,
+    job_position_id: publicationScope.jobPositionId,
     date,
     // The stored schedule is derived from shift_type to prevent invalid mixes.
     start_time: schedule.startTime,

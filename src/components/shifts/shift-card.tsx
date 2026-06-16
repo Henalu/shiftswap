@@ -65,6 +65,11 @@ export function ShiftCard({
           <Badge variant="outline" className="text-foreground">
             {shift.department.name}
           </Badge>
+          {shift.job_position ? (
+            <Badge variant="outline" className="text-foreground">
+              {shift.job_position.name}
+            </Badge>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -79,7 +84,8 @@ export function ShiftCard({
                 {shift.user.full_name}
               </p>
               <p className="truncate text-sm text-muted-foreground">
-                Publicado desde {shift.department.name}
+                Publicado en {shift.department.name}
+                {shift.job_position ? ` - ${shift.job_position.name}` : ""}
               </p>
             </div>
           </div>

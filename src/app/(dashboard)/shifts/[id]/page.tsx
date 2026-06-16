@@ -61,7 +61,8 @@ export default async function ShiftDetailPage({ params }: PageProps) {
       `
       *,
       user:user_profiles!user_id(id, email, full_name, avatar_url, department_id, company_id),
-      department:departments!department_id(id, name)
+      department:departments!department_id(id, name),
+      job_position:job_positions!job_position_id(id, name)
     `
     )
     .eq("id", id)
@@ -75,6 +76,7 @@ export default async function ShiftDetailPage({ params }: PageProps) {
     ...shiftData,
     user: shiftData.user,
     department: shiftData.department,
+    job_position: shiftData.job_position,
   } as ShiftWithUser;
 
   // If user has an active exchange for this shift, redirect to it
@@ -183,6 +185,11 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               <Badge variant="outline" className="text-foreground">
                 {shift.department.name}
               </Badge>
+              {shift.job_position ? (
+                <Badge variant="outline" className="text-foreground">
+                  {shift.job_position.name}
+                </Badge>
+              ) : null}
             </div>
             <div className="space-y-2">
               <CardTitle className="text-[1.75rem]">{timeRange}</CardTitle>
@@ -200,6 +207,7 @@ export default async function ShiftDetailPage({ params }: PageProps) {
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {shift.user.email} · {shift.department.name}
+                {shift.job_position ? ` - ${shift.job_position.name}` : ""}
               </p>
             </div>
 

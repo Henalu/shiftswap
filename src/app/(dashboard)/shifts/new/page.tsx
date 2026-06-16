@@ -13,7 +13,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { todayISO, formatDateISO } from "@/lib/calendar";
 import { getUserCalendar } from "@/lib/calendar-data";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getShiftPublicationScopeData } from "@/lib/shift-publication-scope-server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function NewShiftPage() {
@@ -26,14 +26,9 @@ export default async function NewShiftPage() {
     redirect("/login");
   }
 
-  const adminClient = createAdminClient();
-  const { data: profile, error: profileError } = await adminClient
-    .from("user_profiles")
-    .select("department_id")
-    .eq("id", authUser.id)
-    .maybeSingle();
+  const scopeResult = await getShiftPublicationScopeData(authUser.id);
 
-  if (!profile && profileError) {
+  if (!scopeResult.success && !scopeResult.actionHref) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -44,15 +39,15 @@ export default async function NewShiftPage() {
         <div className="rounded-2xl border border-destructive/15 bg-destructive/10 p-6 text-sm text-foreground">
           <p className="font-semibold">Error al cargar los datos</p>
           <p className="mt-2 text-muted-foreground">
-            No hemos podido verificar tu departamento para publicar un turno. Recarga la
-            pagina o contacta con un administrador.
+            {scopeResult.error} Recarga la pagina o contacta con un
+            administrador.
           </p>
         </div>
       </div>
     );
   }
 
-  if (!profile?.department_id) {
+  if (!scopeResult.success) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -79,35 +74,17 @@ export default async function NewShiftPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-              Ve a tu perfil, selecciona empresa, area y departamento operativo,
-              y vuelve a publicar. Asi el turno queda asociado al equipo correcto.
+              {scopeResult.error} Asi el turno queda asociado al equipo
+              correcto.
             </p>
-            <Link href="/profile">
-              <Button>Ir a mi perfil</Button>
+            <Link href={scopeResult.actionHref ?? "/profile"}>
+              <Button>{scopeResult.actionLabel ?? "Ir a mi perfil"}</Button>
             </Link>
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  const { data: department } = await adminClient
-    .from("departments")
-    .select("id, name, parent_department_id")
-    .eq("id", profile.department_id)
-    .maybeSingle();
-
-  if (!department) {
-    redirect("/profile?setup=1");
-  }
-
-  const { data: parentDepartment } = department.parent_department_id
-    ? await adminClient
-        .from("departments")
-        .select("name")
-        .eq("id", department.parent_department_id)
-        .maybeSingle()
-    : { data: null };
 
   // Load calendar for the next 180 days to enable client-side hints
   const today = todayISO();
@@ -132,8 +109,10 @@ export default async function NewShiftPage() {
         }
       />
       <ShiftForm
-        areaName={parentDepartment?.name ?? department.name}
-        departmentName={department.name}
+        departments={scopeResult.data.departments}
+        jobPositions={scopeResult.data.jobPositions}
+        defaultDepartmentId={scopeResult.data.defaultDepartmentId}
+        defaultJobPositionId={scopeResult.data.defaultJobPositionId}
         calendarDays={calendarDays}
       />
     </div>

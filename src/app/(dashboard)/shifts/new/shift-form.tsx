@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { CalendarDateContext } from "@/components/shifts/calendar-date-context";
+import { ShiftPublicationScopeFields } from "@/components/shifts/shift-publication-scope-fields";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,21 +31,25 @@ import {
   validateShiftCoverageWindow,
 } from "@/lib/shifts";
 import { formatTimeRange, FORM_CONTROL_CLASSNAME } from "@/lib/utils";
-import type { AcceptedModality, ShiftType } from "@/types";
+import type { AcceptedModality, Department, JobPosition, ShiftType } from "@/types";
 import { createShift } from "./actions";
 import { ShiftDatePicker } from "./shift-date-picker";
 
 interface ShiftFormProps {
-  areaName: string;
-  departmentName: string;
+  departments: Department[];
+  jobPositions: JobPosition[];
+  defaultDepartmentId: string;
+  defaultJobPositionId?: string | null;
   calendarDays?: CalendarDay[] | null;
   initialDate?: string;
   initialShiftType?: ShiftType | null;
 }
 
 export function ShiftForm({
-  areaName,
-  departmentName,
+  departments,
+  jobPositions,
+  defaultDepartmentId,
+  defaultJobPositionId = null,
   calendarDays,
   initialDate = "",
   initialShiftType = null,
@@ -208,18 +213,13 @@ export function ShiftForm({
             Cuanto mas claro sea este formulario, mas facil sera que otra persona
             compare tu turno y tome una decision rapido.
           </CardDescription>
-          <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm text-muted-foreground">
-            Este turno se publicara dentro de{" "}
-            <span className="font-semibold text-foreground">{departmentName}</span>
-            {areaName !== departmentName ? (
-              <>
-                {" "}
-                en el area{" "}
-                <span className="font-semibold text-foreground">{areaName}</span>
-              </>
-            ) : null}
-            .
-          </div>
+          <ShiftPublicationScopeFields
+            departments={departments}
+            jobPositions={jobPositions}
+            defaultDepartmentId={defaultDepartmentId}
+            defaultJobPositionId={defaultJobPositionId}
+            idPrefix="shift-publication"
+          />
         </CardHeader>
 
         <CardContent className="space-y-6">

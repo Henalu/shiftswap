@@ -25,7 +25,12 @@ import {
   calendarDayTypeToShiftType,
   type CalendarDay,
 } from "@/lib/calendar";
-import type { CalendarDayType, CalendarExchangeOverlayKind } from "@/types";
+import type {
+  CalendarDayType,
+  CalendarExchangeOverlayKind,
+  Department,
+  JobPosition,
+} from "@/types";
 import { CalendarDayCell } from "@/app/(dashboard)/calendar/calendar-day-cell";
 
 const WEEKDAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -64,8 +69,10 @@ interface CalendarViewProps {
   year: number;
   month: number;
   publicationScope?: {
-    areaName: string;
-    departmentName: string;
+    departments: Department[];
+    jobPositions: JobPosition[];
+    defaultDepartmentId: string;
+    defaultJobPositionId: string | null;
   } | null;
   publicationMarkers?: CalendarPublicationMarker[];
 }
@@ -291,8 +298,10 @@ export function CalendarView({
         {publishDay && publicationScope && (
           <ShiftForm
             key={publishDay.date}
-            areaName={publicationScope.areaName}
-            departmentName={publicationScope.departmentName}
+            departments={publicationScope.departments}
+            jobPositions={publicationScope.jobPositions}
+            defaultDepartmentId={publicationScope.defaultDepartmentId}
+            defaultJobPositionId={publicationScope.defaultJobPositionId}
             calendarDays={days}
             initialDate={publishDay.date}
             initialShiftType={publishShiftType}

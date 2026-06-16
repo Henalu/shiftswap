@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { formatDateISO } from "@/lib/calendar";
 import { getUserCalendar } from "@/lib/calendar-data";
 import { getMadridDateInputValue } from "@/lib/exchange-compensation";
+import { getShiftPublicationScopeData } from "@/lib/shift-publication-scope-server";
 import { createClient } from "@/lib/supabase/server";
 import { ChatView } from "./chat-view";
 import {
@@ -102,11 +103,21 @@ export default async function ConversationPage({ params }: PageProps) {
     getUserCalendar(authUser.id, today, calendarEnd),
     getUserCalendar(otherUser.id, today, calendarEnd),
   ]);
+  const publicationScopeResult = await getShiftPublicationScopeData(authUser.id);
+  const publicationScope = publicationScopeResult.success
+    ? publicationScopeResult.data
+    : null;
 
   const { data: directShifts } = await supabase
     .from("shifts")
     .select(
-      "id, user_id, direct_recipient_id, date, start_time, end_time, coverage_start_time, coverage_end_time, shift_type, status, description, created_at",
+      `
+      id, user_id, direct_recipient_id, date, start_time, end_time,
+      coverage_start_time, coverage_end_time, shift_type, status,
+      description, created_at,
+      department:departments!department_id(id, name),
+      job_position:job_positions!job_position_id(id, name)
+    `,
     )
     .not("direct_recipient_id", "is", null)
     .or(`user_id.eq.${authUser.id},direct_recipient_id.eq.${authUser.id}`)
@@ -180,6 +191,7 @@ export default async function ConversationPage({ params }: PageProps) {
             currentUserId={authUser.id}
             otherUserId={otherUser.id}
             otherUserName={otherUserName}
+            publicationScope={publicationScope}
             calendarDays={calendarDays}
             otherUserCalendarDays={otherUserCalendarDays}
             proposals={directProposals}

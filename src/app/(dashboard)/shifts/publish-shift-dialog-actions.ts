@@ -2,12 +2,13 @@
 
 import { formatDateISO, todayISO, type CalendarDay } from "@/lib/calendar";
 import { getUserCalendar } from "@/lib/calendar-data";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getShiftPublicationScopeData,
+  type ShiftPublicationScopeData,
+} from "@/lib/shift-publication-scope-server";
 import { createClient } from "@/lib/supabase/server";
 
-export interface PublishShiftFormData {
-  areaName: string;
-  departmentName: string;
+export interface PublishShiftFormData extends ShiftPublicationScopeData {
   calendarDays: CalendarDay[] | null;
 }
 
@@ -35,74 +36,11 @@ export async function getPublishShiftFormData(): Promise<PublishShiftFormResult>
     };
   }
 
-  const adminClient = createAdminClient();
-  const { data: profile, error: profileError } = await adminClient
-    .from("user_profiles")
-    .select("department_id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const scopeResult = await getShiftPublicationScopeData(user.id);
 
-  if (profileError) {
-    return {
-      success: false,
-      error:
-        "No hemos podido verificar tu departamento para publicar un turno.",
-    };
+  if (!scopeResult.success) {
+    return scopeResult;
   }
-
-  if (!profile?.department_id) {
-    return {
-      success: false,
-      error:
-        "Necesitas tener un departamento operativo asignado antes de publicar un turno.",
-      actionHref: "/profile",
-      actionLabel: "Ir a mi perfil",
-    };
-  }
-
-  const [
-    { data: department, error: departmentError },
-    { data: childDepartments, error: childDepartmentsError },
-  ] = await Promise.all([
-    adminClient
-      .from("departments")
-      .select("id, name, parent_department_id, is_assignable")
-      .eq("id", profile.department_id)
-      .maybeSingle(),
-    adminClient
-      .from("departments")
-      .select("id")
-      .eq("parent_department_id", profile.department_id)
-      .limit(1),
-  ]);
-
-  if (departmentError || childDepartmentsError || !department) {
-    return {
-      success: false,
-      error:
-        "No hemos podido cargar el departamento desde el que se publicara el turno.",
-      actionHref: "/profile",
-      actionLabel: "Revisar perfil",
-    };
-  }
-
-  if (!department.is_assignable || (childDepartments?.length ?? 0) > 0) {
-    return {
-      success: false,
-      error:
-        "Tu cuenta sigue asociada a un area general. Elige un departamento operativo final antes de publicar.",
-      actionHref: "/profile",
-      actionLabel: "Ir a mi perfil",
-    };
-  }
-
-  const { data: parentDepartment } = department.parent_department_id
-    ? await adminClient
-        .from("departments")
-        .select("name")
-        .eq("id", department.parent_department_id)
-        .maybeSingle()
-    : { data: null };
 
   const today = todayISO();
   const futureDateSeed = new Date();
@@ -113,8 +51,7 @@ export async function getPublishShiftFormData(): Promise<PublishShiftFormResult>
   return {
     success: true,
     data: {
-      areaName: parentDepartment?.name ?? department.name,
-      departmentName: department.name,
+      ...scopeResult.data,
       calendarDays,
     },
   };

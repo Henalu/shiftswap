@@ -319,6 +319,7 @@ export interface Shift {
   coverage_end_time?: string | null;
   shift_type: ShiftType;
   department_id: string;
+  job_position_id?: string | null;
   direct_recipient_id?: string | null;
   description?: string;
   status: ShiftStatus;
@@ -330,6 +331,7 @@ export interface Shift {
 export interface ShiftWithUser extends Shift {
   user: UserProfile;
   department: Department;
+  job_position?: JobPosition | null;
 }
 
 // ============================================

@@ -59,6 +59,7 @@ interface ShiftWithProposals {
   status: string;
   description: string | null;
   department: { id: string; name: string };
+  job_position: { id: string; name: string } | null;
   shift_requests: ProposalWithUser[];
 }
 
@@ -95,6 +96,7 @@ export default async function MyShiftsPage() {
       id, date, start_time, end_time, coverage_start_time, coverage_end_time,
       shift_type, direct_recipient_id, status, description,
       department:departments!department_id(id, name),
+      job_position:job_positions!job_position_id(id, name),
       shift_requests(
         id, shift_id, interested_user_id, agreement_type,
         compensation_shift_date, compensation_shift_type, status, created_at,
@@ -234,6 +236,11 @@ export default async function MyShiftsPage() {
                         <Badge variant="outline" className="text-foreground">
                           {shift.department.name}
                         </Badge>
+                        {shift.job_position && (
+                          <Badge variant="outline" className="text-foreground">
+                            {shift.job_position.name}
+                          </Badge>
+                        )}
                         {coverageTimeRange && (
                           <Badge variant="outline" className="text-foreground">
                             Cobertura {coverageTimeRange}

@@ -27,6 +27,7 @@ import {
   isShiftType,
   validateShiftCoverageWindow,
 } from "@/lib/shifts";
+import { resolveShiftPublicationScope } from "@/lib/shift-publication-scope-server";
 import {
   expireStaleOpenShifts,
   isPastShiftPublicationDate,
@@ -263,14 +264,19 @@ export async function sendDirectProposal(
   const signatureCheck = await requireSignature(user.id);
   if (signatureCheck.error) return { error: signatureCheck.error };
 
+  const publicationScope = await resolveShiftPublicationScope(user.id, formData);
+  if (!publicationScope.success) {
+    return { error: publicationScope.error };
+  }
+
   const [senderProfile, recipientProfile] = await Promise.all([
     getProfileScope(user.id),
     getProfileScope(recipientId),
   ]);
 
-  if (!senderProfile?.department_id) {
+  if (!senderProfile?.company_id) {
     return {
-      error: "Tu perfil no tiene un departamento operativo valido.",
+      error: "Tu perfil no tiene una empresa valida.",
     };
   }
 
@@ -280,13 +286,6 @@ export async function sendDirectProposal(
     recipientProfile.company_id !== senderProfile.company_id
   ) {
     return { error: "No puedes enviar propuestas a ese usuario." };
-  }
-
-  if (recipientProfile.department_id !== senderProfile.department_id) {
-    return {
-      error:
-        "Solo puedes enviar propuestas directas a usuarios de tu mismo departamento operativo.",
-    };
   }
 
   const senderName = senderProfile.full_name ?? senderProfile.email ?? "Empleado";
@@ -464,7 +463,8 @@ export async function sendDirectProposal(
     .insert({
       user_id: user.id,
       direct_recipient_id: recipientId,
-      department_id: senderProfile.department_id,
+      department_id: publicationScope.departmentId,
+      job_position_id: publicationScope.jobPositionId,
       date,
       start_time: schedule.startTime,
       end_time: schedule.endTime,

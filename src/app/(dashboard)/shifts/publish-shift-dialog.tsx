@@ -102,7 +102,7 @@ export function PublishShiftDialog({
                 Preparando el formulario
               </p>
               <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-                Estamos cargando tu calendario y departamento operativo.
+                Estamos cargando tu calendario y datos de publicacion.
               </p>
             </div>
           </div>
@@ -149,8 +149,10 @@ export function PublishShiftDialog({
         {!loading && formData && (
           <ShiftForm
             key={open ? "publish-shift-form-open" : "publish-shift-form-closed"}
-            areaName={formData.areaName}
-            departmentName={formData.departmentName}
+            departments={formData.departments}
+            jobPositions={formData.jobPositions}
+            defaultDepartmentId={formData.defaultDepartmentId}
+            defaultJobPositionId={formData.defaultJobPositionId}
             calendarDays={formData.calendarDays}
           />
         )}

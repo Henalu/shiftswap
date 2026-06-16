@@ -5,6 +5,7 @@ import { Send, ShieldCheck } from "lucide-react";
 import { sendDirectProposal } from "@/app/(dashboard)/chat/actions";
 import { ShiftDatePicker } from "@/app/(dashboard)/shifts/new/shift-date-picker";
 import { CalendarDateContext } from "@/components/shifts/calendar-date-context";
+import { ShiftPublicationScopeFields } from "@/components/shifts/shift-publication-scope-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,12 +40,23 @@ import {
   FORM_CONTROL_CLASSNAME,
   formatTimeRange,
 } from "@/lib/utils";
-import type { ExchangeAgreementType, ShiftType } from "@/types";
+import type {
+  Department,
+  ExchangeAgreementType,
+  JobPosition,
+  ShiftType,
+} from "@/types";
 
 interface DirectProposalDialogProps {
   conversationId: string;
   recipientId: string;
   recipientName: string;
+  publicationScope: {
+    departments: Department[];
+    jobPositions: JobPosition[];
+    defaultDepartmentId: string;
+    defaultJobPositionId: string | null;
+  };
   calendarDays?: CalendarDay[] | null;
   recipientCalendarDays?: CalendarDay[] | null;
 }
@@ -53,6 +65,7 @@ export function DirectProposalDialog({
   conversationId,
   recipientId,
   recipientName,
+  publicationScope,
   calendarDays,
   recipientCalendarDays,
 }: DirectProposalDialogProps) {
@@ -314,6 +327,15 @@ export function DirectProposalDialog({
               </p>
             </div>
           </div>
+
+          <ShiftPublicationScopeFields
+            departments={publicationScope.departments}
+            jobPositions={publicationScope.jobPositions}
+            defaultDepartmentId={publicationScope.defaultDepartmentId}
+            defaultJobPositionId={publicationScope.defaultJobPositionId}
+            idPrefix="direct-publication"
+            summaryPrefix="Esta propuesta quedara asociada"
+          />
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">

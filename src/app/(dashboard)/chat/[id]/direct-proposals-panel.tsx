@@ -18,6 +18,8 @@ import {
 import { formatCompensationDateLabel } from "@/lib/exchange-compensation";
 import { formatShortDate, formatTimeRange } from "@/lib/utils";
 import type {
+  Department,
+  JobPosition,
   RequestStatus,
   ShiftStatus,
   ShiftType,
@@ -37,6 +39,8 @@ export interface DirectChatProposal {
   shift_type: string;
   status: string;
   description: string | null;
+  department?: { id: string; name: string } | null;
+  job_position?: { id: string; name: string } | null;
   request: {
     id: string;
     status: string;
@@ -52,6 +56,12 @@ interface DirectProposalsPanelProps {
   currentUserId: string;
   otherUserId: string;
   otherUserName: string;
+  publicationScope?: {
+    departments: Department[];
+    jobPositions: JobPosition[];
+    defaultDepartmentId: string;
+    defaultJobPositionId: string | null;
+  } | null;
   calendarDays?: CalendarDay[] | null;
   otherUserCalendarDays?: CalendarDay[] | null;
   proposals: DirectChatProposal[];
@@ -92,6 +102,7 @@ export function DirectProposalsPanel({
   currentUserId,
   otherUserId,
   otherUserName,
+  publicationScope,
   calendarDays,
   otherUserCalendarDays,
   proposals,
@@ -110,13 +121,16 @@ export function DirectProposalsPanel({
             Propuestas privadas entre esta conversacion y el flujo formal.
           </p>
         </div>
-        <DirectProposalDialog
-          conversationId={conversationId}
-          recipientId={otherUserId}
-          recipientName={otherUserName}
-          calendarDays={calendarDays}
-          recipientCalendarDays={otherUserCalendarDays}
-        />
+        {publicationScope ? (
+          <DirectProposalDialog
+            conversationId={conversationId}
+            recipientId={otherUserId}
+            recipientName={otherUserName}
+            publicationScope={publicationScope}
+            calendarDays={calendarDays}
+            recipientCalendarDays={otherUserCalendarDays}
+          />
+        ) : null}
       </div>
 
       {visibleProposals.length === 0 ? (
@@ -161,6 +175,16 @@ export function DirectProposalsPanel({
                       {coverageTimeRange && (
                         <Badge variant="outline" className="text-foreground">
                           Cobertura {coverageTimeRange}
+                        </Badge>
+                      )}
+                      {proposal.department && (
+                        <Badge variant="outline" className="text-foreground">
+                          {proposal.department.name}
+                        </Badge>
+                      )}
+                      {proposal.job_position && (
+                        <Badge variant="outline" className="text-foreground">
+                          {proposal.job_position.name}
                         </Badge>
                       )}
                       <Badge className={statusClassName}>{statusLabel}</Badge>

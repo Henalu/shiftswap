@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { CalendarView } from "@/app/(dashboard)/calendar/calendar-view";
 import { getUserCalendar } from "@/lib/calendar-data";
 import { getMonthRange, todayISO } from "@/lib/calendar";
+import { getShiftPublicationScopeData } from "@/lib/shift-publication-scope-server";
 import { expireStaleOpenShifts } from "@/lib/stale-shifts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -28,34 +29,12 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   }
 
   const adminClient = createAdminClient();
-  const { data: profile } = await adminClient
-    .from("user_profiles")
-    .select("department_id")
-    .eq("id", authUser.id)
-    .maybeSingle();
-
-  const { data: department } = profile?.department_id
-    ? await adminClient
-        .from("departments")
-        .select("id, name, parent_department_id")
-        .eq("id", profile.department_id)
-        .maybeSingle()
-    : { data: null };
-
-  const { data: parentDepartment } = department?.parent_department_id
-    ? await adminClient
-        .from("departments")
-        .select("name")
-        .eq("id", department.parent_department_id)
-        .maybeSingle()
-    : { data: null };
-
-  const publicationScope = department
-    ? {
-        areaName: parentDepartment?.name ?? department.name,
-        departmentName: department.name,
-      }
+  const publicationScopeResult = await getShiftPublicationScopeData(authUser.id);
+  const publicationScope = publicationScopeResult.success
+    ? publicationScopeResult.data
     : null;
+  const defaultPublicationDepartmentId =
+    publicationScope?.defaultDepartmentId ?? null;
 
   // Parse month from searchParams or default to current
   const today = todayISO();
@@ -83,9 +62,9 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     .gte("date", publicationStart)
     .lte("date", end);
 
-  publicationsQuery = profile?.department_id
+  publicationsQuery = defaultPublicationDepartmentId
     ? publicationsQuery.or(
-        `user_id.eq.${authUser.id},department_id.eq.${profile.department_id}`
+        `user_id.eq.${authUser.id},department_id.eq.${defaultPublicationDepartmentId}`
       )
     : publicationsQuery.eq("user_id", authUser.id);
 
@@ -127,8 +106,8 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         include_mine: "1",
       });
 
-      if (profile?.department_id && marker.otherCount > 0) {
-        params.set("department_id", profile.department_id);
+      if (defaultPublicationDepartmentId && marker.otherCount > 0) {
+        params.set("department_id", defaultPublicationDepartmentId);
       }
 
       return {

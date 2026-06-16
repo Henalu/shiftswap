@@ -124,7 +124,8 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
       `
       *,
       user:user_profiles!user_id(id, email, full_name, avatar_url, department_id, company_id),
-      department:departments!department_id(id, name, parent_department_id)
+      department:departments!department_id(id, name, parent_department_id),
+      job_position:job_positions!job_position_id(id, name)
     `
     )
     .eq("status", "open")
@@ -164,6 +165,7 @@ export default async function ShiftsPage({ searchParams }: PageProps) {
     ...shift,
     user: shift.user,
     department: shift.department,
+    job_position: shift.job_position,
   })) as ShiftWithUser[];
   const hasFilters = !!(
     effectiveDepartmentId ||
